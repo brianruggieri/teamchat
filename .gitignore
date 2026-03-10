@@ -6,3 +6,6 @@ fixtures/output/
 *.tsbuildinfo
 .DS_Store
 .claude-flow
+.env
+.env.*
+package-lock.json

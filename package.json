@@ -6,11 +6,30 @@
 	"bin": {
 		"teamchat": "./bin/teamchat.ts"
 	},
+	"files": [
+		"bin/",
+		"src/",
+		"scripts/",
+		"dist/",
+		"LICENSE",
+		"README.md"
+	],
 	"scripts": {
 		"dev": "bun run bin/teamchat.ts --team test-team --port 4567",
 		"build": "bun run scripts/build-client.ts",
+		"typecheck": "bun x tsc --noEmit",
 		"test": "bun test",
+		"prepack": "bun run build",
 		"fixture:generate": "bun run fixtures/generate.ts"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/brianruggieri/teamchat.git"
+	},
+	"author": "Brian Ruggieri",
+	"homepage": "https://github.com/brianruggieri/teamchat#readme",
+	"bugs": {
+		"url": "https://github.com/brianruggieri/teamchat/issues"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",
@@ -26,6 +45,7 @@
 	},
 	"keywords": [
 		"claude",
+		"claude-code",
 		"agent-teams",
 		"chat",
 		"visualizer",
