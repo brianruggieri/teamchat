@@ -5,31 +5,41 @@ interface HeaderProps {
 	team: TeamState | null;
 	connected: boolean;
 	onlineCount: number;
+	onOpenWorkbench?: () => void;
 }
 
-export function Header({ team, connected, onlineCount }: HeaderProps) {
+export function Header({
+	team,
+	connected,
+	onlineCount,
+	onOpenWorkbench,
+}: HeaderProps) {
 	const teamName = team?.name ?? 'teamchat';
 
 	return (
-		<header className="flex items-center justify-between px-5 py-3 border-b border-surface-800 bg-surface-900/80 backdrop-blur-sm sticky top-0 z-40">
-			<div className="flex items-center gap-3">
-				<span className="text-lg font-semibold text-gray-100">
-					⬡ teamchat
-				</span>
-				<span className="text-sm text-gray-500">
-					{teamName}
-				</span>
+		<header className="tc-header">
+			<div className="tc-header-brand">
+				<div className="tc-header-logo">TC</div>
+				<div className="tc-header-copy">
+					<span className="tc-header-title">teamchat</span>
+					<span className="tc-header-subtitle">{teamName}</span>
+				</div>
 			</div>
-			<div className="flex items-center gap-3">
-				<span className="text-sm text-gray-500">
-					{onlineCount} online
-				</span>
-				<span
-					className={`w-2 h-2 rounded-full ${
-						connected ? 'bg-green-500' : 'bg-red-500 animate-pulse'
-					}`}
-					title={connected ? 'Connected' : 'Disconnected'}
-				/>
+			<div className="tc-header-actions">
+				<div className="tc-header-status">
+					<span className={`tc-connection-dot ${connected ? 'is-live' : 'is-down'}`} />
+					<span className="tc-header-status-text">
+						{connected ? 'live' : 'reconnecting'}
+					</span>
+					<span className="tc-header-online">{onlineCount} online</span>
+				</div>
+				<button
+					type="button"
+					className="tc-workbench-trigger lg:hidden"
+					onClick={onOpenWorkbench}
+				>
+					Workbench
+				</button>
 			</div>
 		</header>
 	);

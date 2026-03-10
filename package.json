@@ -7,7 +7,7 @@
 		"teamchat": "./bin/teamchat.ts"
 	},
 	"scripts": {
-		"dev": "bun run bin/teamchat.ts --team test-team",
+		"dev": "bun run bin/teamchat.ts --team test-team --port 4567",
 		"build": "bun run scripts/build-client.ts",
 		"test": "bun test",
 		"fixture:generate": "bun run fixtures/generate.ts"

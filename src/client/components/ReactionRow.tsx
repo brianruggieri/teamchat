@@ -4,36 +4,45 @@ import { getAgentColor } from '../types.js';
 
 interface ReactionRowProps {
 	reactions: Reaction[];
+	align?: 'start' | 'end';
 }
 
-export function ReactionRow({ reactions }: ReactionRowProps) {
+export function ReactionRow({
+	reactions,
+	align = 'start',
+}: ReactionRowProps) {
 	if (reactions.length === 0) return null;
 
-	// Group reactions by emoji
 	const grouped = new Map<string, Reaction[]>();
-	for (const r of reactions) {
-		const existing = grouped.get(r.emoji) ?? [];
-		existing.push(r);
-		grouped.set(r.emoji, existing);
+	for (const reaction of reactions) {
+		const existing = grouped.get(reaction.emoji) ?? [];
+		existing.push(reaction);
+		grouped.set(reaction.emoji, existing);
 	}
 
 	return (
-		<div className="flex flex-wrap gap-1 mt-1">
-			{Array.from(grouped.entries()).map(([emoji, reacts]) => (
+		<div className={`tc-reaction-row ${align === 'end' ? 'is-end' : ''}`}>
+			{Array.from(grouped.entries()).map(([emoji, groupedReactions]) => (
 				<span
 					key={emoji}
-					className="reaction-pill animate-pop-in"
-					title={reacts.map((r) => r.tooltip ?? r.fromAgent).join(', ')}
+					className="tc-reaction-pill animate-pop-in"
+					title={groupedReactions
+						.map((reaction) => reaction.tooltip ?? reaction.fromAgent)
+						.join(', ')}
 				>
-					<span>{emoji}</span>
-					{reacts.map((r) => {
-						const color = getAgentColor(r.fromColor);
-						return (
-							<span key={r.fromAgent} className={`${color.text} text-xs`}>
-								{r.fromAgent}
-							</span>
-						);
-					})}
+					<span className="tc-reaction-emoji">{emoji}</span>
+					<span className="tc-reaction-count">{groupedReactions.length}</span>
+					<span className="tc-reaction-people">
+						{groupedReactions.map((reaction, index) => {
+							const color = getAgentColor(reaction.fromColor);
+							return (
+								<span key={`${emoji}-${reaction.fromAgent}`}>
+									{index > 0 ? ', ' : ''}
+									<span className={color.text}>{reaction.fromAgent}</span>
+								</span>
+							);
+						})}
+					</span>
 				</span>
 			))}
 		</div>

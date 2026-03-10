@@ -3,7 +3,10 @@ import type { ContentMessage, Reaction } from '../types.js';
 import { getAgentColor } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
 import { ReactionRow } from './ReactionRow.jsx';
-import { formatRelativeTime, formatISOTooltip } from '../hooks/useRelativeTime.js';
+import {
+	formatRelativeTime,
+	formatISOTooltip,
+} from '../hooks/useRelativeTime.js';
 
 interface PermissionRequestCardProps {
 	message: ContentMessage;
@@ -19,64 +22,61 @@ export function PermissionRequestCard({
 	reactions,
 }: PermissionRequestCardProps) {
 	const agentColor = getAgentColor(message.fromColor);
-	const hasApproval = reactions.some((r) => r.emoji === '✅');
-	const hasDenial = reactions.some((r) => r.emoji === '🚫');
-	const isResolved = hasApproval || hasDenial;
+	const status = reactions.some((reaction) => reaction.emoji === '✅')
+		? 'approved'
+		: reactions.some((reaction) => reaction.emoji === '🚫')
+			? 'denied'
+			: 'pending';
 
 	return (
-		<div className="flex justify-start animate-slide-in-left mb-4">
-			<div className="flex items-start gap-2 max-w-[85%] w-full">
+		<section className="tc-protocol-row">
+			<div className="tc-protocol-shell">
 				<AgentAvatar name={message.from} color={message.fromColor} />
-				<div className="flex flex-col w-full">
-					<div className="flex items-center gap-2 mb-1">
-						<span className={`text-sm font-medium ${agentColor.text}`}>
+				<div className="tc-protocol-main">
+					<div className="tc-protocol-meta">
+						<span className={`tc-protocol-sender ${agentColor.text}`}>
 							{message.from}
 						</span>
 						<span
-							className="text-xs text-gray-500"
+							className="tc-protocol-time"
 							title={formatISOTooltip(message.timestamp)}
 						>
 							{formatRelativeTime(message.timestamp)}
 						</span>
 					</div>
-					<div className="permission-card">
-						<div className="px-4 py-2 border-b border-surface-700 flex items-center gap-2 bg-yellow-500/10">
-							<span>🔐</span>
-							<span className="text-sm font-medium text-gray-200">
-								PERMISSION REQUEST
+					<article className="tc-protocol-card tc-permission-card">
+						<header className="tc-protocol-card-header">
+							<div className="tc-protocol-card-title-group">
+								<span className="tc-protocol-label">PERMISSION</span>
+								<span className="tc-protocol-card-title">
+									Approval required before execution
+								</span>
+							</div>
+							<span className={`tc-status-pill is-${status}`}>
+								{status}
 							</span>
-						</div>
-						<div className="px-4 py-3">
-							<p className="text-sm text-gray-300 mb-2">
-								<span className={agentColor.text}>{message.from}</span> wants to run:
-							</p>
-							<pre className="bg-black/30 rounded px-3 py-2 text-xs font-mono text-gray-200 overflow-x-auto">
-								{command}
-							</pre>
-							{toolName && (
-								<p className="text-xs text-gray-500 mt-2">
-									Tool: <span className="text-gray-400">{toolName}</span>
-								</p>
-							)}
-							{isResolved && (
-								<div className="mt-3 flex items-center gap-2">
-									{hasApproval && (
-										<span className="text-xs text-green-400 flex items-center gap-1">
-											✅ Approved
-										</span>
-									)}
-									{hasDenial && (
-										<span className="text-xs text-red-400 flex items-center gap-1">
-											🚫 Denied
-										</span>
-									)}
+						</header>
+						<div className="tc-protocol-card-body">
+							<div className="tc-protocol-grid">
+								<div>
+									<div className="tc-protocol-field-label">requester</div>
+									<div className="tc-protocol-field-value">{message.from}</div>
 								</div>
-							)}
+								<div>
+									<div className="tc-protocol-field-label">tool</div>
+									<div className="tc-protocol-field-value">
+										{toolName || 'unknown'}
+									</div>
+								</div>
+							</div>
+							<pre className="tc-command-block">{command}</pre>
 						</div>
-					</div>
-					<ReactionRow reactions={reactions} />
+						<footer className="tc-protocol-card-footer">
+							<ReactionRow reactions={reactions} />
+						</footer>
+					</article>
 				</div>
 			</div>
-		</div>
+		</section>
 	);
 }

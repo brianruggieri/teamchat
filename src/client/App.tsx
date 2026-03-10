@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useChatReducer } from './hooks/useChatReducer.js';
 import { useWebSocket } from './hooks/useWebSocket.js';
@@ -13,6 +13,8 @@ import { NewMessageIndicator } from './components/NewMessageIndicator.jsx';
 
 function App() {
 	const [state, dispatch] = useChatReducer();
+	const [workbenchOpen, setWorkbenchOpen] = useState(false);
+
 	useWebSocket(dispatch);
 	useRelativeTime(30000);
 
@@ -21,15 +23,42 @@ function App() {
 	]);
 
 	const onlineCount = Object.values(state.presence).filter(
-		(s) => s === 'working' || s === 'idle'
-	).length + 1; // +1 for lead
+		(status) => status === 'working' || status === 'idle'
+	).length + 1;
+
+	useEffect(() => {
+		if (!workbenchOpen) return undefined;
+
+		const handleKeydown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				setWorkbenchOpen(false);
+			}
+		};
+
+		window.addEventListener('keydown', handleKeydown);
+		return () => window.removeEventListener('keydown', handleKeydown);
+	}, [workbenchOpen]);
+
+	useEffect(() => {
+		const handleResize = () => {
+			if (window.innerWidth >= 1024) {
+				setWorkbenchOpen(false);
+			}
+		};
+
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
+
+	const closeWorkbench = useCallback(() => {
+		setWorkbenchOpen(false);
+	}, []);
 
 	const handleTaskClick = useCallback((taskId: string) => {
-		// Find messages related to this task and scroll to the first one
+		setWorkbenchOpen(false);
 		const container = containerRef.current;
 		if (!container) return;
 
-		// Look for a system event or message mentioning this task
 		const targetEl = container.querySelector(`[data-task-id="${taskId}"]`);
 		if (targetEl) {
 			targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -40,78 +69,140 @@ function App() {
 		}
 	}, [containerRef]);
 
+	const hasEvents = state.events.length > 0;
+
 	return (
-		<div className="h-screen flex flex-col bg-surface-950">
+		<div className="tc-app-shell">
 			<Header
 				team={state.team}
 				connected={state.connected}
 				onlineCount={onlineCount}
+				onOpenWorkbench={() => setWorkbenchOpen(true)}
 			/>
 
-			<div className="flex flex-1 overflow-hidden">
-				{/* Main chat area */}
-				<div className="flex-1 flex flex-col overflow-hidden">
-					<div
-						ref={containerRef}
-						className="flex-1 overflow-y-auto"
-					>
-						{state.events.length === 0 && state.connected && (
-							<div className="flex items-center justify-center h-full text-gray-600">
-								<div className="text-center">
-									<p className="text-lg mb-2">Waiting for messages...</p>
-									<p className="text-sm">
-										Connect a team or load a session to get started.
-									</p>
-								</div>
-							</div>
-						)}
+			<div className="tc-app-body">
+				<section className="tc-thread-pane">
+					<div ref={containerRef} className="tc-thread-scroll">
+						<div className="tc-thread-column">
+							{!state.connected && !hasEvents && (
+								<StatusPanel
+									title="Connecting to server"
+									description="Waiting for the live event stream to attach."
+									spinner
+								/>
+							)}
 
-						{!state.connected && (
-							<div className="flex items-center justify-center h-full text-gray-600">
-								<div className="text-center">
-									<div className="w-4 h-4 border-2 border-gray-600 border-t-indigo-500 rounded-full animate-spin mx-auto mb-3" />
-									<p className="text-sm">Connecting to server...</p>
-								</div>
-							</div>
-						)}
+							{state.connected && !hasEvents && (
+								<StatusPanel
+									title="Waiting for messages"
+									description="Connect a team or load a replay to populate the conversation."
+								/>
+							)}
 
-						<MessageList
-							events={state.events}
-							reactions={state.reactions}
-						/>
+							{!state.connected && hasEvents && (
+								<div className="tc-status-banner">
+									<div className="tc-status-banner-dot" />
+									<span>Connection lost. Rejoining the session stream.</span>
+								</div>
+							)}
+
+							<MessageList
+								events={state.events}
+								reactions={state.reactions}
+							/>
+						</div>
 					</div>
 
 					<NewMessageIndicator
 						show={showIndicator}
 						onClick={scrollToBottom}
 					/>
-				</div>
+				</section>
 
-				{/* Right sidebar */}
-				<aside className="w-64 border-l border-surface-800 bg-surface-900/50 flex flex-col overflow-hidden">
-					<div className="flex-1 overflow-y-auto px-4 py-4">
-						<TaskSidebar
-							tasks={state.tasks}
+				<aside className="tc-right-rail">
+					<div className="tc-rail-scroll">
+						<WorkbenchContent
+							state={state}
 							onTaskClick={handleTaskClick}
 						/>
-						<PresenceRoster
-							team={state.team}
-							presence={state.presence}
-						/>
 					</div>
-					<SessionStats
-						events={state.events}
-						tasks={state.tasks}
-						sessionStart={state.sessionStart}
-						memberCount={state.team?.members.length ?? 0}
-					/>
 				</aside>
 			</div>
+
+			{workbenchOpen && (
+				<div className="tc-bottom-sheet-backdrop" onClick={closeWorkbench}>
+					<div
+						className="tc-bottom-sheet animate-sheet-in"
+						onClick={(event) => event.stopPropagation()}
+					>
+						<div className="tc-bottom-sheet-handle" />
+						<div className="tc-bottom-sheet-header">
+							<div>
+								<div className="tc-bottom-sheet-title">Workbench</div>
+								<div className="tc-bottom-sheet-subtitle">
+									Tasks, roster, and session health
+								</div>
+							</div>
+							<button
+								type="button"
+								onClick={closeWorkbench}
+								className="tc-bottom-sheet-close"
+							>
+								Close
+							</button>
+						</div>
+						<div className="tc-bottom-sheet-content">
+							<WorkbenchContent
+								state={state}
+								onTaskClick={handleTaskClick}
+							/>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
 
-// Mount
+function WorkbenchContent({
+	state,
+	onTaskClick,
+}: {
+	state: ReturnType<typeof useChatReducer>[0];
+	onTaskClick: (taskId: string) => void;
+}) {
+	return (
+		<div className="tc-workbench-stack">
+			<TaskSidebar tasks={state.tasks} onTaskClick={onTaskClick} />
+			<PresenceRoster team={state.team} presence={state.presence} />
+			<SessionStats
+				events={state.events}
+				tasks={state.tasks}
+				sessionStart={state.sessionStart}
+				memberCount={state.team?.members.length ?? 0}
+			/>
+		</div>
+	);
+}
+
+function StatusPanel({
+	title,
+	description,
+	spinner = false,
+}: {
+	title: string;
+	description: string;
+	spinner?: boolean;
+}) {
+	return (
+		<div className="tc-status-panel">
+			{spinner && <div className="tc-status-spinner" />}
+			<h2 className="tc-status-title">{title}</h2>
+			<p className="tc-status-description">{description}</p>
+		</div>
+	);
+}
+
 const root = document.getElementById('root');
 if (root) {
 	createRoot(root).render(<App />);

@@ -8,21 +8,23 @@ interface AgentAvatarProps {
 	size?: 'sm' | 'md';
 }
 
-export function AgentAvatar({ name, color, isLead = false, size = 'md' }: AgentAvatarProps) {
+export function AgentAvatar({
+	name,
+	color,
+	isLead = false,
+	size = 'md',
+}: AgentAvatarProps) {
 	const agentColor = getAgentColor(color);
 	const letter = name.charAt(0).toUpperCase();
-	const sizeClass = size === 'sm' ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm';
 
 	return (
-		<div className="relative flex-shrink-0">
-			<div
-				className={`${sizeClass} rounded-full flex items-center justify-center font-semibold ${agentColor.dot} text-white`}
-			>
+		<div className={`tc-avatar ${size === 'sm' ? 'is-sm' : ''}`}>
+			<div className={`tc-avatar-core ${agentColor.dot}`}>
 				{letter}
 			</div>
 			{isLead && (
-				<span className="absolute -top-1 -right-1 text-xs" title="Team Lead">
-					👑
+				<span className="tc-avatar-badge" title="Team Lead">
+					L
 				</span>
 			)}
 		</div>

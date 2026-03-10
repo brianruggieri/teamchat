@@ -7,54 +7,65 @@ interface PresenceRosterProps {
 	presence: Record<string, 'working' | 'idle' | 'offline'>;
 }
 
-const STATUS_INDICATORS: Record<string, string> = {
-	working: '⚡',
-	idle: '💤',
-	offline: '🔴',
+const STATUS_LABELS: Record<string, string> = {
+	working: 'working',
+	idle: 'idle',
+	offline: 'offline',
 };
 
 export function PresenceRoster({ team, presence }: PresenceRosterProps) {
 	if (!team) return null;
 
-	const members = team.members;
-
 	return (
-		<div className="sidebar-section">
-			<h3 className="text-sm font-semibold text-gray-300 mb-3 flex items-center gap-1.5">
-				👥 Team
-			</h3>
-			<div className="space-y-2">
-				{/* Lead is always first */}
-				<div className="flex items-center gap-2 px-2 py-1">
-					<span className="presence-dot bg-indigo-500" />
-					<span className="text-sm text-gray-200">
-						👑 team-lead
-					</span>
+		<section className="tc-sidecard">
+			<div className="tc-sidecard-header">
+				<div>
+					<h3 className="tc-sidecard-title">Presence</h3>
+					<p className="tc-sidecard-subtitle">Current roster and idle state</p>
+				</div>
+				<span className="tc-sidecard-metric">{team.members.length}</span>
+			</div>
+			<div className="tc-roster-list">
+				<div className="tc-roster-row is-lead">
+					<div className="tc-roster-identity">
+						<span className="tc-roster-dot is-lead" />
+						<div>
+							<div className="tc-roster-name">team-lead</div>
+							<div className="tc-roster-status">lead · working</div>
+						</div>
+					</div>
+					<span className="tc-roster-badge">lead</span>
 				</div>
 
-				{/* Teammates */}
-				{members
-					.filter((m) => m.name !== 'team-lead')
+				{team.members
+					.filter((member) => member.name !== 'team-lead')
 					.map((member) => {
 						const agentColor = getAgentColor(member.color);
 						const status = presence[member.name] ?? 'working';
-						const indicator = STATUS_INDICATORS[status];
-
 						return (
 							<div
 								key={member.name}
-								className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-800 transition-colors cursor-default"
+								className="tc-roster-row"
 								title={`${member.name} — ${status}`}
 							>
-								<span className={`presence-dot ${agentColor.dot}`} />
-								<span className={`text-sm ${agentColor.text}`}>
-									{member.name}
+								<div className="tc-roster-identity">
+									<span className={`tc-roster-dot ${agentColor.dot}`} />
+									<div>
+										<div className={`tc-roster-name ${agentColor.text}`}>
+											{member.name}
+										</div>
+										<div className="tc-roster-status">
+											{STATUS_LABELS[status]}
+										</div>
+									</div>
+								</div>
+								<span className={`tc-roster-badge is-${status}`}>
+									{STATUS_LABELS[status]}
 								</span>
-								<span className="text-xs ml-auto">{indicator}</span>
 							</div>
 						);
 					})}
 			</div>
-		</div>
+		</section>
 	);
 }

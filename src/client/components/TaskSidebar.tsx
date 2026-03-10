@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { TaskInfo } from '../types.js';
 import { TaskCard } from './TaskCard.jsx';
 
@@ -11,31 +11,27 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 	const [recentlyUnblocked, setRecentlyUnblocked] = useState<Set<string>>(new Set());
 	const prevTasks = useRef<TaskInfo[]>([]);
 
-	// Detect task unblocks for pulse animation
 	useEffect(() => {
-		const prevMap = new Map(prevTasks.current.map((t) => [t.id, t]));
+		const prevMap = new Map(prevTasks.current.map((task) => [task.id, task]));
 		const newlyUnblocked: string[] = [];
 
 		for (const task of tasks) {
-			const prev = prevMap.get(task.id);
-			if (prev && prev.status === 'pending' && task.status !== 'pending') {
-				// Status changed from pending — might be unblocked
-			}
-			// A task is "unblocked" if it was blocked (had blockedBy) and now its
-			// blocking tasks are all completed
+			const prevTask = prevMap.get(task.id);
 			if (
-				prev &&
-				prev.blockedBy &&
-				prev.blockedBy.length > 0 &&
-				task.status === 'pending'
+				prevTask
+				&& prevTask.blockedBy
+				&& prevTask.blockedBy.length > 0
+				&& task.status === 'pending'
 			) {
-				const allBlockersCompleted = prev.blockedBy.every((blockerId) => {
-					const blocker = tasks.find((t) => t.id === blockerId);
-					return blocker && blocker.status === 'completed';
+				const allBlockersCompleted = prevTask.blockedBy.every((blockerId) => {
+					const blocker = tasks.find((candidate) => candidate.id === blockerId);
+					return blocker?.status === 'completed';
 				});
-				const prevAllCompleted = prev.blockedBy.every((blockerId) => {
-					const blocker = prevTasks.current.find((t) => t.id === blockerId);
-					return blocker && blocker.status === 'completed';
+				const prevAllCompleted = prevTask.blockedBy.every((blockerId) => {
+					const blocker = prevTasks.current.find(
+						(candidate) => candidate.id === blockerId
+					);
+					return blocker?.status === 'completed';
 				});
 				if (allBlockersCompleted && !prevAllCompleted) {
 					newlyUnblocked.push(task.id);
@@ -44,16 +40,20 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 		}
 
 		if (newlyUnblocked.length > 0) {
-			setRecentlyUnblocked((prev) => {
-				const next = new Set(prev);
-				for (const id of newlyUnblocked) next.add(id);
+			setRecentlyUnblocked((previous) => {
+				const next = new Set(previous);
+				for (const taskId of newlyUnblocked) {
+					next.add(taskId);
+				}
 				return next;
 			});
-			// Clear pulse after 3 seconds
+
 			setTimeout(() => {
-				setRecentlyUnblocked((prev) => {
-					const next = new Set(prev);
-					for (const id of newlyUnblocked) next.delete(id);
+				setRecentlyUnblocked((previous) => {
+					const next = new Set(previous);
+					for (const taskId of newlyUnblocked) {
+						next.delete(taskId);
+					}
 					return next;
 				});
 			}, 3000);
@@ -62,40 +62,41 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 		prevTasks.current = tasks;
 	}, [tasks]);
 
-	const completed = tasks.filter((t) => t.status === 'completed').length;
-	const total = tasks.length;
-	const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+	const completedTasks = tasks.filter((task) => task.status === 'completed').length;
+	const totalTasks = tasks.length;
+	const pct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
 	return (
-		<div className="sidebar-section">
-			<div className="flex items-center justify-between mb-3">
-				<h3 className="text-sm font-semibold text-gray-300 flex items-center gap-1.5">
-					📋 Tasks
-				</h3>
-				<span className="text-xs text-gray-500">
-					{completed}/{total}
+		<section className="tc-sidecard">
+			<div className="tc-sidecard-header">
+				<div>
+					<h3 className="tc-sidecard-title">Tasks</h3>
+					<p className="tc-sidecard-subtitle">Execution progress and blockers</p>
+				</div>
+				<span className="tc-sidecard-metric">
+					{completedTasks}/{totalTasks}
 				</span>
 			</div>
-
-			{/* Progress bar */}
-			<div className="progress-bar-track mb-3">
+			<div className="tc-progress-track">
 				<div
-					className="progress-bar-fill"
+					className="tc-progress-fill"
 					style={{ width: `${pct}%` }}
 				/>
 			</div>
-
-			{/* Task list */}
-			<div className="space-y-0.5">
-				{tasks.map((task) => (
-					<TaskCard
-						key={task.id}
-						task={task}
-						onTaskClick={onTaskClick}
-						isPulsing={recentlyUnblocked.has(task.id)}
-					/>
-				))}
+			<div className="tc-task-list">
+				{tasks.length === 0 ? (
+					<div className="tc-sidecard-empty">No tasks have been correlated yet.</div>
+				) : (
+					tasks.map((task) => (
+						<TaskCard
+							key={task.id}
+							task={task}
+							onTaskClick={onTaskClick}
+							isPulsing={recentlyUnblocked.has(task.id)}
+						/>
+					))
+				)}
 			</div>
-		</div>
+		</section>
 	);
 }
