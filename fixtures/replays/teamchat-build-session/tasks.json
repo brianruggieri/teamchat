@@ -1,0 +1,101 @@
+[
+  {
+    "id": "1",
+    "subject": "Write shared types (src/shared/types.ts + parse.ts)",
+    "description": "All shared type definitions per handoff doc. ChatEvent discriminated union, raw filesystem types, SessionState, card types, JournalEntry, ParsedSystemEvent. Parse utilities: tryParseSystemEvent, isLeadAgent, generateEventId, parseTimestamp, isWithinWindow.",
+    "status": "completed",
+    "owner": "server",
+    "blockedBy": [],
+    "activeForm": null,
+    "created": "2026-03-10T14:00:01.000Z",
+    "updated": "2026-03-10T14:55:00.000Z"
+  },
+  {
+    "id": "2",
+    "subject": "Build server components (watcher, processor, journal, server)",
+    "description": "FileWatcher with fs.watch + 100ms debounce. EventProcessor with broadcast detection (500ms hold), idle suppression (30s), task claim correlation (120s), dependency cascades. Journal with JSONL append. TeamchatServer with Bun.serve, GET /state, WS /ws.",
+    "status": "in_progress",
+    "owner": "server",
+    "blockedBy": ["1"],
+    "activeForm": "Building server components...",
+    "created": "2026-03-10T14:00:01.500Z",
+    "updated": "2026-03-10T14:55:20.000Z"
+  },
+  {
+    "id": "3",
+    "subject": "CLI entry point + replay mode",
+    "description": "bin/teamchat.ts — parse args (--team, --watch, --replay, --port, --compact, --no-journal, --share, setup). Wire all components. Replay mode reads JSONL with timestamp-based playback.",
+    "status": "in_progress",
+    "owner": "server",
+    "blockedBy": ["2"],
+    "activeForm": "Writing CLI entry point...",
+    "created": "2026-03-10T14:00:02.000Z",
+    "updated": "2026-03-10T15:25:00.000Z"
+  },
+  {
+    "id": "4",
+    "subject": "Scaffold React client components",
+    "description": "index.html, App.tsx, client-only types.ts, 14 component stubs, 4 hook stubs, styles/index.css with Tailwind directives.",
+    "status": "in_progress",
+    "owner": "client",
+    "blockedBy": ["1"],
+    "activeForm": "Scaffolding React components...",
+    "created": "2026-03-10T14:00:02.500Z",
+    "updated": "2026-03-10T14:55:30.000Z"
+  },
+  {
+    "id": "5",
+    "subject": "Implement full React client with styling",
+    "description": "Full component implementation: ChatMessage, SystemEvent, ThreadBlock, ReactionRow, PlanApprovalCard, PermissionRequestCard, TaskSidebar, TaskCard, PresenceRoster, SessionStats, MessageList, Header, AgentAvatar, NewMessageIndicator. Hooks: useChatReducer, useWebSocket, useAutoScroll, useRelativeTime. Dark theme, animations, auto-scroll.",
+    "status": "pending",
+    "owner": "client",
+    "blockedBy": ["4"],
+    "activeForm": null,
+    "created": "2026-03-10T14:00:03.000Z",
+    "updated": "2026-03-10T14:00:03.000Z"
+  },
+  {
+    "id": "6",
+    "subject": "Create fixture generator for healthdash-sprint",
+    "description": "config.ts (5 members), tasks.ts (8 tasks + 17 state transitions), events.ts (~40+ transcript entries), generate.ts (routes events to inbox files).",
+    "status": "completed",
+    "owner": "fixtures",
+    "blockedBy": [],
+    "activeForm": null,
+    "created": "2026-03-10T14:00:03.500Z",
+    "updated": "2026-03-10T14:45:00.000Z"
+  },
+  {
+    "id": "7",
+    "subject": "Write package.json, tsconfig.json, README",
+    "description": "package.json (name teamchat, bin config, Bun runtime, scripts). tsconfig.json (strict, ESNext, react-jsx, bun-types). README (quick start, hook config, CLI reference, how it works, replay mode).",
+    "status": "completed",
+    "owner": "fixtures",
+    "blockedBy": [],
+    "activeForm": null,
+    "created": "2026-03-10T14:00:04.000Z",
+    "updated": "2026-03-10T14:45:02.000Z"
+  },
+  {
+    "id": "8",
+    "subject": "Write integration tests",
+    "description": "6 test files: processor.test.ts, broadcast.test.ts, dm-threads.test.ts, idle-suppression.test.ts, task-cascade.test.ts, reactions.test.ts.",
+    "status": "pending",
+    "owner": "fixtures",
+    "blockedBy": ["2", "6"],
+    "activeForm": null,
+    "created": "2026-03-10T14:00:04.500Z",
+    "updated": "2026-03-10T14:00:04.500Z"
+  },
+  {
+    "id": "9",
+    "subject": "End-to-end verification",
+    "description": "Generate fixtures, start server, open browser, verify chat renders correctly. All message types, reactions, DM threads, task sidebar, presence roster, session stats.",
+    "status": "pending",
+    "owner": null,
+    "blockedBy": ["3", "5", "8"],
+    "activeForm": null,
+    "created": "2026-03-10T14:00:05.000Z",
+    "updated": "2026-03-10T14:00:05.000Z"
+  }
+]

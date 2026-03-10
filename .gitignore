@@ -2,5 +2,7 @@ node_modules/
 dist/
 .worktrees/
 fixtures/output/
+*.zip
 *.tsbuildinfo
 .DS_Store
+.claude-flow

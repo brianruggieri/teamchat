@@ -77,6 +77,12 @@ Sessions are automatically recorded to `~/.teamchat/sessions/{team-name}.jsonl`.
 teamchat --replay ~/.teamchat/sessions/healthdash-sprint.jsonl
 ```
 
+This repo also includes a real recorded build session replay:
+
+```bash
+teamchat --replay fixtures/replays/teamchat-build-session/session.jsonl --port 4567
+```
+
 Controls: play/pause, speed (1x/2x/5x/10x), scrub timeline, jump to task completions.
 
 ## Chat Features
