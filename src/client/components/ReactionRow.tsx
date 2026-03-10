@@ -33,18 +33,27 @@ export function ReactionRow({
 					<span className="tc-reaction-emoji">{emoji}</span>
 					<span className="tc-reaction-count">{groupedReactions.length}</span>
 					<span className="tc-reaction-people">
-						{groupedReactions.map((reaction, index) => {
-							const color = getAgentColor(reaction.fromColor);
-							return (
-								<span key={`${emoji}-${reaction.fromAgent}`}>
-									{index > 0 ? ', ' : ''}
-									<span className={color.text}>{reaction.fromAgent}</span>
-								</span>
-							);
-						})}
+						{renderReactionPeople(emoji, groupedReactions)}
 					</span>
 				</span>
 			))}
 		</div>
+	);
+}
+
+function renderReactionPeople(emoji: string, reactions: Reaction[]) {
+	if (reactions.length === 0) return null;
+
+	const first = reactions[0];
+	const firstColor = getAgentColor(first.fromColor);
+	if (reactions.length === 1) {
+		return <span className={firstColor.text}>{first.fromAgent}</span>;
+	}
+
+	return (
+		<>
+			<span className={firstColor.text}>{first.fromAgent}</span>
+			<span>+{reactions.length - 1}</span>
+		</>
 	);
 }

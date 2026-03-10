@@ -1,5 +1,9 @@
 import React from 'react';
 import type { SystemEvent as SystemEventType } from '../types.js';
+import {
+	formatAbsoluteTime,
+	formatISOTooltip,
+} from '../hooks/useRelativeTime.js';
 
 interface SystemEventProps {
 	event: SystemEventType;
@@ -43,9 +47,15 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 					)}
 				</div>
 				<div className="tc-system-text">{event.text}</div>
-				{event.taskSubject && (
-					<div className="tc-system-meta">{event.taskSubject}</div>
-				)}
+				<div className="tc-system-meta">
+					{event.taskSubject ?? event.agentName ?? 'system'}
+					<span
+						className="tc-system-time"
+						title={formatISOTooltip(event.timestamp)}
+					>
+						{formatAbsoluteTime(event.timestamp)}
+					</span>
+				</div>
 			</div>
 		</div>
 	);

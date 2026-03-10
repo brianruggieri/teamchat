@@ -31,6 +31,11 @@ export class TeamChatServer {
 	start(): void {
 		const clientDir = path.resolve(import.meta.dirname ?? '.', '..', '..', 'dist', 'client');
 		const serverRef = this;
+		const noCacheHeaders = {
+			'Cache-Control': 'no-store, no-cache, must-revalidate',
+			Pragma: 'no-cache',
+			Expires: '0',
+		};
 
 		this.server = Bun.serve({
 			port: this.port,
@@ -66,14 +71,14 @@ export class TeamChatServer {
 				const file = Bun.file(fullPath);
 				return file.exists().then((exists) => {
 					if (exists) {
-						return new Response(file);
+						return new Response(file, { headers: noCacheHeaders });
 					}
 					// SPA fallback
 					const indexPath = path.join(clientDir, 'index.html');
 					const indexFile = Bun.file(indexPath);
 					return indexFile.exists().then((indexExists) => {
 						if (indexExists) {
-							return new Response(indexFile);
+							return new Response(indexFile, { headers: noCacheHeaders });
 						}
 						return new Response('Not Found', { status: 404 });
 					});

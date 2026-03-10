@@ -20,44 +20,27 @@ export function SessionStats({
 	const dmThreads = countDMThreads(events);
 	const completedTasks = tasks.filter((task) => task.status === 'completed').length;
 	const duration = sessionStart ? formatDuration(sessionStart) : '--';
+	const stats = [
+		{ label: 'msgs', value: contentMessages },
+		{ label: 'system', value: systemMessages },
+		{ label: 'threads', value: dmThreads },
+		{ label: 'done', value: `${completedTasks}/${tasks.length}` },
+		{ label: 'team', value: memberCount > 0 ? memberCount : '--' },
+	];
 
 	return (
-		<section className="tc-sidecard">
+		<section className="tc-sidecard tc-session-panel">
 			<div className="tc-sidecard-header">
-				<div>
-					<h3 className="tc-sidecard-title">Session</h3>
-					<p className="tc-sidecard-subtitle">Live browser and replay metrics</p>
-				</div>
+				<h3 className="tc-sidecard-title">Session</h3>
+				<span className="tc-sidecard-metric">{duration}</span>
 			</div>
-			<div className="tc-stats-grid">
-				<div className="tc-stat-cell">
-					<span className="tc-stat-label">duration</span>
-					<span className="tc-stat-value">{duration}</span>
-				</div>
-				<div className="tc-stat-cell">
-					<span className="tc-stat-label">messages</span>
-					<span className="tc-stat-value">{contentMessages}</span>
-				</div>
-				<div className="tc-stat-cell">
-					<span className="tc-stat-label">system rows</span>
-					<span className="tc-stat-value">{systemMessages}</span>
-				</div>
-				<div className="tc-stat-cell">
-					<span className="tc-stat-label">DM threads</span>
-					<span className="tc-stat-value">{dmThreads}</span>
-				</div>
-				<div className="tc-stat-cell">
-					<span className="tc-stat-label">tasks done</span>
-					<span className="tc-stat-value">
-						{completedTasks}/{tasks.length}
-					</span>
-				</div>
-				<div className="tc-stat-cell">
-					<span className="tc-stat-label">agents</span>
-					<span className="tc-stat-value">
-						{memberCount > 0 ? memberCount - 1 : 0} + lead
-					</span>
-				</div>
+			<div className="tc-stats-strip">
+				{stats.map((stat) => (
+					<div key={stat.label} className="tc-stat-chip">
+						<span className="tc-stat-label">{stat.label}</span>
+						<span className="tc-stat-value">{stat.value}</span>
+					</div>
+				))}
 			</div>
 		</section>
 	);

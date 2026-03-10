@@ -64,18 +64,24 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 
 	const completedTasks = tasks.filter((task) => task.status === 'completed').length;
 	const totalTasks = tasks.length;
+	const activeTasks = tasks.filter((task) => task.status === 'in_progress').length;
+	const blockedTasks = tasks.filter(
+		(task) => task.status === 'pending' && task.blockedBy && task.blockedBy.length > 0
+	).length;
 	const pct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
 	return (
-		<section className="tc-sidecard">
+		<section className="tc-sidecard tc-task-panel">
 			<div className="tc-sidecard-header">
-				<div>
-					<h3 className="tc-sidecard-title">Tasks</h3>
-					<p className="tc-sidecard-subtitle">Execution progress and blockers</p>
-				</div>
+				<h3 className="tc-sidecard-title">Tasks</h3>
 				<span className="tc-sidecard-metric">
 					{completedTasks}/{totalTasks}
 				</span>
+			</div>
+			<div className="tc-sidecard-inline-meta">
+				<span>{activeTasks} active</span>
+				<span>{blockedTasks} blocked</span>
+				<span>{pct}% complete</span>
 			</div>
 			<div className="tc-progress-track">
 				<div
@@ -85,7 +91,7 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 			</div>
 			<div className="tc-task-list">
 				{tasks.length === 0 ? (
-					<div className="tc-sidecard-empty">No tasks have been correlated yet.</div>
+					<div className="tc-sidecard-empty">No correlated tasks yet.</div>
 				) : (
 					tasks.map((task) => (
 						<TaskCard

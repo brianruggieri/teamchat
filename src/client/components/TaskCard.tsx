@@ -32,25 +32,25 @@ export function TaskCard({
 			title={task.description ?? task.subject}
 		>
 			<div className="tc-task-card-header">
-				<div>
-					<div className="tc-task-card-id">#{task.id}</div>
+				<div className={`tc-task-state-dot is-${task.status}`} />
+				<div className="tc-task-card-main">
 					<div className="tc-task-card-subject">{task.subject}</div>
+					<div className="tc-task-card-id">#{task.id}</div>
 				</div>
 				<span className={`tc-status-pill is-${task.status}`}>
 					{STATUS_LABELS[task.status] ?? task.status}
 				</span>
 			</div>
 			<div className="tc-task-card-meta">
-				<span>{task.owner ? `owner ${task.owner}` : 'unassigned'}</span>
-				{task.status === 'in_progress' && task.updated && (
+				<span>{task.owner ?? 'unassigned'}</span>
+				{isBlocked ? (
+					<span>
+						blocked by {task.blockedBy!.map((taskId) => `#${taskId}`).join(', ')}
+					</span>
+				) : task.status === 'in_progress' && task.updated ? (
 					<span>{formatDuration(task.updated)}</span>
-				)}
+				) : null}
 			</div>
-			{isBlocked && (
-				<div className="tc-task-card-blockers">
-					blocked by {task.blockedBy!.map((taskId) => `#${taskId}`).join(', ')}
-				</div>
-			)}
 		</button>
 	);
 }

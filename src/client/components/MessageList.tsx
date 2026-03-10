@@ -7,6 +7,7 @@ import type {
 import { ThreadBlock } from './ThreadBlock.jsx';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
+import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { buildMessageLaneItems } from './messageGrouping.js';
@@ -80,6 +81,25 @@ export function MessageList({ events, reactions }: MessageListProps) {
 										toolName={laneItem.toolName}
 										command={laneItem.command}
 										reactions={reactions[laneItem.message.id] ?? []}
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'system-group') {
+								if (laneItem.events.length === 1) {
+									return (
+										<SystemEventComponent
+											key={laneItem.events[0].id}
+											event={laneItem.events[0]}
+										/>
+									);
+								}
+
+								return (
+									<SystemEventGroup
+										key={laneItem.events[0].id}
+										subtype={laneItem.subtype}
+										events={laneItem.events}
 									/>
 								);
 							}

@@ -27,11 +27,18 @@ export interface SystemRowItem {
 	event: SystemEvent;
 }
 
+export interface SystemGroupItem {
+	kind: 'system-group';
+	subtype: 'member-joined' | 'task-created';
+	events: SystemEvent[];
+}
+
 export type MessageLaneItem =
 	| MessageStackItem
 	| PlanCardItem
 	| PermissionCardItem
-	| SystemRowItem;
+	| SystemRowItem
+	| SystemGroupItem;
 
 export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];
@@ -47,6 +54,24 @@ export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 		}
 
 		if (event.type === 'system') {
+			if (isCollapsibleSystemEvent(event)) {
+				const lastItem = items.at(-1);
+				if (
+					lastItem?.kind === 'system-group'
+					&& lastItem.subtype === event.subtype
+				) {
+					lastItem.events.push(event);
+					continue;
+				}
+
+				items.push({
+					kind: 'system-group',
+					subtype: event.subtype,
+					events: [event],
+				});
+				continue;
+			}
+
 			items.push({
 				kind: 'system',
 				event,
@@ -97,6 +122,12 @@ function canGroupMessages(a: ContentMessage, b: ContentMessage): boolean {
 		&& a.isLead === b.isLead
 		&& a.isDM === b.isDM
 		&& a.fromColor === b.fromColor;
+}
+
+function isCollapsibleSystemEvent(
+	event: SystemEvent
+): event is SystemEvent & { subtype: 'member-joined' | 'task-created' } {
+	return event.subtype === 'member-joined' || event.subtype === 'task-created';
 }
 
 export function isPlanApproval(message: ContentMessage): boolean {

@@ -16,25 +16,28 @@ const STATUS_LABELS: Record<string, string> = {
 export function PresenceRoster({ team, presence }: PresenceRosterProps) {
 	if (!team) return null;
 
+	const liveCount = team.members.filter((member) => {
+		if (member.name === 'team-lead') return true;
+		const status = presence[member.name] ?? 'working';
+		return status !== 'offline';
+	}).length;
+
 	return (
-		<section className="tc-sidecard">
+		<section className="tc-sidecard tc-team-panel">
 			<div className="tc-sidecard-header">
-				<div>
-					<h3 className="tc-sidecard-title">Presence</h3>
-					<p className="tc-sidecard-subtitle">Current roster and idle state</p>
-				</div>
-				<span className="tc-sidecard-metric">{team.members.length}</span>
+				<h3 className="tc-sidecard-title">Team</h3>
+				<span className="tc-sidecard-metric">{liveCount} live</span>
 			</div>
 			<div className="tc-roster-list">
 				<div className="tc-roster-row is-lead">
 					<div className="tc-roster-identity">
 						<span className="tc-roster-dot is-lead" />
-						<div>
-							<div className="tc-roster-name">team-lead</div>
-							<div className="tc-roster-status">lead · working</div>
-						</div>
+						<div className="tc-roster-name">team-lead</div>
 					</div>
-					<span className="tc-roster-badge">lead</span>
+					<div className="tc-roster-trailing">
+						<span className="tc-roster-badge">lead</span>
+						<span className="tc-roster-state is-working">working</span>
+					</div>
 				</div>
 
 				{team.members
@@ -50,18 +53,15 @@ export function PresenceRoster({ team, presence }: PresenceRosterProps) {
 							>
 								<div className="tc-roster-identity">
 									<span className={`tc-roster-dot ${agentColor.dot}`} />
-									<div>
-										<div className={`tc-roster-name ${agentColor.text}`}>
-											{member.name}
-										</div>
-										<div className="tc-roster-status">
-											{STATUS_LABELS[status]}
-										</div>
+									<div className={`tc-roster-name ${agentColor.text}`}>
+										{member.name}
 									</div>
 								</div>
-								<span className={`tc-roster-badge is-${status}`}>
-									{STATUS_LABELS[status]}
-								</span>
+								<div className="tc-roster-trailing">
+									<span className={`tc-roster-state is-${status}`}>
+										{STATUS_LABELS[status]}
+									</span>
+								</div>
 							</div>
 						);
 					})}

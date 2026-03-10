@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import type { ChatEvent, Reaction } from '../types.js';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
+import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { buildMessageLaneItems } from './messageGrouping.js';
@@ -76,6 +77,25 @@ export function ThreadBlock({ participants, events, reactions }: ThreadBlockProp
 									toolName={item.toolName}
 									command={item.command}
 									reactions={reactions[item.message.id] ?? []}
+								/>
+							);
+						}
+
+						if (item.kind === 'system-group') {
+							if (item.events.length === 1) {
+								return (
+									<SystemEventComponent
+										key={item.events[0].id}
+										event={item.events[0]}
+									/>
+								);
+							}
+
+							return (
+								<SystemEventGroup
+									key={item.events[0].id}
+									subtype={item.subtype}
+									events={item.events}
 								/>
 							);
 						}

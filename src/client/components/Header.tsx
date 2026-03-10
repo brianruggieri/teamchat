@@ -5,14 +5,12 @@ interface HeaderProps {
 	team: TeamState | null;
 	connected: boolean;
 	onlineCount: number;
-	onOpenWorkbench?: () => void;
 }
 
 export function Header({
 	team,
 	connected,
 	onlineCount,
-	onOpenWorkbench,
 }: HeaderProps) {
 	const teamName = team?.name ?? 'teamchat';
 
@@ -33,13 +31,6 @@ export function Header({
 					</span>
 					<span className="tc-header-online">{onlineCount} online</span>
 				</div>
-				<button
-					type="button"
-					className="tc-workbench-trigger lg:hidden"
-					onClick={onOpenWorkbench}
-				>
-					Workbench
-				</button>
 			</div>
 		</header>
 	);
