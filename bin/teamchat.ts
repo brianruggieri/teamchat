@@ -240,9 +240,9 @@ function startTeamSession(
 	});
 
 	const server = new TeamChatServer({
+		mode: 'live',
 		port,
 		teamName,
-		mode: 'live',
 		processor,
 		watcher,
 	});

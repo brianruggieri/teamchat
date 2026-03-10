@@ -223,7 +223,7 @@ export class TeamChatServer {
 			return new Response('Replay artifacts unavailable', { status: 404 });
 		}
 
-		const artifact = this.replay.bundle.artifacts.find((candidate) => candidate.id === artifactId);
+		const artifact = this.replay.bundle.artifacts.find((candidate: { id: string }) => candidate.id === artifactId);
 		if (!artifact) {
 			return new Response('Replay artifact not found', { status: 404 });
 		}
