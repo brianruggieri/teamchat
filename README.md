@@ -41,7 +41,7 @@ teamchat setup
 ```
 teamchat --team <name>           Watch a running team session
 teamchat --watch                 Auto-detect any team creation
-teamchat --replay <file.jsonl>   Replay a recorded session
+teamchat --replay <file-or-dir>  Replay a recorded session
 teamchat --port <number>         Custom port (default: 3456)
 teamchat --compact               Compress short acks into reactions
 teamchat --no-journal            Disable JSONL session recording
@@ -71,19 +71,52 @@ On each file change, teamchat:
 
 ## Replay Mode
 
-Sessions are automatically recorded to `~/.teamchat/sessions/{team-name}.jsonl`. Replay with:
+Replay is now a first-class app mode. It loads an immutable replay bundle, keeps playback local to each viewer, and uses virtual time for timestamps, task state, and session stats.
+
+### Supported Inputs
+
+- Legacy journal file: `~/.teamchat/sessions/{team-name}.jsonl`
+- Replay bundle directory: a folder containing `manifest.json` plus `session.jsonl` or `events.jsonl`
+
+Replay a saved journal with:
 
 ```bash
 teamchat --replay ~/.teamchat/sessions/healthdash-sprint.jsonl
 ```
 
-This repo also includes a real recorded build session replay:
+Replay the bundled fixture in this repo with:
 
 ```bash
-teamchat --replay fixtures/replays/teamchat-build-session/session.jsonl --port 4567
+teamchat --replay fixtures/replays/teamchat-build-session --port 4567
 ```
 
-Controls: play/pause, speed (1x/2x/5x/10x), scrub timeline, jump to task completions.
+### Replay Features
+
+- Local per-viewer controls: play, pause, restart, step forward/back, previous/next marker
+- Speed controls: `0.25x`, `0.5x`, `1x`, `2x`, `5x`, `10x`
+- Timeline scrubber with checkpoint dots and condensed session-beat chips
+- Saved artifact panel for reopening captured reports and outputs
+- Replay-specific mode banner and status treatment so recorded sessions read differently from live sessions
+
+### Keyboard Shortcuts
+
+- `Space`: play or pause
+- `ArrowLeft` / `ArrowRight`: step backward or forward one event
+- `Shift+ArrowLeft` / `Shift+ArrowRight`: jump to previous or next marker
+- `0`: restart from the beginning
+- `1`, `2`, `5`: set playback speed quickly
+
+### Replay Bundle Layout
+
+Bundle directories can include these files:
+
+- `manifest.json`: session metadata
+- `session.jsonl` or `events.jsonl`: recorded event stream
+- `config.json`: team roster metadata
+- `tasks.initial.json`: initial task state for accurate `t=0` playback
+- `tasks.final.json` or `tasks.json`: final task state
+- `artifacts.json`: saved replay artifacts such as reports
+- `artifacts/*`: saved artifact files served by the replay UI
 
 ## Chat Features
 
