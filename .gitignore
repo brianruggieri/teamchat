@@ -6,3 +6,4 @@ fixtures/output/
 *.tsbuildinfo
 .DS_Store
 .claude-flow
+.codex/
