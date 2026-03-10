@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Build Session Summary</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 32px;
+			background: #08101a;
+			color: #f3f7fb;
+			font-family: "IBM Plex Sans", system-ui, sans-serif;
+		}
+
+		main {
+			max-width: 720px;
+			margin: 0 auto;
+			padding: 24px 28px;
+			border: 1px solid rgba(126, 146, 170, 0.16);
+			border-radius: 20px;
+			background: rgba(13, 23, 34, 0.96);
+		}
+
+		h1,
+		h2,
+		p,
+		li {
+			margin-top: 0;
+		}
+
+		section + section {
+			margin-top: 24px;
+		}
+
+		.meta {
+			display: inline-flex;
+			gap: 8px;
+			padding: 6px 10px;
+			border-radius: 999px;
+			background: rgba(255, 189, 74, 0.14);
+			color: #ffd38b;
+			font-size: 12px;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+	</style>
+</head>
+<body>
+	<main>
+		<div class="meta">Saved report · replay artifact</div>
+		<section>
+			<h1>teamchat Build Session Summary</h1>
+			<p>The original build session completed the first end-to-end version of teamchat with the live chat UI, task sidebar, replay fixture, and Bun server.</p>
+		</section>
+		<section>
+			<h2>Key Outcomes</h2>
+			<ul>
+				<li>Shared types and parsing utilities landed first to unblock the rest of the team.</li>
+				<li>Server, client, and fixtures converged on the replayable chat event model.</li>
+				<li>Integration and regression fixtures validated the full session flow.</li>
+			</ul>
+		</section>
+		<section>
+			<h2>Session Stats</h2>
+			<ul>
+				<li>Duration: 1h 26m</li>
+				<li>Events: 79</li>
+				<li>Agents: 4</li>
+				<li>Tasks: 9</li>
+			</ul>
+		</section>
+	</main>
+</body>
+</html>

@@ -3,10 +3,7 @@ import type { ContentMessage, Reaction } from '../types.js';
 import { getAgentColor } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
 import { ReactionRow } from './ReactionRow.jsx';
-import {
-	formatRelativeTime,
-	formatISOTooltip,
-} from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface PermissionRequestCardProps {
 	message: ContentMessage;
@@ -21,6 +18,7 @@ export function PermissionRequestCard({
 	command,
 	reactions,
 }: PermissionRequestCardProps) {
+	const { formatRelativeTime, formatISOTooltip } = useRelativeTime();
 	const agentColor = getAgentColor(message.fromColor);
 	const status = reactions.some((reaction) => reaction.emoji === '✅')
 		? 'approved'

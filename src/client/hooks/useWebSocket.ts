@@ -2,11 +2,13 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { ChatAction } from '../types.js';
 import type { ChatEvent, SessionState } from '../../shared/types.js';
 
-const WS_URL = `ws://${window.location.host}/ws`;
 const STATE_URL = `/state`;
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000];
 
-export function useWebSocket(dispatch: React.Dispatch<ChatAction>) {
+export function useWebSocket(
+	dispatch: React.Dispatch<ChatAction>,
+	wsUrl: string = `ws://${window.location.host}/ws`,
+) {
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectAttempt = useRef(0);
 	const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -15,7 +17,7 @@ export function useWebSocket(dispatch: React.Dispatch<ChatAction>) {
 		// Server sends { type: "init", state: SessionState } on WS connect,
 		// so we don't need a separate REST fetch. GET /state is available
 		// as a fallback if the WS init message is missed.
-		const ws = new WebSocket(WS_URL);
+		const ws = new WebSocket(wsUrl);
 		wsRef.current = ws;
 
 		ws.onopen = () => {
@@ -46,7 +48,7 @@ export function useWebSocket(dispatch: React.Dispatch<ChatAction>) {
 		ws.onerror = () => {
 			ws.close();
 		};
-	}, [dispatch]);
+	}, [dispatch, wsUrl]);
 
 	const scheduleReconnect = useCallback(() => {
 		const delay = RECONNECT_DELAYS[

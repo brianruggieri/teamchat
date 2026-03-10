@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 
-export function formatRelativeTime(timestamp: string): string {
-	const now = Date.now();
+const TimeContext = createContext<number>(Date.now());
+
+export function formatRelativeTime(timestamp: string, nowMs: number = Date.now()): string {
 	const then = new Date(timestamp).getTime();
-	const diff = now - then;
+	const diff = nowMs - then;
 
 	if (diff < MINUTE) {
 		return 'just now';
@@ -16,9 +17,7 @@ export function formatRelativeTime(timestamp: string): string {
 		const mins = Math.floor(diff / MINUTE);
 		return `${mins}m ago`;
 	}
-	// For >= 1hr, show absolute time
-	const date = new Date(timestamp);
-	return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+	return formatAbsoluteTime(timestamp);
 }
 
 export function formatAbsoluteTime(timestamp: string): string {
@@ -30,10 +29,9 @@ export function formatISOTooltip(timestamp: string): string {
 	return new Date(timestamp).toISOString();
 }
 
-export function formatDuration(startISO: string): string {
-	const now = Date.now();
+export function formatDuration(startISO: string, nowMs: number = Date.now()): string {
 	const start = new Date(startISO).getTime();
-	const diff = now - start;
+	const diff = nowMs - start;
 
 	if (diff < MINUTE) {
 		return '<1m';
@@ -46,13 +44,44 @@ export function formatDuration(startISO: string): string {
 	return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
-export function useRelativeTime(interval: number = 30000) {
-	const [, setTick] = useState(0);
+export function TimeProvider({
+	nowMs,
+	children,
+	interval = 30000,
+}: {
+	nowMs?: number;
+	children: React.ReactNode;
+	interval?: number;
+}) {
+	const [liveNowMs, setLiveNowMs] = useState(nowMs ?? Date.now());
+	const value = nowMs ?? liveNowMs;
 
 	useEffect(() => {
-		const timer = setInterval(() => setTick((t) => t + 1), interval);
-		return () => clearInterval(timer);
-	}, [interval]);
+		if (typeof nowMs === 'number') {
+			return undefined;
+		}
 
-	return { formatRelativeTime, formatAbsoluteTime, formatISOTooltip, formatDuration };
+		const timer = setInterval(() => setLiveNowMs(Date.now()), interval);
+		return () => clearInterval(timer);
+	}, [interval, nowMs]);
+
+	useEffect(() => {
+		if (typeof nowMs === 'number') {
+			setLiveNowMs(nowMs);
+		}
+	}, [nowMs]);
+
+	return React.createElement(TimeContext.Provider, { value }, children);
+}
+
+export function useRelativeTime() {
+	const nowMs = useContext(TimeContext);
+
+	return useMemo(() => ({
+		nowMs,
+		formatRelativeTime: (timestamp: string) => formatRelativeTime(timestamp, nowMs),
+		formatAbsoluteTime,
+		formatISOTooltip,
+		formatDuration: (timestamp: string) => formatDuration(timestamp, nowMs),
+	}), [nowMs]);
 }

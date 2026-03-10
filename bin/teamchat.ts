@@ -6,7 +6,7 @@ import { FileWatcher } from '../src/server/watcher.js';
 import { EventProcessor } from '../src/server/processor.js';
 import { Journal } from '../src/server/journal.js';
 import { TeamChatServer } from '../src/server/server.js';
-import type { ChatEvent } from '../src/shared/types.js';
+import { loadReplaySource } from '../src/server/replay.js';
 
 // === Argument parsing ===
 
@@ -188,63 +188,32 @@ function startWatchMode(watchDir: string, port: number, compact: boolean, noJour
 // === Replay mode ===
 
 function startReplayMode(filePath: string, port: number): void {
-	const entries = Journal.readFrom(filePath);
-	if (entries.length === 0) {
-		console.error(`No entries found in ${filePath}`);
+	const replay = loadReplaySource(filePath);
+	if (replay.bundle.entries.length === 0) {
+		console.error(`No replay events found in ${filePath}`);
 		process.exit(1);
 	}
 
-	console.log(`Loaded ${entries.length} events from ${filePath}`);
-
-	// Extract team name from file path
-	const teamName = path.basename(filePath, '.jsonl');
-	const allEvents = entries.map((e) => e.event);
-
-	// Create a minimal processor and watcher for the server
-	const emittedEvents: ChatEvent[] = [];
-	const processor = new EventProcessor((events) => {
-		emittedEvents.push(...events);
-	}, false);
-
-	// Manually populate processor state from journal
-	const watcher = new FileWatcher(teamName, () => {}, 100);
+	console.log(`Loaded replay: ${replay.bundle.manifest.teamName}`);
+	console.log(`Events: ${replay.bundle.manifest.eventCount}`);
 
 	const server = new TeamChatServer({
 		port,
-		teamName,
-		processor,
-		watcher,
+		teamName: replay.bundle.manifest.teamName,
+		mode: 'replay',
+		replay,
 	});
 
 	server.start();
 
-	// Serve replay events with timing
-	let currentIndex = 0;
-	const baseTime = entries[0] ? new Date(entries[0].event.timestamp).getTime() : 0;
-
-	const replayNext = (): void => {
-		if (currentIndex >= entries.length) {
-			console.log('Replay complete.');
-			return;
-		}
-
-		const entry = entries[currentIndex]!;
-		server.broadcast([entry.event]);
-		currentIndex++;
-
-		if (currentIndex < entries.length) {
-			const nextEntry = entries[currentIndex]!;
-			const currentTime = new Date(entry.event.timestamp).getTime();
-			const nextTime = new Date(nextEntry.event.timestamp).getTime();
-			const delay = Math.min(Math.max(nextTime - currentTime, 10), 5000); // Cap at 5s
-			setTimeout(replayNext, delay);
-		} else {
-			console.log('Replay complete.');
-		}
+	const shutdown = (): void => {
+		console.log('\nShutting down replay server...');
+		server.stop();
+		process.exit(0);
 	};
 
-	// Start replay after a small delay to let clients connect
-	setTimeout(replayNext, 1000);
+	process.on('SIGINT', shutdown);
+	process.on('SIGTERM', shutdown);
 }
 
 // === Main team session ===
@@ -273,6 +242,7 @@ function startTeamSession(
 	const server = new TeamChatServer({
 		port,
 		teamName,
+		mode: 'live',
 		processor,
 		watcher,
 	});

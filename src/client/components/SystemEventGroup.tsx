@@ -1,9 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { SystemEvent } from '../types.js';
-import {
-	formatAbsoluteTime,
-	formatISOTooltip,
-} from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface SystemEventGroupProps {
 	subtype: 'member-joined' | 'task-created';
@@ -15,6 +12,7 @@ export function SystemEventGroup({
 	events,
 }: SystemEventGroupProps) {
 	const [collapsed, setCollapsed] = useState(true);
+	const { formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const detailId = useMemo(
 		() => `tc-system-group-${events[0]?.id ?? subtype}`,
 		[events, subtype]

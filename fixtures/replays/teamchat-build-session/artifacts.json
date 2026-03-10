@@ -1,0 +1,15 @@
+[
+	{
+		"id": "build-session-summary",
+		"kind": "report",
+		"title": "Build Session Summary",
+		"createdAtMs": 5100000,
+		"createdBy": "team-lead",
+		"sourceEventIds": ["evt-079"],
+		"summary": "Saved wrap-up report for the teamchat build session.",
+		"file": {
+			"relativePath": "artifacts/build-session-summary.html",
+			"mimeType": "text/html"
+		}
+	}
+]
