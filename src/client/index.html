@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>teamchat</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<script>
+		tailwind.config = {
+			darkMode: 'class',
+			theme: {
+				extend: {
+					colors: {
+						surface: {
+							950: '#0a0a0f',
+							900: '#111118',
+							800: '#1a1a24',
+							700: '#24243a',
+						},
+						accent: {
+							indigo: '#4f46e5',
+							blue: '#3b82f6',
+							green: '#22c55e',
+							purple: '#a855f7',
+							yellow: '#eab308',
+							red: '#ef4444',
+							orange: '#f97316',
+							cyan: '#06b6d4',
+							pink: '#ec4899',
+						},
+					},
+					animation: {
+						'slide-in-left': 'slideInLeft 150ms ease-out',
+						'slide-in-right': 'slideInRight 150ms ease-out',
+						'pop-in': 'popIn 200ms cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+						'pulse-unblock': 'pulseUnblock 3s ease-in-out',
+						'fade-in': 'fadeIn 150ms ease-out',
+					},
+					keyframes: {
+						slideInLeft: {
+							'0%': { opacity: '0', transform: 'translateX(-20px)' },
+							'100%': { opacity: '1', transform: 'translateX(0)' },
+						},
+						slideInRight: {
+							'0%': { opacity: '0', transform: 'translateX(20px)' },
+							'100%': { opacity: '1', transform: 'translateX(0)' },
+						},
+						popIn: {
+							'0%': { opacity: '0', transform: 'scale(0.5)' },
+							'100%': { opacity: '1', transform: 'scale(1)' },
+						},
+						pulseUnblock: {
+							'0%, 100%': { boxShadow: '0 0 0 0 rgba(79, 70, 229, 0)' },
+							'50%': { boxShadow: '0 0 0 4px rgba(79, 70, 229, 0.3)' },
+						},
+						fadeIn: {
+							'0%': { opacity: '0' },
+							'100%': { opacity: '1' },
+						},
+					},
+				},
+			},
+		};
+	</script>
+	<link rel="stylesheet" href="/styles/index.css" />
+</head>
+<body class="bg-surface-950 text-gray-100 antialiased">
+	<div id="root"></div>
+	<script type="module" src="/App.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.worktrees/
+fixtures/output/
+*.tsbuildinfo
+.DS_Store

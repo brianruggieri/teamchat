@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+	:root {
+		--scrollbar-thumb: #2a2a3a;
+		--scrollbar-track: #111118;
+	}
+
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+	}
+
+	*::-webkit-scrollbar {
+		width: 6px;
+	}
+
+	*::-webkit-scrollbar-track {
+		background: var(--scrollbar-track);
+	}
+
+	*::-webkit-scrollbar-thumb {
+		background: var(--scrollbar-thumb);
+		border-radius: 3px;
+	}
+
+	*::-webkit-scrollbar-thumb:hover {
+		background: #3a3a4a;
+	}
+
+	body {
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+	}
+}
+
+@layer components {
+	.chat-bubble {
+		@apply rounded-lg px-4 py-3 max-w-[85%] break-words;
+	}
+
+	.chat-bubble-lead {
+		@apply bg-indigo-600/90 text-white;
+	}
+
+	.chat-bubble-teammate {
+		@apply bg-surface-800 text-gray-100 border border-surface-700;
+	}
+
+	.system-event {
+		@apply text-center text-gray-500 text-sm py-1;
+	}
+
+	.thread-marker {
+		@apply flex items-center gap-2 text-xs text-gray-500 py-2;
+	}
+
+	.thread-marker::before,
+	.thread-marker::after {
+		content: '';
+		@apply flex-1 h-px bg-surface-700;
+	}
+
+	.reaction-pill {
+		@apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs
+		       bg-surface-800 border border-surface-700 text-gray-300 cursor-default;
+	}
+
+	.reaction-pill:hover {
+		@apply border-surface-700 bg-surface-700;
+	}
+
+	.task-card {
+		@apply flex items-start gap-2 px-3 py-2 rounded-md text-sm
+		       hover:bg-surface-800 transition-colors cursor-pointer;
+	}
+
+	.task-card.pulse {
+		animation: pulseUnblock 3s ease-in-out;
+	}
+
+	.presence-dot {
+		@apply w-2 h-2 rounded-full inline-block;
+	}
+
+	.new-message-indicator {
+		@apply fixed bottom-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full
+		       bg-indigo-600 text-white text-sm shadow-lg cursor-pointer
+		       hover:bg-indigo-500 transition-colors z-50;
+	}
+
+	.avatar {
+		@apply w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold
+		       flex-shrink-0;
+	}
+
+	.plan-card {
+		@apply border border-surface-700 rounded-lg overflow-hidden bg-surface-900;
+	}
+
+	.permission-card {
+		@apply border border-surface-700 rounded-lg overflow-hidden bg-surface-900;
+	}
+
+	.expandable-content {
+		@apply overflow-hidden transition-all duration-200 ease-in-out;
+	}
+
+	.sidebar-section {
+		@apply border-b border-surface-800 pb-4 mb-4;
+	}
+
+	.progress-bar-track {
+		@apply w-full h-1.5 bg-surface-800 rounded-full overflow-hidden;
+	}
+
+	.progress-bar-fill {
+		@apply h-full bg-indigo-600 rounded-full transition-all duration-500 ease-out;
+	}
+}

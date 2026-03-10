@@ -1,0 +1,109 @@
+[
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"4\",\"subject\":\"Scaffold React client components\",\"description\":\"Set up src/client/ with index.html, App.tsx, component stubs, hooks, Tailwind config. Components: ChatMessage, SystemEvent, ThreadBlock, ReactionRow, PlanApprovalCard, PermissionRequestCard, TaskSidebar, PresenceRoster, SessionStats, NewMessageIndicator, AgentAvatar.\",\"assignedBy\":\"team-lead\",\"timestamp\":\"2026-03-10T00:56:34.828Z\"}",
+    "timestamp": "2026-03-10T00:56:34.828Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"5\",\"subject\":\"Implement full React client with styling\",\"description\":\"Full implementation of all React components with Tailwind dark theme (Linear/Raycast aesthetic). Left/right message alignment, DM thread collapse, emoji reactions, plan/permission cards, task sidebar, presence roster, session stats. Auto-scroll with new message indicator. 150ms slide-in animations, reaction pop-in, smooth thread transitions. Agent avatars (first letter + color circle, lead gets crown).\",\"assignedBy\":\"team-lead\",\"timestamp\":\"2026-03-10T00:56:35.278Z\"}",
+    "timestamp": "2026-03-10T00:56:35.279Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Your implementation plan is approved — great coverage of all UI requirements. Proceed with implementation once task #1 (shared types) is complete. Server just got approved and is starting on types now, so you should be unblocked soon. When you get the types, start with #4 (scaffold) then #5 (full implementation).",
+    "summary": "Plan approved, proceed when types ready",
+    "timestamp": "2026-03-10T01:00:35.429Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Your plan is approved. Please submit it formally via ExitPlanMode so you can exit plan mode and start implementation. You're blocked on task #1 (shared types) — server is writing those now and will be done shortly. Once types land, start with #4 (scaffold) then #5 (full implementation).",
+    "summary": "Plan approved, submit via ExitPlanMode",
+    "timestamp": "2026-03-10T01:01:01.362Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104528944@client@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:02:10.912Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:02:10.912Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Your plan is approved. You are clear to implement. You're blocked on shared types (#1) — server is starting now. Once src/shared/types.ts exists, begin scaffolding components immediately. Do not submit another plan.",
+    "summary": "Plan approved, start when types land",
+    "timestamp": "2026-03-10T01:02:17.828Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104528944@client@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:02:25.408Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:02:25.408Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"shutdown_request\",\"requestId\":\"shutdown-1773104565983@client\",\"from\":\"team-lead\",\"reason\":\"Shutting down to respawn without plan mode. Your plan is fully approved.\",\"timestamp\":\"2026-03-10T01:02:45.983Z\"}",
+    "timestamp": "2026-03-10T01:02:45.983Z",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "src/shared/types.ts and src/shared/parse.ts are ready. You can import all ChatEvent types, SessionState, TaskInfo, AgentInfo, etc. from '../shared/types.ts'. The parse utilities (tryParseSystemEvent, isLeadAgent, generateEventId, parseTimestamp, isWithinWindow) are in '../shared/parse.ts'.",
+    "summary": "Shared types ready for import",
+    "timestamp": "2026-03-10T01:06:50.217Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "Heads up: the tsconfig.json uses `moduleResolution: \"bundler\"` without `allowImportingTsExtensions`, so import paths need to use `.js` extensions instead of `.ts`/`.tsx`. For example: `import type { ChatEvent } from '../shared/types.js'` instead of `'../shared/types.ts'`. All src/shared/ and src/server/ files use `.js` extensions already. Please update your imports to match.",
+    "summary": "Import paths need .js not .ts extensions",
+    "timestamp": "2026-03-10T01:18:11.431Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "Reminder: src/shared/types.ts and src/shared/parse.ts are ready and have been for a while. Import from '../shared/types.js' (use .js extension, not .ts, due to tsconfig). All ChatEvent types, SessionState, TaskInfo, AgentInfo, etc. are exported.",
+    "summary": "Types are ready, reminder to unblock",
+    "timestamp": "2026-03-10T01:19:01.954Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "Both files have been written and ready for a while now! You should be fully unblocked.\n\n- `src/shared/types.ts` — exports everything you need: `ChatEvent`, `ContentMessage`, `SystemEvent`, `ReactionEvent`, `ThreadMarker`, `PresenceChange`, `TaskUpdate`, `SessionState`, `TaskInfo`, `AgentInfo`, `TeamState`, `PlanApprovalCard`, `PermissionRequestCard`, and more.\n\n- `src/shared/parse.ts` — exports `tryParseSystemEvent`, `isLeadAgent`, `generateEventId`, `parseTimestamp`, `isWithinWindow`.\n\nImportant: use `.js` extensions in your imports, not `.ts`. The tsconfig doesn't have `allowImportingTsExtensions`. Example:\n\n```typescript\nimport type { ChatEvent, SessionState, TaskInfo } from '../shared/types.js';\nimport { isLeadAgent } from '../shared/parse.js';\n```\n\nGo ahead and start scaffolding!",
+    "summary": "Types are done, you're unblocked, use .js imports",
+    "timestamp": "2026-03-10T01:19:21.091Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "The file already exists on disk right now at src/shared/types.ts. It's been there for a while. Task #1 is complete. Please check — you should see the file and be able to import from it immediately. No need to wait for anything.",
+    "summary": "File exists on disk now, start immediately",
+    "timestamp": "2026-03-10T01:19:27.624Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "Great work! Answers to your questions:\n\n1. Yes, WebSocket path is `/ws`.\n2. Yes, `GET /state` returns the full `SessionState` object.\n3. Almost — there's a small difference in the WebSocket message format. Events are NOT sent one-at-a-time as bare ChatEvent objects. They're wrapped in an envelope:\n\n**On initial connect**, the server sends:\n```json\n{ \"type\": \"init\", \"state\": <SessionState> }\n```\n\n**For new events**, the server sends:\n```json\n{ \"type\": \"events\", \"events\": [<ChatEvent>, ...] }\n```\n\nSo events come as batches in an `events` array, wrapped in an object with `\"type\": \"events\"`. You'll need to check the `type` field of the incoming WS message first, then iterate the `events` array to dispatch each one to your reducer.\n\nIf adjusting your client to handle this envelope format is a pain, I can change the server to send bare events instead — but the batched format is better for performance when multiple events fire from a single file change.",
+    "summary": "WS format uses envelope: {type, events[]}, not bare events",
+    "timestamp": "2026-03-10T01:19:48.023Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "I don't own tsconfig.json — that's in fixtures' scope (they own root config files). Please flag it to fixtures or team-lead. \n\nFor what it's worth, my files already work around this by using `.js` extensions in imports (e.g. `'../shared/types.js'`). But adding `allowImportingTsExtensions: true` to tsconfig would be the cleaner fix for everyone.",
+    "summary": "tsconfig owned by fixtures, flag to them",
+    "timestamp": "2026-03-10T01:19:55.405Z",
+    "color": "blue",
+    "read": true
+  }
+]

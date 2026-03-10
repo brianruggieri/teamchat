@@ -1,0 +1,238 @@
+[
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"2\",\"subject\":\"Build file watcher + event processor + WebSocket server\",\"description\":\"Implement src/server/watcher.ts (Bun native file watching, 100ms debounce, try/catch JSON.parse), src/server/processor.ts (message classification, broadcast detection with 500ms hold window, idle suppression, reaction correlation, dependency unblock cascades), src/server/server.ts (WebSocket at localhost:3456, REST GET /state), src/server/journal.ts (JSONL session journal).\",\"assignedBy\":\"team-lead\",\"timestamp\":\"2026-03-10T00:56:32.993Z\"}",
+    "timestamp": "2026-03-10T00:56:32.993Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"3\",\"subject\":\"Build CLI entry point + replay mode\",\"description\":\"Implement bin/teamchat.ts — CLI arg parsing (--team, --watch, --replay, --port, --compact, --no-journal, --share, setup). Replay mode reads JSONL journal and serves events with timestamp-based playback. Wire all server components together.\",\"assignedBy\":\"team-lead\",\"timestamp\":\"2026-03-10T00:56:33.962Z\"}",
+    "timestamp": "2026-03-10T00:56:33.962Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"1\",\"subject\":\"Write shared types (src/shared/types.ts + parse.ts)\",\"description\":\"Define the ChatEvent type contract in src/shared/types.ts and parsing utilities in src/shared/parse.ts. This is the interface contract between server and client. Types are fully specified in the build handoff doc. Both client and fixtures agents depend on this.\",\"assignedBy\":\"team-lead\",\"timestamp\":\"2026-03-10T00:56:33.988Z\"}",
+    "timestamp": "2026-03-10T00:56:33.988Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104333942@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T00:58:57.204Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T00:58:57.204Z",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "Hey -- I've been assigned task #4 (scaffold React client) but I'm blocked on task #1 (src/shared/types.ts + parse.ts) which you own. I need the ChatEvent types, SessionState, TaskInfo, AgentInfo, and the other shared interfaces before I can start scaffolding components. What's your status on #1? Any ETA?",
+    "summary": "Blocked on shared types -- requesting status on task #1",
+    "timestamp": "2026-03-10T00:59:59.095Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104333942@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:00:13.290Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:00:13.290Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104424128@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:00:27.453Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:00:27.453Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104424128@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:00:49.200Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:00:49.200Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104471931@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:01:14.137Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:01:14.137Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104471931@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:01:27.203Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:01:27.203Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104498428@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:01:41.364Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:01:41.364Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Your plan (request plan_approval-1773104471931) was approved. You should be out of plan mode now. Start implementing immediately — task #1 (shared types) first, then #2 (server components), then #3 (CLI). Go.",
+    "summary": "Plan already approved, start coding now",
+    "timestamp": "2026-03-10T01:01:43.413Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104498428@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:01:48.306Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:01:48.306Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104528000@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:02:10.912Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:02:10.912Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "All your plans have been approved. You are clear to implement. Start writing src/shared/types.ts right now — create the directory and write the file. Do not submit another plan. Begin coding immediately.",
+    "summary": "All plans approved, start coding NOW",
+    "timestamp": "2026-03-10T01:02:14.819Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104528000@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:02:24.611Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:02:24.611Z",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "My plan just got approved and I'm ready to start scaffolding as soon as src/shared/types.ts exists. Are you working on task #1 now? Let me know when the shared types are committed so I can begin.",
+    "summary": "Ready to start, waiting on shared types from you",
+    "timestamp": "2026-03-10T01:02:24.960Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104546062@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:02:30.750Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:02:30.750Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104546062@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:02:34.099Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:02:34.099Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"shutdown_request\",\"requestId\":\"shutdown-1773104565066@server\",\"from\":\"team-lead\",\"reason\":\"Shutting down to respawn without plan mode. Your plan is fully approved.\",\"timestamp\":\"2026-03-10T01:02:45.066Z\"}",
+    "timestamp": "2026-03-10T01:02:45.066Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Please approve the shutdown request you received. I need to respawn you without plan mode so you can actually write code. Accept the shutdown — I'll have you back up in seconds.",
+    "summary": "Accept shutdown request to respawn",
+    "timestamp": "2026-03-10T01:04:09.997Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"plan_approval_response\",\"requestId\":\"plan_approval-1773104651407@server@teamchat-build\",\"approved\":true,\"timestamp\":\"2026-03-10T01:04:12.533Z\",\"permissionMode\":\"default\"}",
+    "timestamp": "2026-03-10T01:04:12.533Z",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"1\",\"subject\":\"Write shared types (src/shared/types.ts + parse.ts)\",\"description\":\"Define the ChatEvent type contract in src/shared/types.ts and parsing utilities in src/shared/parse.ts. This is the interface contract between server and client. Types are fully specified in the build handoff doc. Both client and fixtures agents depend on this.\",\"assignedBy\":\"server\",\"timestamp\":\"2026-03-10T01:05:54.838Z\"}",
+    "timestamp": "2026-03-10T01:05:54.838Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"2\",\"subject\":\"Build file watcher + event processor + WebSocket server\",\"description\":\"Implement src/server/watcher.ts (Bun native file watching, 100ms debounce, try/catch JSON.parse), src/server/processor.ts (message classification, broadcast detection with 500ms hold window, idle suppression, reaction correlation, dependency unblock cascades), src/server/server.ts (WebSocket at localhost:3456, REST GET /state), src/server/journal.ts (JSONL session journal).\",\"assignedBy\":\"server\",\"timestamp\":\"2026-03-10T01:06:56.260Z\"}",
+    "timestamp": "2026-03-10T01:06:56.260Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"3\",\"subject\":\"Build CLI entry point + replay mode\",\"description\":\"Implement bin/teamchat.ts — CLI arg parsing (--team, --watch, --replay, --port, --compact, --no-journal, --share, setup). Replay mode reads JSONL journal and serves events with timestamp-based playback. Wire all server components together.\",\"assignedBy\":\"server\",\"timestamp\":\"2026-03-10T01:09:55.212Z\"}",
+    "timestamp": "2026-03-10T01:09:55.212Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "Client scaffolding and full implementation complete. 22 files created under src/client/:\n\n- index.html (SPA entry with Tailwind CDN + custom animations config)\n- App.tsx (root: WebSocket + useReducer + layout with chat + sidebar)\n- types.ts (client-only: ChatState, ChatAction, Reaction, AgentColor, reducer initial state)\n- 4 hooks: useWebSocket, useChatReducer, useAutoScroll, useRelativeTime\n- 11 components: ChatMessage, SystemEvent, ThreadBlock, ReactionRow, PlanApprovalCard, PermissionRequestCard, TaskSidebar, TaskCard, PresenceRoster, SessionStats, NewMessageIndicator, AgentAvatar, MessageList, Header\n- styles/index.css (Tailwind directives + custom component classes)\n\nAll imports use src/shared/types.ts as the shared contract.\n\nWebSocket format I'm expecting:\n- Connect to ws://localhost:3456/ws\n- On connect, fetch GET /state which returns SessionState (team, events[], tasks[], presence, sessionStart)\n- Each WebSocket message is a single JSON-serialized ChatEvent (message | system | reaction | thread-marker | presence | task-update)\n- I dispatch each event into useReducer which updates state accordingly\n\nDoes this match your server implementation? Specifically:\n1. Is the WebSocket path /ws?\n2. Does GET /state return the full SessionState object?\n3. Are events sent one-at-a-time as individual JSON messages over WS?",
+    "summary": "Client done, confirming WebSocket format with server",
+    "timestamp": "2026-03-10T01:16:18.185Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "The tsconfig.json at the project root needs \"allowImportingTsExtensions\": true added to compilerOptions. Without it, all .ts extension imports fail type checking. This affects all agents' files since we're using Bun's convention of explicit .ts extensions. Can you add it since you own root config, or should I flag it to fixtures?",
+    "summary": "tsconfig needs allowImportingTsExtensions flag",
+    "timestamp": "2026-03-10T01:17:10.868Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Status check — have you written src/shared/types.ts yet? Both client and fixtures are waiting on it. It's the critical path blocker right now.",
+    "summary": "Status check on shared types",
+    "timestamp": "2026-03-10T01:18:00.411Z",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "Got it, thanks. I'm already importing from types.ts. The parse.ts utilities are server-side concerns -- my client relies on the pre-processed ChatEvent fields (like isLead, isBroadcast, isDM) that your processor sets. No changes needed on my end.\n\nStill waiting on your confirmation about the WebSocket format (path /ws, GET /state, individual JSON events over WS). And the tsconfig allowImportingTsExtensions fix.",
+    "summary": "Acknowledged parse.ts, awaiting WS format confirmation",
+    "timestamp": "2026-03-10T01:18:09.030Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "All your tasks are complete — nice work. Stand by. Once fixtures finishes integration tests (#8), we'll do E2E verification (#9) and you may be needed for any fixes. No action needed right now.",
+    "summary": "All tasks done, stand by for E2E",
+    "timestamp": "2026-03-10T01:18:56.189Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Both client and fixtures are already unblocked and working — client finished all its tasks, fixtures has 5 of 6 test files written. No need to keep messaging them. Please stand by quietly until I assign you E2E work.",
+    "summary": "Everyone unblocked, stand by quietly",
+    "timestamp": "2026-03-10T01:19:32.206Z",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "Done -- updated all client imports to use .js/.jsx extensions. Client files now pass tsc --noEmit cleanly. The only remaining type errors are in fixtures/ (still using .ts extensions, not my files).",
+    "summary": "Import extensions fixed, client compiles clean",
+    "timestamp": "2026-03-10T01:22:29.237Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "Updated useWebSocket.ts to handle the envelope format:\n- `{ type: \"init\", state }` -> dispatches HYDRATE\n- `{ type: \"events\", events[] }` -> iterates and dispatches each EVENT\n\nRemoved the redundant REST GET /state fetch since the server sends init via WS on connect. GET /state is still available as a fallback but not called by default. Compiles clean.",
+    "summary": "Client updated for WS envelope format",
+    "timestamp": "2026-03-10T01:23:30.505Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Bug found by fixtures in processor.ts: `computeUnblocks()` never fires because `this.previousTasks` is updated to `currMap` on line 574 BEFORE `computeUnblocks(currMap)` is called on line 577. The unblock detection compares current state against itself, so it always thinks blockers were already complete. Fix: swap lines 574 and 577 — call computeUnblocks(currMap) first, THEN update this.previousTasks. This is blocking the dependency cascade feature.",
+    "summary": "Fix processor bug: unblock cascade broken",
+    "timestamp": "2026-03-10T01:25:16.665Z",
+    "read": true
+  },
+  {
+    "from": "fixtures",
+    "text": "Thanks — already wrote all integration tests against the processor, 43 passing.\n\nFound a bug: in processor.ts line 574, `this.previousTasks = currMap` runs before `computeUnblocks(currMap)` on line 577. This means unblock detection compares current state against itself and never fires. The fix is to swap the order — call `computeUnblocks` before updating `this.previousTasks`:\n\n```\n// Line 574-577 currently:\nthis.previousTasks = currMap;\nconst unblockedEvents = this.computeUnblocks(currMap);\n\n// Should be:\nconst unblockedEvents = this.computeUnblocks(currMap);\nthis.previousTasks = currMap;\n```\n\nI have 3 test.todo() entries in fixtures/tests/task-cascade.test.ts ready to validate the fix.",
+    "summary": "Bug: computeUnblocks ordering issue in processor.ts",
+    "timestamp": "2026-03-10T01:26:13.883Z",
+    "color": "yellow",
+    "read": true
+  }
+]

@@ -1,0 +1,25 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
+		"strict": true,
+		"esModuleInterop": true,
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"declaration": true,
+		"declarationMap": true,
+		"sourceMap": true,
+		"outDir": "dist",
+		"types": ["bun-types"],
+		"paths": {
+			"@shared/*": ["./src/shared/*"],
+			"@server/*": ["./src/server/*"],
+			"@client/*": ["./src/client/*"]
+		}
+	},
+	"include": ["src/**/*", "bin/**/*", "fixtures/**/*"],
+	"exclude": ["node_modules", "dist", "fixtures/output"]
+}

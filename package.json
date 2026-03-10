@@ -1,0 +1,38 @@
+{
+	"name": "teamchat",
+	"version": "0.1.0",
+	"description": "Group chat visualizer for Claude Code Agent Teams",
+	"type": "module",
+	"bin": {
+		"teamchat": "./bin/teamchat.ts"
+	},
+	"scripts": {
+		"dev": "bun run bin/teamchat.ts --team test-team",
+		"build": "bun build bin/teamchat.ts --outdir dist --target bun",
+		"test": "bun test",
+		"fixture:generate": "bun run fixtures/generate.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"@types/react": "^19.0.0",
+		"@types/react-dom": "^19.0.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0",
+		"tailwindcss": "^4.0.0",
+		"typescript": "^5.9.3"
+	},
+	"optionalDependencies": {
+		"chokidar": "^4.0.0"
+	},
+	"keywords": [
+		"claude",
+		"agent-teams",
+		"chat",
+		"visualizer",
+		"cli"
+	],
+	"license": "MIT",
+	"engines": {
+		"bun": ">=1.0.0"
+	}
+}
