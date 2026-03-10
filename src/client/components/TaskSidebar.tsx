@@ -39,6 +39,8 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 			}
 		}
 
+		let timerId: ReturnType<typeof setTimeout> | undefined;
+
 		if (newlyUnblocked.length > 0) {
 			setRecentlyUnblocked((previous) => {
 				const next = new Set(previous);
@@ -48,7 +50,7 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 				return next;
 			});
 
-			setTimeout(() => {
+			timerId = setTimeout(() => {
 				setRecentlyUnblocked((previous) => {
 					const next = new Set(previous);
 					for (const taskId of newlyUnblocked) {
@@ -60,6 +62,12 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 		}
 
 		prevTasks.current = tasks;
+
+		return () => {
+			if (timerId !== undefined) {
+				clearTimeout(timerId);
+			}
+		};
 	}, [tasks]);
 
 	const completedTasks = tasks.filter((task) => task.status === 'completed').length;

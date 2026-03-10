@@ -10,7 +10,7 @@ import { SystemEventComponent } from './SystemEvent.jsx';
 import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
-import { buildMessageLaneItems } from './messageGrouping.js';
+import { buildMessageLaneItems, type MessageLaneItem } from './messageGrouping.js';
 
 interface MessageListProps {
 	events: ChatEvent[];
@@ -26,6 +26,7 @@ interface ThreadGroup {
 interface FlatEventsGroup {
 	kind: 'flat-events';
 	events: ChatEvent[];
+	laneItems: MessageLaneItem[];
 }
 
 type RenderItem = ThreadGroup | FlatEventsGroup;
@@ -47,7 +48,7 @@ export function MessageList({ events, reactions }: MessageListProps) {
 					);
 				}
 
-				const laneItems = buildMessageLaneItems(item.events);
+				const laneItems = item.laneItems;
 				return (
 					<React.Fragment key={`lane-${index}`}>
 						{laneItems.map((laneItem) => {
@@ -125,10 +126,12 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 
 	const pushFlatEvents = () => {
 		if (currentFlatEvents.length > 0) {
-			items.push({
+			const group: FlatEventsGroup = {
 				kind: 'flat-events',
 				events: currentFlatEvents,
-			});
+				laneItems: buildMessageLaneItems(currentFlatEvents),
+			};
+			items.push(group);
 			currentFlatEvents = [];
 		}
 	};
