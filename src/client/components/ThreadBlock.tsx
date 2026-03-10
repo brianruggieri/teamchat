@@ -35,7 +35,7 @@ export function ThreadBlock({ participants, events, reactions }: ThreadBlockProp
 				type="button"
 			>
 				<span className={`tc-thread-chevron ${collapsed ? '' : 'is-open'}`}>
-					>
+					{'›'}
 				</span>
 				<div className="tc-thread-heading">
 					<span className="tc-thread-title">{label}</span>

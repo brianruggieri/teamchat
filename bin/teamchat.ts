@@ -210,6 +210,7 @@ function startReplayMode(filePath: string, port: number): void {
 	const watcher = new FileWatcher(teamName, () => {}, 100);
 
 	const server = new TeamChatServer({
+		mode: 'live',
 		port,
 		teamName,
 		processor,
@@ -271,6 +272,7 @@ function startTeamSession(
 	});
 
 	const server = new TeamChatServer({
+		mode: 'live',
 		port,
 		teamName,
 		processor,
