@@ -1,0 +1,29 @@
+{
+  "name": "concurrent-shimmying-garden",
+  "members": [
+    {
+      "name": "team-lead",
+      "agentId": "lead-001",
+      "agentType": "lead",
+      "color": "#FFD700"
+    },
+    {
+      "name": "server",
+      "agentId": "agent-a6ebaa15",
+      "agentType": "teammate",
+      "color": "#3B82F6"
+    },
+    {
+      "name": "client",
+      "agentId": "agent-a22ce551",
+      "agentType": "teammate",
+      "color": "#22C55E"
+    },
+    {
+      "name": "fixtures",
+      "agentId": "agent-acab8290",
+      "agentType": "teammate",
+      "color": "#F59E0B"
+    }
+  ]
+}

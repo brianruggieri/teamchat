@@ -8,47 +8,49 @@ interface TaskCardProps {
 	isPulsing?: boolean;
 }
 
-const STATUS_ICONS: Record<string, string> = {
-	pending: '⏳',
-	in_progress: '🔵',
-	completed: '✅',
-	failed: '❌',
+const STATUS_LABELS: Record<string, string> = {
+	pending: 'pending',
+	in_progress: 'active',
+	completed: 'done',
+	failed: 'failed',
 };
 
-export function TaskCard({ task, onTaskClick, isPulsing = false }: TaskCardProps) {
-	const icon = STATUS_ICONS[task.status] ?? '⏳';
-	const isBlocked = task.status === 'pending' && task.blockedBy && task.blockedBy.length > 0;
+export function TaskCard({
+	task,
+	onTaskClick,
+	isPulsing = false,
+}: TaskCardProps) {
+	const isBlocked = task.status === 'pending'
+		&& task.blockedBy
+		&& task.blockedBy.length > 0;
 
 	return (
-		<div
-			className={`task-card ${isPulsing ? 'pulse' : ''}`}
+		<button
+			type="button"
+			className={`tc-task-card ${isPulsing ? 'pulse' : ''}`}
 			onClick={() => onTaskClick(task.id)}
 			title={task.description ?? task.subject}
 		>
-			<span className="flex-shrink-0">{icon}</span>
-			<div className="flex-1 min-w-0">
-				<div className="flex items-baseline gap-1.5">
-					<span className="text-xs text-gray-500">#{task.id}</span>
-					<span className="text-sm text-gray-200 truncate">{task.subject}</span>
+			<div className="tc-task-card-header">
+				<div className={`tc-task-state-dot is-${task.status}`} />
+				<div className="tc-task-card-main">
+					<div className="tc-task-card-subject">{task.subject}</div>
+					<div className="tc-task-card-id">#{task.id}</div>
 				</div>
-				<div className="flex items-center gap-2 mt-0.5">
-					{task.owner && (
-						<span className="text-xs text-gray-500">
-							→ {task.owner}
-						</span>
-					)}
-					{task.status === 'in_progress' && task.updated && (
-						<span className="text-xs text-gray-600">
-							{formatDuration(task.updated)}
-						</span>
-					)}
-					{isBlocked && (
-						<span className="text-xs text-yellow-600">
-							blocked by {task.blockedBy!.map((id) => `#${id}`).join(', ')}
-						</span>
-					)}
-				</div>
+				<span className={`tc-status-pill is-${task.status}`}>
+					{STATUS_LABELS[task.status] ?? task.status}
+				</span>
 			</div>
-		</div>
+			<div className="tc-task-card-meta">
+				<span>{task.owner ?? 'unassigned'}</span>
+				{isBlocked ? (
+					<span>
+						blocked by {task.blockedBy!.map((taskId) => `#${taskId}`).join(', ')}
+					</span>
+				) : task.status === 'in_progress' && task.updated ? (
+					<span>{formatDuration(task.updated)}</span>
+				) : null}
+			</div>
+		</button>
 	);
 }

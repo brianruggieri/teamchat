@@ -9,23 +9,40 @@ interface SessionStatsProps {
 	memberCount: number;
 }
 
-export function SessionStats({ events, tasks, sessionStart, memberCount }: SessionStatsProps) {
-	const contentMessages = events.filter((e) => e.type === 'message').length;
-	const systemMessages = events.filter((e) => e.type === 'system').length;
+export function SessionStats({
+	events,
+	tasks,
+	sessionStart,
+	memberCount,
+}: SessionStatsProps) {
+	const contentMessages = events.filter((event) => event.type === 'message').length;
+	const systemMessages = events.filter((event) => event.type === 'system').length;
 	const dmThreads = countDMThreads(events);
-	const completedTasks = tasks.filter((t) => t.status === 'completed').length;
+	const completedTasks = tasks.filter((task) => task.status === 'completed').length;
 	const duration = sessionStart ? formatDuration(sessionStart) : '--';
+	const stats = [
+		{ label: 'msgs', value: contentMessages },
+		{ label: 'system', value: systemMessages },
+		{ label: 'threads', value: dmThreads },
+		{ label: 'done', value: `${completedTasks}/${tasks.length}` },
+		{ label: 'team', value: memberCount > 0 ? memberCount : '--' },
+	];
 
 	return (
-		<div className="px-4 py-3 border-t border-surface-800 text-xs text-gray-500">
-			<div className="grid grid-cols-2 gap-y-1.5">
-				<span>Duration: {duration}</span>
-				<span>Messages: {contentMessages} + {systemMessages} sys</span>
-				<span>DM threads: {dmThreads}</span>
-				<span>Tasks: {completedTasks}/{tasks.length}</span>
-				<span>Agents: {memberCount > 0 ? memberCount - 1 : 0} + lead</span>
+		<section className="tc-sidecard tc-session-panel">
+			<div className="tc-sidecard-header">
+				<h3 className="tc-sidecard-title">Session</h3>
+				<span className="tc-sidecard-metric">{duration}</span>
 			</div>
-		</div>
+			<div className="tc-stats-strip">
+				{stats.map((stat) => (
+					<div key={stat.label} className="tc-stat-chip">
+						<span className="tc-stat-label">{stat.label}</span>
+						<span className="tc-stat-value">{stat.value}</span>
+					</div>
+				))}
+			</div>
+		</section>
 	);
 }
 
@@ -33,7 +50,7 @@ function countDMThreads(events: ChatEvent[]): number {
 	const threadPairs = new Set<string>();
 	for (const event of events) {
 		if (event.type === 'thread-marker' && event.subtype === 'thread-start') {
-			const key = event.participants.sort().join('↔');
+			const key = [...event.participants].sort().join('<->');
 			threadPairs.add(key);
 		}
 	}
