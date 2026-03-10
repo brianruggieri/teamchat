@@ -8,7 +8,7 @@
 	},
 	"scripts": {
 		"dev": "bun run bin/teamchat.ts --team test-team",
-		"build": "bun build bin/teamchat.ts --outdir dist --target bun",
+		"build": "bun run scripts/build-client.ts",
 		"test": "bun test",
 		"fixture:generate": "bun run fixtures/generate.ts"
 	},

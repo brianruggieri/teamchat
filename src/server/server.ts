@@ -29,7 +29,7 @@ export class TeamChatServer {
 
 	/** Start the HTTP + WebSocket server. */
 	start(): void {
-		const clientDir = path.resolve(import.meta.dirname ?? '.', '..', 'client');
+		const clientDir = path.resolve(import.meta.dirname ?? '.', '..', '..', 'dist', 'client');
 		const serverRef = this;
 
 		this.server = Bun.serve({
