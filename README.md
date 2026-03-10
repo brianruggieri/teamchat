@@ -95,7 +95,9 @@ teamchat --replay fixtures/replays/teamchat-build-session --port 4567
 - Local per-viewer controls: play, pause, restart, step forward/back, previous/next marker
 - Speed controls: `0.25x`, `0.5x`, `1x`, `2x`, `5x`, `10x`
 - Timeline scrubber with checkpoint dots and condensed session-beat chips
-- Saved artifact panel for reopening captured reports and outputs
+- Saved artifact rail that acts as a navigator for reports and outputs
+- In-app artifact viewer for HTML, text, JSON, and NDJSON artifacts
+- Unsupported artifact types fall back to opening in a new browser tab
 - Replay-specific mode banner and status treatment so recorded sessions read differently from live sessions
 
 ### Keyboard Shortcuts

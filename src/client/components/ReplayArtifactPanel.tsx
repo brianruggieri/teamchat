@@ -1,34 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ReplayArtifact } from '../../shared/replay.js';
+import {
+	formatArtifactDocumentText,
+	getArtifactPreviewKicker,
+	getArtifactPreviewMode,
+	getArtifactRailExcerpt,
+} from '../artifacts.js';
 
 interface ReplayArtifactPanelProps {
 	artifacts: ReplayArtifact[];
 	artifactBaseUrl: string;
+	selectedArtifactId: string | null;
+	onSelectArtifact: (artifactId: string) => void;
+	onExpandArtifact: (artifact: ReplayArtifact) => void;
 }
 
 export function ReplayArtifactPanel({
 	artifacts,
 	artifactBaseUrl,
+	selectedArtifactId,
+	onSelectArtifact,
+	onExpandArtifact,
 }: ReplayArtifactPanelProps) {
-	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 	const [previewContent, setPreviewContent] = useState<string | null>(null);
 	const [previewError, setPreviewError] = useState<string | null>(null);
-
-	useEffect(() => {
-		if (!selectedArtifactId && artifacts.length > 0) {
-			setSelectedArtifactId(artifacts[artifacts.length - 1]!.id);
-			return;
-		}
-
-		if (selectedArtifactId && !artifacts.some((artifact) => artifact.id === selectedArtifactId)) {
-			setSelectedArtifactId(artifacts[artifacts.length - 1]?.id ?? null);
-		}
-	}, [artifacts, selectedArtifactId]);
 
 	const selectedArtifact = useMemo(
 		() => artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? null,
 		[artifacts, selectedArtifactId],
 	);
+	const previewMode = selectedArtifact
+		? getArtifactPreviewMode(selectedArtifact.file.mimeType)
+		: 'external';
+	const summaryExcerpt = selectedArtifact
+		? getArtifactRailExcerpt(selectedArtifact, previewContent)
+		: null;
 
 	useEffect(() => {
 		setPreviewContent(null);
@@ -38,12 +44,9 @@ export function ReplayArtifactPanel({
 			return;
 		}
 
-		const mimeType = selectedArtifact.file.mimeType;
-		if (
-			mimeType.startsWith('text/')
-			|| mimeType === 'application/json'
-			|| mimeType === 'application/x-ndjson'
-		) {
+		if (previewMode === 'text' || previewMode === 'json') {
+			let cancelled = false;
+
 			fetch(`${artifactBaseUrl}/${selectedArtifact.id}`)
 				.then(async (response) => {
 					if (!response.ok) {
@@ -52,13 +55,23 @@ export function ReplayArtifactPanel({
 					return response.text();
 				})
 				.then((text) => {
-					setPreviewContent(text);
+					if (!cancelled) {
+						setPreviewContent(
+							formatArtifactDocumentText(selectedArtifact.file.mimeType, text),
+						);
+					}
 				})
 				.catch((error) => {
-					setPreviewError(error instanceof Error ? error.message : 'Artifact unavailable');
+					if (!cancelled) {
+						setPreviewError(error instanceof Error ? error.message : 'Artifact unavailable');
+					}
 				});
+
+			return () => {
+				cancelled = true;
+			};
 		}
-	}, [artifactBaseUrl, selectedArtifact]);
+	}, [artifactBaseUrl, previewMode, selectedArtifact]);
 
 	return (
 		<section className="tc-sidecard tc-artifact-panel">
@@ -78,7 +91,7 @@ export function ReplayArtifactPanel({
 								key={artifact.id}
 								type="button"
 								className={`tc-artifact-item ${artifact.id === selectedArtifact?.id ? 'is-active' : ''}`}
-								onClick={() => setSelectedArtifactId(artifact.id)}
+								onClick={() => onSelectArtifact(artifact.id)}
 							>
 								<div className="tc-artifact-title">{artifact.title}</div>
 								<div className="tc-artifact-meta">{artifact.summary ?? artifact.kind}</div>
@@ -94,32 +107,44 @@ export function ReplayArtifactPanel({
 										{selectedArtifact.file.mimeType}
 									</div>
 								</div>
-								<a
-									href={`${artifactBaseUrl}/${selectedArtifact.id}`}
-									target="_blank"
-									rel="noreferrer"
-									className="tc-replay-button is-subtle"
-								>
-									Open
-								</a>
 							</div>
-							{selectedArtifact.file.mimeType === 'text/html' ? (
-								<iframe
-									title={selectedArtifact.title}
-									src={`${artifactBaseUrl}/${selectedArtifact.id}`}
-									className="tc-artifact-frame"
-								/>
-							) : previewError ? (
-								<div className="tc-sidecard-empty">{previewError}</div>
-							) : previewContent != null ? (
-								<pre className="tc-artifact-text-preview">
-									{previewContent}
-								</pre>
-							) : (
-								<div className="tc-sidecard-empty">
-									Preview unavailable. Open the saved artifact instead.
+							<div className={`tc-artifact-summary-card is-${previewMode}`}>
+								<div className="tc-artifact-summary-kicker">
+									{getArtifactPreviewKicker(previewMode)}
 								</div>
-							)}
+								<div className="tc-artifact-summary-body">
+									{previewError ? (
+										<div className="tc-sidecard-empty">{previewError}</div>
+									) : previewMode === 'external' ? (
+										<p className="tc-artifact-summary-text">
+											Preview this artifact in a new tab. Binary and unsupported types are not rendered in-app yet.
+										</p>
+									) : (
+										<p className="tc-artifact-summary-text">
+											{summaryExcerpt}
+										</p>
+									)}
+								</div>
+								<div className="tc-artifact-summary-actions">
+									{previewMode !== 'external' && (
+										<button
+											type="button"
+											className="tc-replay-button"
+											onClick={() => onExpandArtifact(selectedArtifact)}
+										>
+											Expand
+										</button>
+									)}
+									<a
+										href={`${artifactBaseUrl}/${selectedArtifact.id}`}
+										target="_blank"
+										rel="noreferrer"
+										className="tc-replay-button is-subtle"
+									>
+										Open
+									</a>
+								</div>
+							</div>
 						</div>
 					)}
 				</>

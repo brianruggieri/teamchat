@@ -14,9 +14,12 @@ import { NewMessageIndicator } from './components/NewMessageIndicator.jsx';
 import { ReplayControls } from './components/ReplayControls.jsx';
 import { ReplayTimeline } from './components/ReplayTimeline.jsx';
 import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
+import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle } from '../shared/replay.js';
+import type { ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
+import { resolveSelectedArtifactId } from './artifacts.js';
 
 function App() {
 	const [bootstrap, setBootstrap] = useState<AppBootstrap | null>(null);
@@ -190,14 +193,20 @@ function ReplayWorkspaceLoaded({
 	bundle: ReplayBundle;
 }) {
 	const controller = useReplayController(bundle);
+	const visibleArtifacts = controller.derivedState.visibleArtifacts;
+	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
 
 	useEffect(() => {
 		const handleKeydown = (event: KeyboardEvent) => {
 			const target = event.target as HTMLElement | null;
 			if (
 				target
-				&& ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+				&& ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)
 			) {
+				return;
+			}
+			if (artifactViewerOpen) {
 				return;
 			}
 
@@ -246,7 +255,31 @@ function ReplayWorkspaceLoaded({
 
 		window.addEventListener('keydown', handleKeydown);
 		return () => window.removeEventListener('keydown', handleKeydown);
-	}, [controller]);
+	}, [artifactViewerOpen, controller]);
+
+	useEffect(() => {
+		const nextSelectedId = resolveSelectedArtifactId(visibleArtifacts, selectedArtifactId);
+		const selectionLost = selectedArtifactId != null
+			&& !visibleArtifacts.some((artifact) => artifact.id === selectedArtifactId);
+
+		if (selectionLost && artifactViewerOpen) {
+			setArtifactViewerOpen(false);
+		}
+
+		if (nextSelectedId !== selectedArtifactId) {
+			setSelectedArtifactId(nextSelectedId);
+		}
+	}, [artifactViewerOpen, selectedArtifactId, visibleArtifacts]);
+
+	const selectedArtifact = useMemo(
+		() => visibleArtifacts.find((artifact) => artifact.id === selectedArtifactId) ?? null,
+		[selectedArtifactId, visibleArtifacts],
+	);
+
+	const handleExpandArtifact = useCallback((artifact: ReplayArtifact) => {
+		setSelectedArtifactId(artifact.id);
+		setArtifactViewerOpen(true);
+	}, []);
 
 	const replayStatusText = `${controller.state.status} · ${controller.state.speed}x`;
 	const replayTopContent = (
@@ -286,35 +319,47 @@ function ReplayWorkspaceLoaded({
 
 	return (
 		<TimeProvider nowMs={controller.state.virtualNowMs}>
-			<TeamChatScaffold
-				state={controller.derivedState.chatState}
-				mode="replay"
-				headerStatusText={replayStatusText}
-				topContent={replayTopContent}
-				emptyTitle="Replay ready"
-				emptyDescription="Press play, step through the session, or scrub the timeline."
-				renderPanels={(onTaskClick) => [
-					<ReplayArtifactPanel
-						key="artifacts"
-						artifacts={controller.derivedState.visibleArtifacts}
+			<>
+				<TeamChatScaffold
+					state={controller.derivedState.chatState}
+					mode="replay"
+					headerStatusText={replayStatusText}
+					topContent={replayTopContent}
+					emptyTitle="Replay ready"
+					emptyDescription="Press play, step through the session, or scrub the timeline."
+					renderPanels={(onTaskClick) => [
+						<ReplayArtifactPanel
+							key="artifacts"
+							artifacts={visibleArtifacts}
+							artifactBaseUrl={bootstrap.artifactBaseUrl}
+							selectedArtifactId={selectedArtifactId}
+							onSelectArtifact={setSelectedArtifactId}
+							onExpandArtifact={handleExpandArtifact}
+						/>,
+						<PresenceRoster
+							key="presence"
+							mode="replay"
+							team={controller.derivedState.chatState.team}
+							presence={controller.derivedState.chatState.presence}
+						/>,
+						<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
+						<SessionStats
+							key="stats"
+							events={controller.derivedState.chatState.events}
+							tasks={controller.derivedState.chatState.tasks}
+							sessionStart={controller.derivedState.chatState.sessionStart}
+							memberCount={controller.derivedState.chatState.team?.members.length ?? 0}
+						/>,
+					]}
+				/>
+				{artifactViewerOpen && selectedArtifact && (
+					<ArtifactViewerModal
+						artifact={selectedArtifact}
 						artifactBaseUrl={bootstrap.artifactBaseUrl}
-					/>,
-					<PresenceRoster
-						key="presence"
-						mode="replay"
-						team={controller.derivedState.chatState.team}
-						presence={controller.derivedState.chatState.presence}
-					/>,
-					<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
-					<SessionStats
-						key="stats"
-						events={controller.derivedState.chatState.events}
-						tasks={controller.derivedState.chatState.tasks}
-						sessionStart={controller.derivedState.chatState.sessionStart}
-						memberCount={controller.derivedState.chatState.team?.members.length ?? 0}
-					/>,
-				]}
-			/>
+						onClose={() => setArtifactViewerOpen(false)}
+					/>
+				)}
+			</>
 		</TimeProvider>
 	);
 }
