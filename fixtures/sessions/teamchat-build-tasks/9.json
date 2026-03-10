@@ -1,0 +1,13 @@
+{
+  "id": "9",
+  "subject": "End-to-end verification",
+  "description": "Generate fixtures, start server, verify: chat renders the healthdash-sprint transcript correctly, all message types render, reactions appear, task sidebar updates, presence roster works, DM threads collapse/expand, session stats are accurate.",
+  "activeForm": "Running end-to-end verification",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": [
+    "3",
+    "5",
+    "8"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "5",
+  "subject": "Implement full React client with styling",
+  "description": "Full implementation of all React components with Tailwind dark theme (Linear/Raycast aesthetic). Left/right message alignment, DM thread collapse, emoji reactions, plan/permission cards, task sidebar, presence roster, session stats. Auto-scroll with new message indicator. 150ms slide-in animations, reaction pop-in, smooth thread transitions. Agent avatars (first letter + color circle, lead gets crown).",
+  "activeForm": "Implementing React client",
+  "status": "completed",
+  "blocks": [
+    "9"
+  ],
+  "blockedBy": [
+    "4"
+  ]
+}

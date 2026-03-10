@@ -234,5 +234,33 @@
     "timestamp": "2026-03-10T01:26:13.883Z",
     "color": "yellow",
     "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Time for E2E (#9). Verify the server starts correctly: generate fixtures with `bun run fixtures/generate.ts`, then start the server with `bun run bin/teamchat.ts --team test-team --port 3456`. Confirm it serves GET /state and accepts WebSocket connections. Also verify the JSONL journal is written. Use `export BUN_INSTALL=\"$HOME/.bun\" && export PATH=\"$BUN_INSTALL/bin:$PATH\"` before bun commands.",
+    "summary": "E2E: start server, verify endpoints work",
+    "timestamp": "2026-03-10T01:26:55.422Z",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"9\",\"subject\":\"End-to-end verification\",\"description\":\"Generate fixtures, start server, verify: chat renders the healthdash-sprint transcript correctly, all message types render, reactions appear, task sidebar updates, presence roster works, DM threads collapse/expand, session stats are accurate.\",\"assignedBy\":\"server\",\"timestamp\":\"2026-03-10T01:26:58.494Z\"}",
+    "timestamp": "2026-03-10T01:26:58.494Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "fixtures",
+    "text": "Done — updated all import paths in fixtures/ to use `.js` extensions. All 10 files updated, tests still pass (43/43), fixture generator still works. Thanks for the heads-up.",
+    "summary": "Import extensions updated to .js, all passing",
+    "timestamp": "2026-03-10T01:28:19.277Z",
+    "color": "yellow",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"shutdown_request\",\"requestId\":\"shutdown-1773106195360@server\",\"from\":\"team-lead\",\"reason\":\"All tasks complete, initial commit pushed to GitHub. Great work. Shutting down the team.\",\"timestamp\":\"2026-03-10T01:29:55.360Z\"}",
+    "timestamp": "2026-03-10T01:29:55.360Z",
+    "read": true
   }
 ]

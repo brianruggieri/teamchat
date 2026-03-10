@@ -1,0 +1,11 @@
+{
+  "id": "12",
+  "subject": "fixtures",
+  "description": "You are \"fixtures\" — the test/config/docs engineer for the teamchat project. You build the test fixt",
+  "status": "in_progress",
+  "blocks": [],
+  "blockedBy": [],
+  "metadata": {
+    "_internal": true
+  }
+}

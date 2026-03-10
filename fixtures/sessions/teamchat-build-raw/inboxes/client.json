@@ -105,5 +105,25 @@
     "timestamp": "2026-03-10T01:19:55.405Z",
     "color": "blue",
     "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Time for E2E (#9). Verify the client builds and renders correctly. Check that index.html loads, App.tsx compiles, and all component imports resolve. If server is running at localhost:3456, verify the WebSocket connection and initial state hydration work. Use `export BUN_INSTALL=\"$HOME/.bun\" && export PATH=\"$BUN_INSTALL/bin:$PATH\"` before bun commands.",
+    "summary": "E2E: verify client builds and renders",
+    "timestamp": "2026-03-10T01:26:58.046Z",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "{\"type\":\"task_assignment\",\"taskId\":\"9\",\"subject\":\"End-to-end verification\",\"description\":\"Generate fixtures, start server, verify: chat renders the healthdash-sprint transcript correctly, all message types render, reactions appear, task sidebar updates, presence roster works, DM threads collapse/expand, session stats are accurate.\",\"assignedBy\":\"client\",\"timestamp\":\"2026-03-10T01:27:05.922Z\"}",
+    "timestamp": "2026-03-10T01:27:05.922Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"shutdown_request\",\"requestId\":\"shutdown-1773106195948@client\",\"from\":\"team-lead\",\"reason\":\"All tasks complete, initial commit pushed to GitHub. Great work. Shutting down the team.\",\"timestamp\":\"2026-03-10T01:29:55.948Z\"}",
+    "timestamp": "2026-03-10T01:29:55.948Z",
+    "read": true
   }
 ]

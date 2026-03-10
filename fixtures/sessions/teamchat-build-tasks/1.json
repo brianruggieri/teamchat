@@ -1,0 +1,13 @@
+{
+  "id": "1",
+  "subject": "Write shared types (src/shared/types.ts + parse.ts)",
+  "description": "Define the ChatEvent type contract in src/shared/types.ts and parsing utilities in src/shared/parse.ts. This is the interface contract between server and client. Types are fully specified in the build handoff doc. Both client and fixtures agents depend on this.",
+  "activeForm": "Writing shared types and parse utilities",
+  "owner": "server",
+  "status": "completed",
+  "blocks": [
+    "2",
+    "4"
+  ],
+  "blockedBy": []
+}

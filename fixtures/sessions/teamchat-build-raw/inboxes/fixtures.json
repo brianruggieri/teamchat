@@ -157,6 +157,19 @@
     "text": "Tests confirmed: 43 pass, 3 todo, 0 fail. The computeUnblocks ordering looks correct in the current code (line 574 computes before line 578 updates previousTasks). Can you convert the 3 todo tests to real assertions and verify unblock cascades work correctly? That would close out the last gap before E2E.",
     "summary": "Convert 3 todo tests to real assertions",
     "timestamp": "2026-03-10T01:26:35.142Z",
+    "read": true
+  },
+  {
+    "from": "team-lead",
+    "text": "Time for E2E (#9). Run the fixture generator to produce the healthdash-sprint data, then convert those 3 todo tests to real assertions and re-run the full suite. Report results.",
+    "summary": "E2E: generate fixtures, convert todos, run tests",
+    "timestamp": "2026-03-10T01:26:51.889Z",
     "read": false
+  },
+  {
+    "from": "team-lead",
+    "text": "{\"type\":\"shutdown_request\",\"requestId\":\"shutdown-1773106202657@fixtures\",\"from\":\"team-lead\",\"reason\":\"All tasks complete, initial commit pushed to GitHub. Great work. Shutting down the team.\",\"timestamp\":\"2026-03-10T01:30:02.657Z\"}",
+    "timestamp": "2026-03-10T01:30:02.657Z",
+    "read": true
   }
 ]

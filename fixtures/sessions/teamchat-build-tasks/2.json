@@ -1,0 +1,15 @@
+{
+  "id": "2",
+  "subject": "Build file watcher + event processor + WebSocket server",
+  "description": "Implement src/server/watcher.ts (Bun native file watching, 100ms debounce, try/catch JSON.parse), src/server/processor.ts (message classification, broadcast detection with 500ms hold window, idle suppression, reaction correlation, dependency unblock cascades), src/server/server.ts (WebSocket at localhost:3456, REST GET /state), src/server/journal.ts (JSONL session journal).",
+  "activeForm": "Building file watcher, processor, journal, and server",
+  "owner": "server",
+  "status": "completed",
+  "blocks": [
+    "3",
+    "8"
+  ],
+  "blockedBy": [
+    "1"
+  ]
+}

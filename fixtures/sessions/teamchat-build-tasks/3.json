@@ -1,0 +1,14 @@
+{
+  "id": "3",
+  "subject": "Build CLI entry point + replay mode",
+  "description": "Implement bin/teamchat.ts — CLI arg parsing (--team, --watch, --replay, --port, --compact, --no-journal, --share, setup). Replay mode reads JSONL journal and serves events with timestamp-based playback. Wire all server components together.",
+  "activeForm": "Writing CLI entry point with replay mode",
+  "owner": "server",
+  "status": "completed",
+  "blocks": [
+    "9"
+  ],
+  "blockedBy": [
+    "2"
+  ]
+}

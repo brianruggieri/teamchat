@@ -1,0 +1,13 @@
+{
+  "id": "4",
+  "subject": "Scaffold React client components",
+  "description": "Set up src/client/ with index.html, App.tsx, component stubs, hooks, Tailwind config. Components: ChatMessage, SystemEvent, ThreadBlock, ReactionRow, PlanApprovalCard, PermissionRequestCard, TaskSidebar, PresenceRoster, SessionStats, NewMessageIndicator, AgentAvatar.",
+  "activeForm": "Scaffolding React client",
+  "status": "completed",
+  "blocks": [
+    "5"
+  ],
+  "blockedBy": [
+    "1"
+  ]
+}

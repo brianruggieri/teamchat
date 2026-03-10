@@ -1,0 +1,10 @@
+{
+  "id": "7",
+  "subject": "Write package.json, tsconfig.json, and README",
+  "description": "package.json: name teamchat, bin config for npx, Bun runtime, minimal deps. tsconfig.json: strict mode. README: what it is, quick start (npx teamchat --team my-team), auto-launch hook config, CLI reference, how it works, replay mode.",
+  "activeForm": "Writing package.json, tsconfig.json, and README",
+  "owner": "fixtures",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": []
+}

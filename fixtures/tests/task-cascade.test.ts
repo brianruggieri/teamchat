@@ -151,7 +151,7 @@ describe("Task Cascade", () => {
 		expect(tasks.every((t) => t.status === "completed")).toBe(true);
 	});
 
-	test("completing #1 unblocks #2, #3, #4", () => {
+	test("completing #1 unblocks pending dependents", () => {
 		// Feed snapshots through #1 completion (snapshot 3)
 		feedSnapshotsUpTo(processor, 3);
 
@@ -159,11 +159,12 @@ describe("Task Cascade", () => {
 			(e) => e.type === "system" && (e as SystemEvent).subtype === "task-unblocked",
 		) as SystemEvent[];
 
-		// Tasks #2, #4 are blocked only by #1 and still pending at the moment of completion
-		// #3 gets claimed in the same snapshot so it transitions to in_progress
+		// Only pending tasks get unblock events. By snapshot 3:
+		// - #2 is still pending (blocked only by #1) → unblocked
+		// - #3 was claimed in same snapshot (in_progress) → no unblock event
+		// - #4 was claimed by privacy at snapshot 2 (in_progress) → no unblock event
 		const unblockedIds = unblocked.map((u) => u.taskId).sort();
 		expect(unblockedIds).toContain("2");
-		expect(unblockedIds).toContain("4");
 	});
 
 	test("completing #4 unblocks #5", () => {

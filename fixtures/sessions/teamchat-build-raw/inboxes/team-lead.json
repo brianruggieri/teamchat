@@ -672,5 +672,99 @@
     "timestamp": "2026-03-10T01:26:23.938Z",
     "color": "blue",
     "read": true
+  },
+  {
+    "from": "client",
+    "text": "E2E verification (task #9) complete. Results:\n\n- Client TypeScript: 0 errors (all 22 files compile clean)\n- Bun build: success (30 modules bundled to 1.0 MB)\n- Server at localhost:3456 is running and serving all client assets (index.html, App.tsx, styles/index.css all return HTTP 200)\n- GET /state returns valid SessionState JSON with correct structure\n- WebSocket connects to /ws and receives { type: \"init\", state: {...} } envelope with keys: team, events, tasks, presence, sessionStart\n- Client useWebSocket.ts is wired to handle both \"init\" and \"events\" envelope types\n\nOnly remaining issue: 25 type errors in fixtures/ files (they still use .ts import extensions instead of .js). Already flagged to fixtures agent. Not a client or server issue.",
+    "summary": "E2E verified: client builds, server serves, WS works",
+    "timestamp": "2026-03-10T01:28:20.027Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "fixtures",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"fixtures\",\"timestamp\":\"2026-03-10T01:28:21.804Z\",\"idleReason\":\"available\",\"summary\":\"[to server] Import extensions updated to .js, all passing\"}",
+    "timestamp": "2026-03-10T01:28:21.804Z",
+    "color": "yellow",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"client\",\"timestamp\":\"2026-03-10T01:28:22.097Z\",\"idleReason\":\"available\"}",
+    "timestamp": "2026-03-10T01:28:22.097Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"client\",\"timestamp\":\"2026-03-10T01:28:25.942Z\",\"idleReason\":\"available\"}",
+    "timestamp": "2026-03-10T01:28:25.942Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "E2E verification complete. Results:\n\n- Server starts cleanly on specified port\n- GET /health returns ok\n- GET /state returns full SessionState with fixture data\n- WebSocket /ws connects and sends init payload\n- JSONL journal written correctly (81 entries)\n\nWith healthdash-sprint fixtures:\n- 5 members detected from config.json\n- 81 events processed: 39 messages, 22 system events, 8 task-updates, 7 presence changes, 5 thread-markers\n- All 8 tasks loaded with correct status/owner\n- Presence tracking working (backend/frontend/qa offline from shutdown, privacy working)\n\nFound and fixed one bug during E2E: `startTeamSession` was calling `watcher.readInitialState()` without feeding the snapshot through the processor, so initial state was empty. Fixed by generating synthetic deltas (null->current) for config, tasks, and each inbox on startup.\n\nCleaned up test data from ~/.claude/ after verification.",
+    "summary": "E2E passed: 81 events, 8 tasks, 5 members, journal works",
+    "timestamp": "2026-03-10T01:29:12.086Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"server\",\"timestamp\":\"2026-03-10T01:29:17.136Z\",\"idleReason\":\"available\"}",
+    "timestamp": "2026-03-10T01:29:17.136Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"server\",\"timestamp\":\"2026-03-10T01:29:20.086Z\",\"idleReason\":\"available\"}",
+    "timestamp": "2026-03-10T01:29:20.086Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"server\",\"timestamp\":\"2026-03-10T01:29:22.472Z\",\"idleReason\":\"available\"}",
+    "timestamp": "2026-03-10T01:29:22.472Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "server",
+    "text": "{\"type\":\"shutdown_approved\",\"requestId\":\"shutdown-1773106195360@server\",\"from\":\"server\",\"timestamp\":\"2026-03-10T01:29:59.207Z\",\"paneId\":\"in-process\",\"backendType\":\"in-process\"}",
+    "timestamp": "2026-03-10T01:29:59.207Z",
+    "color": "blue",
+    "read": true
+  },
+  {
+    "from": "client",
+    "text": "{\"type\":\"shutdown_approved\",\"requestId\":\"shutdown-1773106195948@client\",\"from\":\"client\",\"timestamp\":\"2026-03-10T01:29:59.999Z\",\"paneId\":\"in-process\",\"backendType\":\"in-process\"}",
+    "timestamp": "2026-03-10T01:29:59.999Z",
+    "color": "green",
+    "read": true
+  },
+  {
+    "from": "fixtures",
+    "text": "Done. Converted all 3 todo tests to real assertions. The processor bug is fixed (computeUnblocks now runs before previousTasks update).\n\nFull suite: **47 pass, 0 fail, 0 todo.**\n\nThe 3 new unblock cascade tests verify:\n- Completing #1 unblocks #2 (only pending dependents get unblock events — #3 and #4 are already in_progress when #1 completes)\n- Completing #4 unblocks #5\n- Completing #3 fully unblocks #6 and #7 (last blockers cleared)\n- Partial unblock does NOT emit events (#6 not unblocked when only #2 is done)\n\nReady for E2E.",
+    "summary": "47 pass, 0 fail, 0 todo — unblock cascades verified",
+    "timestamp": "2026-03-10T01:30:02.659Z",
+    "color": "yellow",
+    "read": true
+  },
+  {
+    "from": "fixtures",
+    "text": "{\"type\":\"idle_notification\",\"from\":\"fixtures\",\"timestamp\":\"2026-03-10T01:30:05.301Z\",\"idleReason\":\"available\"}",
+    "timestamp": "2026-03-10T01:30:05.301Z",
+    "color": "yellow",
+    "read": true
+  },
+  {
+    "from": "fixtures",
+    "text": "{\"type\":\"shutdown_approved\",\"requestId\":\"shutdown-1773106202657@fixtures\",\"from\":\"fixtures\",\"timestamp\":\"2026-03-10T01:30:08.260Z\",\"paneId\":\"in-process\",\"backendType\":\"in-process\"}",
+    "timestamp": "2026-03-10T01:30:08.260Z",
+    "color": "yellow",
+    "read": true
   }
 ]

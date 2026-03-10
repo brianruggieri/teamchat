@@ -1,0 +1,12 @@
+{
+  "id": "6",
+  "subject": "Create fixture generator for healthdash-sprint",
+  "description": "Build fixtures/generate.ts that creates a complete ~/.claude/teams/test-team/ directory matching the healthdash-sprint session transcript. config.json with 5 members, inboxes/ with all message types (content, system events, DMs, broadcasts), tasks/ with 8 tasks and dependency chains. Must reproduce the exact sequence from the transcript.",
+  "activeForm": "Creating fixture generator for healthdash-sprint",
+  "owner": "fixtures",
+  "status": "completed",
+  "blocks": [
+    "8"
+  ],
+  "blockedBy": []
+}

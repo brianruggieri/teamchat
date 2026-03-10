@@ -1,0 +1,11 @@
+{
+  "id": "13",
+  "subject": "client",
+  "description": "You are \"client\" — the frontend engineer for teamchat. Your plan has been approved. Start implementi",
+  "status": "completed",
+  "blocks": [],
+  "blockedBy": [],
+  "metadata": {
+    "_internal": true
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "id": "8",
+  "subject": "Write integration tests",
+  "description": "Integration tests that verify the processor produces correct ChatEvent sequences from fixture data. Test: message ordering, broadcast deduplication, DM thread detection, idle suppression, reaction correlation, dependency unblock cascades, all-tasks-completed detection. Uses Bun test runner.",
+  "activeForm": "Writing integration tests",
+  "owner": "fixtures",
+  "status": "completed",
+  "blocks": [
+    "9"
+  ],
+  "blockedBy": [
+    "2",
+    "6"
+  ]
+}
