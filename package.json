@@ -11,6 +11,7 @@
 		"src/",
 		"scripts/",
 		"dist/",
+		"fixtures/replays/",
 		"LICENSE",
 		"README.md"
 	],

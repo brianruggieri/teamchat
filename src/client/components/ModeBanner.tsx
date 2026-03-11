@@ -6,6 +6,7 @@ interface ModeBannerProps {
 	title: string;
 	description: string;
 	meta?: string[];
+	isDemo?: boolean;
 	children?: React.ReactNode;
 }
 
@@ -15,10 +16,14 @@ export function ModeBanner({
 	title,
 	description,
 	meta = [],
+	isDemo = false,
 	children,
 }: ModeBannerProps) {
+	const modeClass = isDemo ? 'is-demo' : `is-${mode}`;
+	const ariaLabel = isDemo ? 'demo session banner' : `${mode} session banner`;
+
 	return (
-		<section className={`tc-mode-banner is-${mode}`} aria-label={`${mode} session banner`}>
+		<section className={`tc-mode-banner ${modeClass}`} aria-label={ariaLabel}>
 			<div className="tc-mode-banner-head">
 				<div className="tc-mode-banner-copy">
 					<div className="tc-mode-banner-eyebrow">{eyebrow}</div>
@@ -26,7 +31,7 @@ export function ModeBanner({
 					<p className="tc-mode-banner-description">{description}</p>
 				</div>
 				{meta.length > 0 && (
-					<div className="tc-mode-banner-meta" aria-label={`${mode} session metadata`}>
+					<div className="tc-mode-banner-meta" aria-label={isDemo ? 'demo session metadata' : `${mode} session metadata`}>
 						{meta.map((item) => (
 							<span key={item} className="tc-mode-chip">
 								{item}

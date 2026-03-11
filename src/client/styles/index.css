@@ -75,7 +75,10 @@ select {
 }
 
 button {
+	appearance: none;
 	border: 0;
+	background: none;
+	cursor: pointer;
 }
 
 pre,
@@ -336,6 +339,14 @@ code {
 		radial-gradient(circle at top right, rgba(255, 189, 74, 0.18), transparent 38%);
 }
 
+/* Demo mode banner — warm amber, visually distinct from the standard replay banner */
+.tc-mode-banner.is-demo {
+	border-color: rgba(251, 146, 60, 0.38);
+	background:
+		linear-gradient(180deg, rgba(50, 22, 4, 0.96), rgba(28, 14, 4, 0.88)),
+		radial-gradient(circle at top right, rgba(251, 146, 60, 0.22), transparent 40%);
+}
+
 .tc-mode-banner-head {
 	display: flex;
 	align-items: flex-start;
@@ -364,6 +375,10 @@ code {
 
 .tc-mode-banner.is-replay .tc-mode-banner-eyebrow {
 	color: #ffd38b;
+}
+
+.tc-mode-banner.is-demo .tc-mode-banner-eyebrow {
+	color: #fdba74;
 }
 
 .tc-mode-banner-title {
@@ -406,6 +421,11 @@ code {
 .tc-mode-banner.is-replay .tc-mode-chip {
 	border-color: rgba(255, 189, 74, 0.2);
 	background: rgba(33, 24, 10, 0.62);
+}
+
+.tc-mode-banner.is-demo .tc-mode-chip {
+	border-color: rgba(251, 146, 60, 0.26);
+	background: rgba(40, 16, 4, 0.68);
 }
 
 .tc-mode-banner-body {
@@ -1638,6 +1658,9 @@ code {
 	background: rgba(74, 53, 17, 0.35);
 	color: var(--text-primary);
 	cursor: pointer;
+	font-size: 0.76rem;
+	font-weight: 600;
+	line-height: 1;
 	transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 
@@ -1647,15 +1670,31 @@ code {
 	color: #fff6e5;
 }
 
+.tc-replay-button.is-primary[aria-pressed="true"] {
+	border-color: rgba(255, 189, 74, 0.6);
+	background: linear-gradient(180deg, rgba(255, 189, 74, 0.38), rgba(161, 104, 22, 0.52));
+	box-shadow: 0 0 0 3px rgba(255, 189, 74, 0.12);
+}
+
 .tc-replay-button:hover {
 	transform: translateY(-1px);
 	border-color: rgba(255, 189, 74, 0.45);
 	background: rgba(97, 69, 23, 0.44);
 }
 
+.tc-replay-button:active {
+	transform: translateY(0);
+}
+
 .tc-replay-button.is-subtle {
 	border-color: var(--border-subtle);
 	background: rgba(18, 30, 45, 0.72);
+	color: var(--text-secondary);
+}
+
+.tc-replay-button.is-subtle:hover {
+	border-color: var(--border-strong);
+	color: var(--text-primary);
 }
 
 .tc-replay-speed,
@@ -1672,9 +1711,13 @@ code {
 }
 
 .tc-replay-speed select {
+	appearance: none;
 	border: 0;
 	background: transparent;
 	color: var(--text-primary);
+	cursor: pointer;
+	font-size: 0.76rem;
+	font-weight: 600;
 }
 
 .tc-replay-timeline {
@@ -1715,17 +1758,35 @@ code {
 	cursor: pointer;
 }
 
-.tc-replay-marker.is-task-completed,
-.tc-replay-marker.is-all-tasks-completed {
+/* Task events → green */
+.tc-replay-marker.is-task-created,
+.tc-replay-marker.is-task-claimed,
+.tc-replay-marker.is-task-unblocked,
+.tc-replay-marker.is-task-completed {
 	background: #2ad06c;
 }
 
+/* All tasks completed → gold/amber */
+.tc-replay-marker.is-all-tasks-completed {
+	background: #ffbd4a;
+	border-color: rgba(255, 189, 74, 0.5);
+	width: 12px;
+	height: 12px;
+}
+
+/* Session boundary → gray */
+.tc-replay-marker.is-session-start {
+	background: #7f90a6;
+}
+
+/* Artifact / permission / plan → amber */
 .tc-replay-marker.is-artifact,
 .tc-replay-marker.is-permission,
 .tc-replay-marker.is-plan {
 	background: #ffbd4a;
 }
 
+/* Thread events → blue */
 .tc-replay-marker.is-thread-start {
 	background: #6bddff;
 }
