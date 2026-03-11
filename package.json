@@ -1,6 +1,6 @@
 {
 	"name": "teamchat",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Group chat visualizer for Claude Code Agent Teams",
 	"type": "module",
 	"bin": {
