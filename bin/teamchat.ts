@@ -7,6 +7,7 @@ import { EventProcessor } from '../src/server/processor.js';
 import { Journal } from '../src/server/journal.js';
 import { TeamChatServer } from '../src/server/server.js';
 import { loadReplaySource } from '../src/server/replay.js';
+import { runExport, runScan, type ExportArgs } from '../src/export/cli.js';
 
 // === Argument parsing ===
 
@@ -20,6 +21,15 @@ interface CliArgs {
 	share: boolean;
 	setup: boolean;
 	help: boolean;
+	version: boolean;
+	demo: boolean;
+	// Export subcommand
+	subcommand: 'export' | 'scan' | null;
+	subcommandArg: string | null;
+	// Export flags
+	latest: boolean;
+	sanitize: boolean;
+	stripContent: boolean;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -33,6 +43,13 @@ function parseArgs(argv: string[]): CliArgs {
 		share: false,
 		setup: false,
 		help: false,
+		version: false,
+		demo: false,
+		subcommand: null,
+		subcommandArg: null,
+		latest: false,
+		sanitize: false,
+		stripContent: false,
 	};
 
 	for (let i = 0; i < argv.length; i++) {
@@ -70,6 +87,35 @@ function parseArgs(argv: string[]): CliArgs {
 			case '-h':
 				args.help = true;
 				break;
+			case '--version':
+			case '-v':
+				args.version = true;
+				break;
+			case '--demo':
+				args.demo = true;
+				break;
+			case '--latest':
+				args.latest = true;
+				break;
+			case '--sanitize':
+				args.sanitize = true;
+				break;
+			case '--strip-content':
+				args.stripContent = true;
+				break;
+			case 'export':
+				args.subcommand = 'export';
+				// Next arg is the path (if it doesn't start with --)
+				if (argv[i + 1] && !argv[i + 1]!.startsWith('--')) {
+					args.subcommandArg = argv[++i] ?? null;
+				}
+				break;
+			case 'scan':
+				args.subcommand = 'scan';
+				if (argv[i + 1] && !argv[i + 1]!.startsWith('--')) {
+					args.subcommandArg = argv[++i] ?? null;
+				}
+				break;
 		}
 	}
 
@@ -83,18 +129,29 @@ teamchat — Group chat visualizer for Claude Code Agent Teams
 USAGE:
   teamchat --team <name>           Watch a specific team
   teamchat --watch <dir>           Auto-detect teams in directory
-  teamchat --replay <file.jsonl>   Replay a recorded session
+  teamchat --replay <file-or-dir>  Replay a recorded session
+  teamchat --replay --demo         Replay bundled demo session
+  teamchat export <path>           Export session to .teamchat-replay bundle
+  teamchat export --latest         Export most recent session
+  teamchat scan <file.jsonl>       Scan a session for secrets
   teamchat setup                   Configure auto-launch hook
 
 OPTIONS:
   --team, -t <name>       Team name to watch
   --watch, -w <dir>       Directory to watch for new teams
-  --replay, -r <file>     JSONL file to replay
+  --replay, -r <path>     JSONL file or bundle directory to replay
+  --demo                  Use bundled demo session (with --replay)
   --port, -p <port>       Server port (default: 3456)
   --compact               Enable compact mode (compress short acks to reactions)
   --no-journal            Disable JSONL journaling
   --share                 Expose server on all interfaces (for sharing)
+  --version, -v           Print version and exit
   --help, -h              Show this help message
+
+EXPORT OPTIONS:
+  --latest                Export the most recent session
+  --sanitize              Run sanitization pipeline (anonymize agents, redact secrets)
+  --strip-content         Strip all message content (use with --sanitize)
 `);
 }
 
@@ -187,7 +244,12 @@ function startWatchMode(watchDir: string, port: number, compact: boolean, noJour
 
 // === Replay mode ===
 
-function startReplayMode(filePath: string, port: number): void {
+function startReplayMode(filePath: string, port: number, isDemo: boolean): void {
+	if (!fs.existsSync(filePath)) {
+		console.error(`Replay path not found: ${filePath}`);
+		process.exit(1);
+	}
+
 	const replay = loadReplaySource(filePath);
 	if (replay.bundle.entries.length === 0) {
 		console.error(`No replay events found in ${filePath}`);
@@ -196,6 +258,9 @@ function startReplayMode(filePath: string, port: number): void {
 
 	console.log(`Loaded replay: ${replay.bundle.manifest.teamName}`);
 	console.log(`Events: ${replay.bundle.manifest.eventCount}`);
+	if (isDemo) {
+		console.log('Demo mode: using bundled fixture session');
+	}
 
 	const server = new TeamChatServer({
 		port,
@@ -302,9 +367,26 @@ function startTeamSession(
 	process.on('SIGTERM', shutdown);
 }
 
+// === Version ===
+
+function printVersion(): void {
+	const pkgPath = path.resolve(import.meta.dir ?? '.', '../package.json');
+	try {
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) as { version: string };
+		console.log(`teamchat v${pkg.version}`);
+	} catch {
+		console.log('teamchat v0.1.0');
+	}
+}
+
 // === Entry point ===
 
 const args = parseArgs(process.argv.slice(2));
+
+if (args.version) {
+	printVersion();
+	process.exit(0);
+}
 
 if (args.help) {
 	printHelp();
@@ -316,11 +398,39 @@ if (args.setup) {
 	process.exit(0);
 }
 
-if (args.replay) {
-	startReplayMode(args.replay, args.port);
+if (args.subcommand === 'export') {
+	const exportArgs: ExportArgs = {
+		input: args.subcommandArg,
+		latest: args.latest,
+		sanitize: args.sanitize,
+		stripContent: args.stripContent,
+	};
+	runExport(exportArgs);
+} else if (args.subcommand === 'scan') {
+	if (!args.subcommandArg) {
+		console.error('Usage: teamchat scan <file.jsonl>');
+		process.exit(1);
+	}
+	runScan(args.subcommandArg);
+} else if (args.replay) {
+	const replayPath = args.demo
+		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/teamchat-build-session')
+		: args.replay;
+	startReplayMode(replayPath, args.port, args.demo);
 } else if (args.watch) {
 	startWatchMode(args.watch, args.port, args.compact, args.noJournal);
 } else if (args.team) {
+	const teamDir = path.join(
+		process.env.HOME ?? process.env.USERPROFILE ?? '~',
+		'.claude',
+		'teams',
+		args.team,
+	);
+	if (!fs.existsSync(teamDir)) {
+		console.error(`Team directory not found: ${teamDir}`);
+		console.error(`Run 'teamchat setup' to configure auto-launch, or check that the team name is correct.`);
+		process.exit(1);
+	}
 	startTeamSession(args.team, args.port, args.compact, args.noJournal);
 } else {
 	// Default: watch ~/.claude/teams/
