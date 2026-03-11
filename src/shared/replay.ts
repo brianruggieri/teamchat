@@ -84,6 +84,7 @@ export interface ReplayAppBootstrap {
 	replayManifest: ReplayManifest;
 	replayBundleUrl: string;
 	artifactBaseUrl: string;
+	isDemo?: boolean;
 }
 
 export type AppBootstrap = LiveAppBootstrap | ReplayAppBootstrap;

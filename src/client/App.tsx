@@ -291,12 +291,18 @@ function ReplayWorkspaceLoaded({
 	}, []);
 
 	const replayStatusText = `${controller.state.status} · ${controller.state.speed}x`;
+	const isDemo = bootstrap.isDemo === true;
 	const replayTopContent = (
 		<ModeBanner
 			mode="replay"
-			eyebrow="Replay mode"
-			title="Recorded session with local playback"
-			description="Scrub, step, and inspect saved artifacts without affecting any other viewer."
+			eyebrow={isDemo ? 'Demo Session' : 'Replay mode'}
+			title={isDemo ? 'Demo Session — sample data' : 'Recorded session with local playback'}
+			description={
+				isDemo
+					? 'This is sample data from a simulated teamchat session — not a real team session.'
+					: 'Scrub, step, and inspect saved artifacts without affecting any other viewer.'
+			}
+			isDemo={isDemo}
 			meta={[
 				`${bundle.manifest.eventCount} events`,
 				formatReplayStamp(bundle.manifest.startedAt),
