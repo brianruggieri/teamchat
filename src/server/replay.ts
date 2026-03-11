@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { JournalEntry, TaskInfo, TeamConfig, TeamState } from '../shared/types.js';
+import type { AgentInfo, JournalEntry, TaskInfo, TeamConfig, TeamState } from '../shared/types.js';
 import type {
 	ReplayArtifact,
 	ReplayBundle,
@@ -35,6 +35,10 @@ export function loadReplaySource(inputPath: string): LoadedReplaySource {
 		return loadLegacyReplayFile(resolvedInput);
 	}
 
+	if (stat.isFile() && resolvedInput.endsWith('.teamchat-replay')) {
+		return loadBundleFile(resolvedInput);
+	}
+
 	throw new Error(`Unsupported replay source: ${resolvedInput}`);
 }
 
@@ -66,6 +70,16 @@ function loadReplayDirectory(rootDir: string): LoadedReplaySource {
 		]),
 		artifactsPath: resolveFirstExistingPath([path.join(rootDir, 'artifacts.json')]),
 	});
+}
+
+function loadBundleFile(filePath: string): LoadedReplaySource {
+	const raw = fs.readFileSync(filePath, 'utf-8');
+	const bundle = JSON.parse(raw) as ReplayBundle;
+	return {
+		bundle,
+		rootDir: path.dirname(filePath),
+		artifactBaseDir: null,
+	};
 }
 
 function loadLegacyReplayFile(filePath: string): LoadedReplaySource {
@@ -128,9 +142,14 @@ function buildReplaySource({
 		?? config?.name
 		?? fileName
 		?? path.basename(rootDir);
+	const configMembers = config?.members ?? [];
+	// If no config, infer members from event 'from' fields
+	const members = configMembers.length > 0
+		? configMembers
+		: inferMembersFromEntries(normalizedEntries);
 	const team: TeamState = {
 		name: teamName,
-		members: config?.members ?? [],
+		members,
 	};
 
 	const computedManifest = buildManifest({
@@ -158,6 +177,54 @@ function buildReplaySource({
 		rootDir,
 		artifactBaseDir: artifacts.length > 0 ? rootDir : null,
 	};
+}
+
+const INFERRED_COLORS = ['blue', 'green', 'purple', 'yellow', 'red', 'cyan', 'orange', 'pink'];
+
+function inferMembersFromEntries(entries: ReplayEntry[]): AgentInfo[] {
+	const seen = new Map<string, { firstType: string; color: string }>();
+	let colorIdx = 0;
+
+	for (const entry of entries) {
+		const ev = entry.event;
+		let name: string | null = null;
+		let fromColor: string | null = null;
+
+		if (ev.type === 'message') {
+			const msg = ev as { from: string; fromColor?: string; isLead?: boolean };
+			name = msg.from;
+			fromColor = msg.fromColor ?? null;
+			if (name && !seen.has(name)) {
+				seen.set(name, {
+					firstType: msg.isLead ? 'lead' : 'worker',
+					color: fromColor ?? INFERRED_COLORS[colorIdx++ % INFERRED_COLORS.length]!,
+				});
+			}
+		} else if (ev.type === 'system') {
+			const sys = ev as { agentName?: string | null };
+			if (sys.agentName && !seen.has(sys.agentName)) {
+				seen.set(sys.agentName, {
+					firstType: 'worker',
+					color: INFERRED_COLORS[colorIdx++ % INFERRED_COLORS.length]!,
+				});
+			}
+		} else if (ev.type === 'presence') {
+			const pres = ev as { agentName: string };
+			if (pres.agentName && !seen.has(pres.agentName)) {
+				seen.set(pres.agentName, {
+					firstType: 'worker',
+					color: INFERRED_COLORS[colorIdx++ % INFERRED_COLORS.length]!,
+				});
+			}
+		}
+	}
+
+	return Array.from(seen.entries()).map(([name, info]) => ({
+		name,
+		agentId: `inferred-${name}`,
+		agentType: info.firstType,
+		color: info.color,
+	}));
 }
 
 function readEntries(filePath: string): JournalEntry[] {

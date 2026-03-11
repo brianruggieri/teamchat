@@ -64,9 +64,15 @@ function parseArgs(argv: string[]): CliArgs {
 				args.watch = argv[++i] ?? null;
 				break;
 			case '--replay':
-			case '-r':
-				args.replay = argv[++i] ?? null;
+			case '-r': {
+				const next = argv[i + 1];
+				if (next && !next.startsWith('--')) {
+					args.replay = argv[++i] ?? null;
+				} else {
+					args.replay = '__demo_placeholder__';
+				}
 				break;
+			}
 			case '--port':
 			case '-p':
 				args.port = parseInt(argv[++i] ?? '3456', 10);
@@ -414,7 +420,7 @@ if (args.subcommand === 'export') {
 	runScan(args.subcommandArg);
 } else if (args.replay) {
 	const replayPath = args.demo
-		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/teamchat-build-session')
+		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/demo/session.teamchat-replay')
 		: args.replay;
 	startReplayMode(replayPath, args.port, args.demo);
 } else if (args.watch) {
