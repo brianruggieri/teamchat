@@ -52,17 +52,18 @@ capture_tmux_panes() {
 	for i in $(tmux list-panes -t "$tmux_session" -F '#{pane_index}' 2>/dev/null); do
 		local pane_title
 		pane_title=$(tmux display-message -t "${tmux_session}:0.${i}" -p '#{pane_title}' 2>/dev/null || echo "pane-${i}")
-		# Sanitize title for filename
+		# Sanitize title for filename, include pane index to prevent overwrites
 		local safe_title
 		safe_title=$(echo "$pane_title" | tr '/' '-' | tr ' ' '_')
+		local pane_label="pane${i}-${safe_title}"
 
 		# Plain text capture (full scrollback)
 		tmux capture-pane -t "${tmux_session}:0.${i}" -p -S - \
-			> "${capture_dir}/cli/${safe_title}-${seq}.txt" 2>/dev/null || true
+			> "${capture_dir}/cli/${pane_label}-${seq}.txt" 2>/dev/null || true
 
 		# ANSI capture (with colors, for visual replay)
 		tmux capture-pane -t "${tmux_session}:0.${i}" -e -p -S - \
-			> "${capture_dir}/cli/${safe_title}-${seq}.ansi" 2>/dev/null || true
+			> "${capture_dir}/cli/${pane_label}-${seq}.ansi" 2>/dev/null || true
 	done
 
 	# Full window capture (all panes visible)
@@ -156,9 +157,21 @@ cmd_start() {
 	echo "$$" > "$PIDFILE"
 	echo "${team}|${capture_dir}|${project_dir}" > "$METAFILE"
 
-	# Start fswatch on inbox and task dirs if fswatch is available
+	# Take initial snapshots of inbox and task state
 	local inbox_dir="${HOME}/.claude/teams/${team}/inboxes"
 	local task_dir="${HOME}/.claude/tasks/${team}"
+	capture_inbox_snapshot "$team" "$capture_dir" "initial"
+	capture_task_snapshot "$team" "$capture_dir" "initial"
+	log "Initial inbox/task snapshots taken"
+
+	# Also capture initial config if it exists
+	local config_file="${HOME}/.claude/teams/${team}/config.json"
+	if [ -f "$config_file" ]; then
+		cp "$config_file" "${capture_dir}/meta/team-config.json"
+		log "Team config captured"
+	fi
+
+	# Start fswatch on inbox and task dirs if fswatch is available
 
 	if command -v fswatch &>/dev/null; then
 		# Watch inboxes
