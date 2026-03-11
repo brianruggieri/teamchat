@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { JournalEntry, TaskInfo, TeamConfig, TeamState, ChatEvent } from '../shared/types.js';
+import type { JournalEntry, TaskInfo, TeamConfig, TeamState } from '../shared/types.js';
 import type {
 	ReplayArtifact,
 	ReplayBundle,

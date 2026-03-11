@@ -21,7 +21,7 @@ export function ArtifactViewerModal({
 	const [loading, setLoading] = useState(false);
 	const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 	const previewMode = getArtifactPreviewMode(artifact.file.mimeType);
-	const artifactUrl = `${artifactBaseUrl}/${artifact.id}`;
+	const artifactUrl = `${artifactBaseUrl}/${encodeURIComponent(artifact.id)}`;
 
 	useEffect(() => {
 		closeButtonRef.current?.focus();
@@ -83,6 +83,7 @@ export function ArtifactViewerModal({
 				<iframe
 					title={artifact.title}
 					src={artifactUrl}
+					sandbox=""
 					className="tc-artifact-modal-frame"
 				/>
 			);

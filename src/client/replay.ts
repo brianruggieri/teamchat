@@ -4,6 +4,7 @@ import type {
 	ReplayArtifact,
 	ReplayBundle,
 	ReplayCursor,
+	ReplayEntry,
 	ReplayMarker,
 } from '../shared/replay.js';
 
@@ -146,12 +147,25 @@ export function deriveReplayState(
 	};
 }
 
+const seqIndexCache = new WeakMap<readonly ReplayEntry[], Map<number, number>>();
+
+function getSeqIndexMap(entries: readonly ReplayEntry[]): Map<number, number> {
+	let map = seqIndexCache.get(entries);
+	if (!map) {
+		map = new Map();
+		for (let i = 0; i < entries.length; i++) {
+			map.set(entries[i]!.seq, i);
+		}
+		seqIndexCache.set(entries, map);
+	}
+	return map;
+}
+
 function getEntryIndexForCursor(bundle: ReplayBundle, cursor: ReplayCursor): number {
 	if (cursor.seq < 0) {
 		return -1;
 	}
-	const index = bundle.entries.findIndex((entry) => entry.seq === cursor.seq);
-	return index;
+	return getSeqIndexMap(bundle.entries).get(cursor.seq) ?? -1;
 }
 
 function findNearestCheckpoint(checkpoints: ReplayCheckpoint[], seq: number): ReplayCheckpoint {

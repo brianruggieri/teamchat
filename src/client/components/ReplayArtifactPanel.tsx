@@ -47,7 +47,7 @@ export function ReplayArtifactPanel({
 		if (previewMode === 'text' || previewMode === 'json') {
 			let cancelled = false;
 
-			fetch(`${artifactBaseUrl}/${selectedArtifact.id}`)
+			fetch(`${artifactBaseUrl}/${encodeURIComponent(selectedArtifact.id)}`)
 				.then(async (response) => {
 					if (!response.ok) {
 						throw new Error(`Artifact unavailable (${response.status})`);
@@ -136,9 +136,9 @@ export function ReplayArtifactPanel({
 										</button>
 									)}
 									<a
-										href={`${artifactBaseUrl}/${selectedArtifact.id}`}
+										href={`${artifactBaseUrl}/${encodeURIComponent(selectedArtifact.id)}`}
 										target="_blank"
-										rel="noreferrer"
+										rel="noopener noreferrer"
 										className="tc-replay-button is-subtle"
 									>
 										Open

@@ -193,6 +193,15 @@ function ReplayWorkspaceLoaded({
 	bundle: ReplayBundle;
 }) {
 	const controller = useReplayController(bundle);
+	const {
+		toggle,
+		nextMarker,
+		prevMarker,
+		stepForward,
+		stepBack,
+		restart,
+		setSpeed,
+	} = controller;
 	const visibleArtifacts = controller.derivedState.visibleArtifacts;
 	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
@@ -212,50 +221,50 @@ function ReplayWorkspaceLoaded({
 
 			if (event.key === ' ') {
 				event.preventDefault();
-				controller.toggle();
+				toggle();
 				return;
 			}
 			if (event.key === 'ArrowRight' && event.shiftKey) {
 				event.preventDefault();
-				controller.nextMarker();
+				nextMarker();
 				return;
 			}
 			if (event.key === 'ArrowLeft' && event.shiftKey) {
 				event.preventDefault();
-				controller.prevMarker();
+				prevMarker();
 				return;
 			}
 			if (event.key === 'ArrowRight') {
 				event.preventDefault();
-				controller.stepForward();
+				stepForward();
 				return;
 			}
 			if (event.key === 'ArrowLeft') {
 				event.preventDefault();
-				controller.stepBack();
+				stepBack();
 				return;
 			}
 			if (event.key === '0') {
 				event.preventDefault();
-				controller.restart();
+				restart();
 				return;
 			}
 			if (event.key === '1') {
-				controller.setSpeed(1);
+				setSpeed(1);
 				return;
 			}
 			if (event.key === '2') {
-				controller.setSpeed(2);
+				setSpeed(2);
 				return;
 			}
 			if (event.key === '5') {
-				controller.setSpeed(5);
+				setSpeed(5);
 			}
 		};
 
 		window.addEventListener('keydown', handleKeydown);
 		return () => window.removeEventListener('keydown', handleKeydown);
-	}, [artifactViewerOpen, controller]);
+	}, [artifactViewerOpen, toggle, nextMarker, prevMarker, stepForward, stepBack, restart, setSpeed]);
 
 	useEffect(() => {
 		const nextSelectedId = resolveSelectedArtifactId(visibleArtifacts, selectedArtifactId);
