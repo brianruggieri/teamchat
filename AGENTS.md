@@ -11,7 +11,7 @@ Instructions for AI agents working on this project.
 
 ## v1 Spec
 
-The current product spec is `.claude/teamchat-v1-spec.md`. This is the source of truth for what ships in v1.0.
+The current product spec is `.claude/teamchat-v1-spec.md` (local, not committed to the repo). This is the source of truth for what ships in v1.0.
 
 ## Code Style
 
@@ -57,7 +57,7 @@ The watcher in `src/server/watcher.ts` monitors three paths:
 - `~/.claude/teams/{name}/inboxes/*.json` — agent messages
 - `~/.claude/tasks/{name}/*.json` — task states
 
-Changes are debounced and diffed against previous state. The processor receives deltas, not full snapshots.
+File changes are debounced; the watcher forwards both the previous and current snapshots to the processor, which computes the deltas.
 
 ## Common Pitfalls
 

@@ -33,7 +33,7 @@ bin/teamchat.ts                # CLI entry point, arg parsing, mode selection
 src/
   server/
     server.ts                  # Bun HTTP + WebSocket server
-    watcher.ts                 # File watcher (chokidar) with debounce
+    watcher.ts                 # File watcher (fs.watch) with debounce
     processor.ts               # Event classification, reactions, idle suppression
     journal.ts                 # JSONL session recording
     replay.ts                  # Replay bundle loading (server-side)
@@ -77,7 +77,7 @@ The `ChatEvent` union type in `src/shared/types.ts` is the core contract:
 - **Indentation**: Tabs
 - **Reactions are never fabricated** — every emoji traces to a real protocol event
 - **Idle suppression is critical** — a 42-min idle period produces ~630 pings. Without suppression, the chat is 95% noise.
-- **File paths**: Semantic `--tc-*` CSS tokens for theming. Don't add new hardcoded color values.
+- **Theming**: Semantic `--tc-*` CSS tokens for theming. Don't add new hardcoded color values.
 - **Tests**: All tests use fixture data in `fixtures/`. Run `bun test` after any change.
 
 ## Current Branches
@@ -88,7 +88,7 @@ The `ChatEvent` union type in `src/shared/types.ts` is the core contract:
 
 ## Planning & Specs
 
-All planning docs live in `.claude/`:
+Planning docs live in `.claude/` (local, gitignored — not committed to the repo):
 - `teamchat-v1-spec.md` — v1 product spec (the launch plan)
 - `teamchat-spec-v02.md` — original product spec (detailed design reference)
 - `teamchat-build-handoff.md` — architecture decisions and rationale
