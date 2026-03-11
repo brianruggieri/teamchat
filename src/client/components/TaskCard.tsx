@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TaskInfo } from '../types.js';
-import { formatDuration } from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface TaskCardProps {
 	task: TaskInfo;
@@ -20,6 +20,7 @@ export function TaskCard({
 	onTaskClick,
 	isPulsing = false,
 }: TaskCardProps) {
+	const { formatDuration } = useRelativeTime();
 	const isBlocked = task.status === 'pending'
 		&& task.blockedBy
 		&& task.blockedBy.length > 0;

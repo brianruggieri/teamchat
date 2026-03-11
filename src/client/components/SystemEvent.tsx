@@ -1,9 +1,6 @@
 import React from 'react';
 import type { SystemEvent as SystemEventType } from '../types.js';
-import {
-	formatAbsoluteTime,
-	formatISOTooltip,
-} from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface SystemEventProps {
 	event: SystemEventType;
@@ -27,6 +24,7 @@ const SUBTYPE_META: Record<string, { icon: string; label: string; tone: string }
 };
 
 export function SystemEventComponent({ event }: SystemEventProps) {
+	const { formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const meta = SUBTYPE_META[event.subtype] ?? {
 		icon: '.',
 		label: 'system',

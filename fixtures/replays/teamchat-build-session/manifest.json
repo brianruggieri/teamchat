@@ -1,0 +1,16 @@
+{
+	"version": 1,
+	"sessionId": "teamchat-build-session",
+	"teamName": "concurrent-shimmying-garden",
+	"startedAt": "2026-03-10T14:00:00.000Z",
+	"endedAt": "2026-03-10T15:26:00.000Z",
+	"durationMs": 5160000,
+	"eventCount": 79,
+	"memberCount": 4,
+	"taskCount": 9,
+	"hasArtifacts": true,
+	"source": {
+		"kind": "bundle",
+		"pathLabel": "teamchat-build-session"
+	}
+}

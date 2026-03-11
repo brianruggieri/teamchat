@@ -1,30 +1,435 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useChatReducer } from './hooks/useChatReducer.js';
 import { useWebSocket } from './hooks/useWebSocket.js';
 import { useAutoScroll } from './hooks/useAutoScroll.js';
-import { useRelativeTime } from './hooks/useRelativeTime.js';
+import { TimeProvider } from './hooks/useRelativeTime.js';
+import { useReplayController } from './hooks/useReplayController.js';
 import { Header } from './components/Header.jsx';
 import { MessageList } from './components/MessageList.jsx';
 import { TaskSidebar } from './components/TaskSidebar.jsx';
 import { PresenceRoster } from './components/PresenceRoster.jsx';
 import { SessionStats } from './components/SessionStats.jsx';
 import { NewMessageIndicator } from './components/NewMessageIndicator.jsx';
+import { ReplayControls } from './components/ReplayControls.jsx';
+import { ReplayTimeline } from './components/ReplayTimeline.jsx';
+import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
+import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
+import { ModeBanner } from './components/ModeBanner.jsx';
+import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle } from '../shared/replay.js';
+import type { ReplayArtifact } from '../shared/replay.js';
+import type { ChatState } from './types.js';
+import { resolveSelectedArtifactId } from './artifacts.js';
 
 function App() {
+	const [bootstrap, setBootstrap] = useState<AppBootstrap | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let isActive = true;
+
+		fetch('/bootstrap')
+			.then(async (response) => {
+				if (!response.ok) {
+					throw new Error(`Bootstrap failed (${response.status})`);
+				}
+				return response.json() as Promise<AppBootstrap>;
+			})
+			.then((payload) => {
+				if (isActive) {
+					setBootstrap(payload);
+				}
+			})
+			.catch((fetchError) => {
+				if (isActive) {
+					setError(fetchError instanceof Error ? fetchError.message : 'Bootstrap failed');
+				}
+			});
+
+		return () => {
+			isActive = false;
+		};
+	}, []);
+
+	if (error) {
+		return (
+			<div className="tc-app-shell">
+				<StatusPanel
+					title="Unable to start teamchat"
+					description={error}
+				/>
+			</div>
+		);
+	}
+
+	if (!bootstrap) {
+		return (
+			<div className="tc-app-shell">
+				<StatusPanel
+					title="Loading teamchat"
+					description="Fetching bootstrap state for the active session."
+					spinner
+				/>
+			</div>
+		);
+	}
+
+	if (bootstrap.mode === 'live') {
+		return <LiveWorkspace bootstrap={bootstrap} />;
+	}
+
+	return <ReplayWorkspace bootstrap={bootstrap} />;
+}
+
+function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode: 'live' }> }) {
 	const [state, dispatch] = useChatReducer();
+
+	useEffect(() => {
+		dispatch({ type: 'HYDRATE', state: bootstrap.initialState });
+	}, [bootstrap.initialState, dispatch]);
+
+	useWebSocket(dispatch, bootstrap.wsUrl);
+
+	return (
+		<TimeProvider>
+			<TeamChatScaffold
+				state={state}
+				mode="live"
+				headerStatusText={state.connected ? 'following stream' : 'reconnecting'}
+				topContent={(
+					<ModeBanner
+						mode="live"
+						eyebrow="Live mode"
+						title="Following the active team session"
+						description={
+							state.connected
+								? 'Incoming events stream into the workspace in real time.'
+								: 'Trying to reattach to the live event stream.'
+						}
+						meta={[
+							state.connected ? 'Realtime websocket' : 'Reconnect in progress',
+							`${bootstrap.initialState.team?.members.length ?? 0} agents configured`,
+						]}
+					/>
+				)}
+				emptyTitle="Waiting for messages"
+				emptyDescription="Connect a team or load a replay to populate the conversation."
+				renderPanels={(onTaskClick) => [
+					<PresenceRoster key="presence" mode="live" team={state.team} presence={state.presence} />,
+					<TaskSidebar key="tasks" tasks={state.tasks} onTaskClick={onTaskClick} />,
+					<SessionStats
+						key="stats"
+						events={state.events}
+						tasks={state.tasks}
+						sessionStart={state.sessionStart}
+						memberCount={state.team?.members.length ?? 0}
+					/>,
+				]}
+			/>
+		</TimeProvider>
+	);
+}
+
+function ReplayWorkspace({ bootstrap }: { bootstrap: ReplayAppBootstrap }) {
+	const [bundle, setBundle] = useState<ReplayBundle | null>(null);
+	const [error, setError] = useState<string | null>(null);
+
+	useEffect(() => {
+		let isActive = true;
+		fetch(bootstrap.replayBundleUrl)
+			.then(async (response) => {
+				if (!response.ok) {
+					throw new Error(`Replay bundle failed (${response.status})`);
+				}
+				return response.json() as Promise<ReplayBundle>;
+			})
+			.then((payload) => {
+				if (isActive) {
+					setBundle(payload);
+				}
+			})
+			.catch((fetchError) => {
+				if (isActive) {
+					setError(fetchError instanceof Error ? fetchError.message : 'Replay bundle failed');
+				}
+			});
+
+		return () => {
+			isActive = false;
+		};
+	}, [bootstrap.replayBundleUrl]);
+
+	if (error) {
+		return (
+			<div className="tc-app-shell">
+				<StatusPanel
+					title="Unable to load replay"
+					description={error}
+				/>
+			</div>
+		);
+	}
+
+	if (!bundle) {
+		return (
+			<div className="tc-app-shell">
+				<StatusPanel
+					title="Loading replay"
+					description="Preparing the replay bundle and timeline markers."
+					spinner
+				/>
+			</div>
+		);
+	}
+
+	return <ReplayWorkspaceLoaded bootstrap={bootstrap} bundle={bundle} />;
+}
+
+function ReplayWorkspaceLoaded({
+	bootstrap,
+	bundle,
+}: {
+	bootstrap: ReplayAppBootstrap;
+	bundle: ReplayBundle;
+}) {
+	const controller = useReplayController(bundle);
+	const {
+		toggle,
+		nextMarker,
+		prevMarker,
+		stepForward,
+		stepBack,
+		restart,
+		setSpeed,
+	} = controller;
+	const visibleArtifacts = controller.derivedState.visibleArtifacts;
+	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
+
+	useEffect(() => {
+		const handleKeydown = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (
+				target
+				&& ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(target.tagName)
+			) {
+				return;
+			}
+			if (artifactViewerOpen) {
+				return;
+			}
+
+			if (event.key === ' ') {
+				event.preventDefault();
+				toggle();
+				return;
+			}
+			if (event.key === 'ArrowRight' && event.shiftKey) {
+				event.preventDefault();
+				nextMarker();
+				return;
+			}
+			if (event.key === 'ArrowLeft' && event.shiftKey) {
+				event.preventDefault();
+				prevMarker();
+				return;
+			}
+			if (event.key === 'ArrowRight') {
+				event.preventDefault();
+				stepForward();
+				return;
+			}
+			if (event.key === 'ArrowLeft') {
+				event.preventDefault();
+				stepBack();
+				return;
+			}
+			if (event.key === '0') {
+				event.preventDefault();
+				restart();
+				return;
+			}
+			if (event.key === '1') {
+				setSpeed(1);
+				return;
+			}
+			if (event.key === '2') {
+				setSpeed(2);
+				return;
+			}
+			if (event.key === '5') {
+				setSpeed(5);
+			}
+		};
+
+		window.addEventListener('keydown', handleKeydown);
+		return () => window.removeEventListener('keydown', handleKeydown);
+	}, [artifactViewerOpen, toggle, nextMarker, prevMarker, stepForward, stepBack, restart, setSpeed]);
+
+	useEffect(() => {
+		const nextSelectedId = resolveSelectedArtifactId(visibleArtifacts, selectedArtifactId);
+		const selectionLost = selectedArtifactId != null
+			&& !visibleArtifacts.some((artifact) => artifact.id === selectedArtifactId);
+
+		if (selectionLost && artifactViewerOpen) {
+			setArtifactViewerOpen(false);
+		}
+
+		if (nextSelectedId !== selectedArtifactId) {
+			setSelectedArtifactId(nextSelectedId);
+		}
+	}, [artifactViewerOpen, selectedArtifactId, visibleArtifacts]);
+
+	const selectedArtifact = useMemo(
+		() => visibleArtifacts.find((artifact) => artifact.id === selectedArtifactId) ?? null,
+		[selectedArtifactId, visibleArtifacts],
+	);
+
+	const handleExpandArtifact = useCallback((artifact: ReplayArtifact) => {
+		setSelectedArtifactId(artifact.id);
+		setArtifactViewerOpen(true);
+	}, []);
+
+	const replayStatusText = `${controller.state.status} · ${controller.state.speed}x`;
+	const replayTopContent = (
+		<ModeBanner
+			mode="replay"
+			eyebrow="Replay mode"
+			title="Recorded session with local playback"
+			description="Scrub, step, and inspect saved artifacts without affecting any other viewer."
+			meta={[
+				`${bundle.manifest.eventCount} events`,
+				formatReplayStamp(bundle.manifest.startedAt),
+				`${bundle.artifacts.length} artifact${bundle.artifacts.length === 1 ? '' : 's'}`,
+			]}
+		>
+			<ReplayControls
+				status={controller.state.status}
+				speed={controller.state.speed}
+				elapsedMs={controller.state.cursor.atMs}
+				durationMs={controller.state.durationMs}
+				onToggle={controller.toggle}
+				onRestart={controller.restart}
+				onStepBack={controller.stepBack}
+				onStepForward={controller.stepForward}
+				onPrevMarker={controller.prevMarker}
+				onNextMarker={controller.nextMarker}
+				onSpeedChange={controller.setSpeed}
+			/>
+			<ReplayTimeline
+				elapsedMs={controller.state.cursor.atMs}
+				durationMs={controller.state.durationMs}
+				markers={bundle.markers}
+				onSeek={controller.seek}
+				onMarkerJump={(marker) => controller.seek(marker.atMs)}
+			/>
+		</ModeBanner>
+	);
+
+	return (
+		<TimeProvider nowMs={controller.state.virtualNowMs}>
+			<>
+				<TeamChatScaffold
+					state={controller.derivedState.chatState}
+					mode="replay"
+					headerStatusText={replayStatusText}
+					topContent={replayTopContent}
+					emptyTitle="Replay ready"
+					emptyDescription="Press play, step through the session, or scrub the timeline."
+					renderPanels={(onTaskClick) => [
+						<ReplayArtifactPanel
+							key="artifacts"
+							artifacts={visibleArtifacts}
+							artifactBaseUrl={bootstrap.artifactBaseUrl}
+							selectedArtifactId={selectedArtifactId}
+							onSelectArtifact={setSelectedArtifactId}
+							onExpandArtifact={handleExpandArtifact}
+						/>,
+						<PresenceRoster
+							key="presence"
+							mode="replay"
+							team={controller.derivedState.chatState.team}
+							presence={controller.derivedState.chatState.presence}
+						/>,
+						<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
+						<SessionStats
+							key="stats"
+							events={controller.derivedState.chatState.events}
+							tasks={controller.derivedState.chatState.tasks}
+							sessionStart={controller.derivedState.chatState.sessionStart}
+							memberCount={controller.derivedState.chatState.team?.members.length ?? 0}
+						/>,
+					]}
+				/>
+				{artifactViewerOpen && selectedArtifact && (
+					<ArtifactViewerModal
+						artifact={selectedArtifact}
+						artifactBaseUrl={bootstrap.artifactBaseUrl}
+						onClose={() => setArtifactViewerOpen(false)}
+					/>
+				)}
+			</>
+		</TimeProvider>
+	);
+}
+
+function TeamChatScaffold({
+	state,
+	mode,
+	headerStatusText,
+	headerChildren,
+	topContent,
+	emptyTitle,
+	emptyDescription,
+	renderPanels,
+}: {
+	state: ChatState;
+	mode: 'live' | 'replay';
+	headerStatusText: string;
+	headerChildren?: React.ReactNode;
+	topContent?: React.ReactNode;
+	emptyTitle: string;
+	emptyDescription: string;
+	renderPanels: (onTaskClick: (taskId: string) => void) => React.ReactNode[];
+}) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
-
-	useWebSocket(dispatch);
-	useRelativeTime(30000);
-
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
 		state.events.length,
 	]);
 
-	const onlineCount = Object.values(state.presence).filter(
-		(status) => status === 'working' || status === 'idle'
-	).length + 1;
+	const handleTaskClick = useCallback((taskId: string) => {
+		setWorkbenchOpen(false);
+		const container = containerRef.current;
+		if (!container) return;
+
+		const groupToggle = container.querySelector<HTMLButtonElement>(
+			`[data-task-ids~="${taskId}"]`,
+		);
+		if (groupToggle?.getAttribute('aria-expanded') === 'false') {
+			groupToggle.click();
+		}
+
+		const targetEl = container.querySelector<HTMLElement>(
+			`[data-task-id="${taskId}"], [data-task-ids~="${taskId}"]`,
+		);
+		if (targetEl) {
+			targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			targetEl.classList.add('ring-2', 'ring-indigo-500/50');
+			setTimeout(() => {
+				targetEl.classList.remove('ring-2', 'ring-indigo-500/50');
+			}, 2000);
+		}
+	}, [containerRef]);
+	const desktopPanels = useMemo(
+		() => renderPanels(handleTaskClick),
+		[handleTaskClick, renderPanels],
+	);
+	const sheetPanels = useMemo(
+		() => renderPanels(handleTaskClick),
+		[handleTaskClick, renderPanels],
+	);
+	const onlineCount = getOnlineCount(state);
+	const hasEvents = state.events.length > 0;
 
 	useEffect(() => {
 		if (!workbenchOpen) return undefined;
@@ -54,45 +459,29 @@ function App() {
 		setWorkbenchOpen(false);
 	}, []);
 
-	const handleTaskClick = useCallback((taskId: string) => {
-		setWorkbenchOpen(false);
-		const container = containerRef.current;
-		if (!container) return;
-
-		const groupToggle = container.querySelector<HTMLButtonElement>(
-			`[data-task-ids~="${taskId}"]`
-		);
-		if (groupToggle?.getAttribute('aria-expanded') === 'false') {
-			groupToggle.click();
-		}
-
-		const targetEl = container.querySelector<HTMLElement>(
-			`[data-task-id="${taskId}"], [data-task-ids~="${taskId}"]`
-		);
-		if (targetEl) {
-			targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-			targetEl.classList.add('ring-2', 'ring-indigo-500/50');
-			setTimeout(() => {
-				targetEl.classList.remove('ring-2', 'ring-indigo-500/50');
-			}, 2000);
-		}
-	}, [containerRef]);
-
-	const hasEvents = state.events.length > 0;
-
 	return (
-		<div className="tc-app-shell">
+		<div className={`tc-app-shell is-${mode}`}>
 			<Header
 				team={state.team}
-				connected={state.connected}
+				connected={mode === 'live' ? state.connected : true}
 				onlineCount={onlineCount}
-			/>
+				mode={mode}
+				statusText={headerStatusText}
+			>
+				{headerChildren}
+			</Header>
+
+			{topContent && (
+				<div className={`tc-top-content is-${mode}`}>
+					{topContent}
+				</div>
+			)}
 
 			<div className="tc-app-body">
 				<section className="tc-thread-pane">
 					<div ref={containerRef} className="tc-thread-scroll">
 						<div className="tc-thread-column">
-							{!state.connected && !hasEvents && (
+							{mode === 'live' && !state.connected && !hasEvents && (
 								<StatusPanel
 									title="Connecting to server"
 									description="Waiting for the live event stream to attach."
@@ -100,14 +489,14 @@ function App() {
 								/>
 							)}
 
-							{state.connected && !hasEvents && (
+							{((mode === 'live' && state.connected && !hasEvents) || (mode === 'replay' && !hasEvents)) && (
 								<StatusPanel
-									title="Waiting for messages"
-									description="Connect a team or load a replay to populate the conversation."
+									title={emptyTitle}
+									description={emptyDescription}
 								/>
 							)}
 
-							{!state.connected && hasEvents && (
+							{mode === 'live' && !state.connected && hasEvents && (
 								<div className="tc-status-banner">
 									<div className="tc-status-banner-dot" />
 									<span>Connection lost. Rejoining the session stream.</span>
@@ -130,10 +519,13 @@ function App() {
 				</section>
 
 				<aside className="tc-right-rail" aria-label="Team and task panel">
-					<DesktopWorkbench
-						state={state}
-						onTaskClick={handleTaskClick}
-					/>
+					<div className="tc-rail-frame">
+						{desktopPanels.map((panel, index) => (
+							<div key={index} className="tc-rail-section">
+								{panel}
+							</div>
+						))}
+					</div>
 				</aside>
 			</div>
 
@@ -169,16 +561,10 @@ function App() {
 						<div className="tc-bottom-sheet-handle" />
 						<div className="tc-bottom-sheet-header">
 							<div>
-								<div
-									id="tc-bottom-sheet-title"
-									className="tc-bottom-sheet-title"
-								>
+								<div id="tc-bottom-sheet-title" className="tc-bottom-sheet-title">
 									Team panel
 								</div>
-								<div
-									id="tc-bottom-sheet-description"
-									className="tc-bottom-sheet-subtitle"
-								>
+								<div id="tc-bottom-sheet-description" className="tc-bottom-sheet-subtitle">
 									Tasks, team status, and session metrics
 								</div>
 							</div>
@@ -191,10 +577,11 @@ function App() {
 							</button>
 						</div>
 						<div className="tc-bottom-sheet-content">
-							<SheetWorkbench
-								state={state}
-								onTaskClick={handleTaskClick}
-							/>
+							<div className="tc-workbench-stack">
+								{sheetPanels.map((panel, index) => (
+									<div key={index}>{panel}</div>
+								))}
+							</div>
 						</div>
 					</div>
 				</div>
@@ -203,52 +590,24 @@ function App() {
 	);
 }
 
-function DesktopWorkbench({
-	state,
-	onTaskClick,
-}: {
-	state: ReturnType<typeof useChatReducer>[0];
-	onTaskClick: (taskId: string) => void;
-}) {
-	return (
-		<div className="tc-rail-frame">
-			<div className="tc-rail-section is-top">
-				<PresenceRoster team={state.team} presence={state.presence} />
-			</div>
-			<div className="tc-rail-section is-middle">
-				<TaskSidebar tasks={state.tasks} onTaskClick={onTaskClick} />
-			</div>
-			<div className="tc-rail-section is-bottom">
-				<SessionStats
-					events={state.events}
-					tasks={state.tasks}
-					sessionStart={state.sessionStart}
-					memberCount={state.team?.members.length ?? 0}
-				/>
-			</div>
-		</div>
-	);
+function formatReplayStamp(timestamp: string): string {
+	return new Date(timestamp).toLocaleString([], {
+		month: 'short',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit',
+	});
 }
 
-function SheetWorkbench({
-	state,
-	onTaskClick,
-}: {
-	state: ReturnType<typeof useChatReducer>[0];
-	onTaskClick: (taskId: string) => void;
-}) {
-	return (
-		<div className="tc-workbench-stack">
-			<TaskSidebar tasks={state.tasks} onTaskClick={onTaskClick} />
-			<PresenceRoster team={state.team} presence={state.presence} />
-			<SessionStats
-				events={state.events}
-				tasks={state.tasks}
-				sessionStart={state.sessionStart}
-				memberCount={state.team?.members.length ?? 0}
-			/>
-		</div>
-	);
+function getOnlineCount(state: ChatState): number {
+	if (!state.team) {
+		return 0;
+	}
+
+	return state.team.members.filter((member) => {
+		if (member.name === 'team-lead') return true;
+		return (state.presence[member.name] ?? 'offline') !== 'offline';
+	}).length;
 }
 
 function StatusPanel({

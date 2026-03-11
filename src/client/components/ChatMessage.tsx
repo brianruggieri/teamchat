@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import type { ContentMessage, Reaction } from '../types.js';
 import { getAgentColor } from '../types.js';
 import { ReactionRow } from './ReactionRow.jsx';
-import {
-	formatRelativeTime,
-	formatAbsoluteTime,
-	formatISOTooltip,
-} from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface ChatMessageProps {
 	message: ContentMessage;
@@ -22,15 +18,15 @@ export function ChatMessage({
 	stackPosition = 'single',
 }: ChatMessageProps) {
 	const [expanded, setExpanded] = useState(false);
+	const { nowMs, formatRelativeTime, formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const agentColor = getAgentColor(message.fromColor);
 	const isLong = message.text.length > TRUNCATE_LENGTH;
 	const displayText = isLong && !expanded
 		? message.summary ?? `${message.text.slice(0, TRUNCATE_LENGTH)}...`
 		: message.text;
 
-	const now = Date.now();
 	const msgTime = new Date(message.timestamp).getTime();
-	const isRecent = now - msgTime < 3600000;
+	const isRecent = nowMs - msgTime < 3600000;
 	const timeDisplay = isRecent
 		? formatRelativeTime(message.timestamp)
 		: formatAbsoluteTime(message.timestamp);

@@ -1,7 +1,423 @@
-import type { ReplayBundle } from '../shared/replay.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { JournalEntry, TaskInfo, TeamConfig, TeamState } from '../shared/types.js';
+import type {
+	ReplayArtifact,
+	ReplayBundle,
+	ReplayEntry,
+	ReplayManifest,
+	ReplayMarker,
+} from '../shared/replay.js';
+import { Journal } from './journal.js';
+
+interface ReplayConfigFile extends TeamConfig {
+	name?: string;
+}
 
 export interface LoadedReplaySource {
 	bundle: ReplayBundle;
 	rootDir: string;
 	artifactBaseDir: string | null;
+}
+
+export function loadReplaySource(inputPath: string): LoadedReplaySource {
+	const resolvedInput = path.resolve(inputPath);
+	if (!fs.existsSync(resolvedInput)) {
+		throw new Error(`Replay source not found: ${resolvedInput}`);
+	}
+
+	const stat = fs.statSync(resolvedInput);
+	if (stat.isDirectory()) {
+		return loadReplayDirectory(resolvedInput);
+	}
+
+	if (stat.isFile() && resolvedInput.endsWith('.jsonl')) {
+		return loadLegacyReplayFile(resolvedInput);
+	}
+
+	throw new Error(`Unsupported replay source: ${resolvedInput}`);
+}
+
+function loadReplayDirectory(rootDir: string): LoadedReplaySource {
+	const manifestPath = path.join(rootDir, 'manifest.json');
+	const manifest = readJsonFile<ReplayManifest>(manifestPath);
+	const eventsPath = resolveFirstExistingPath([
+		path.join(rootDir, 'events.jsonl'),
+		path.join(rootDir, 'session.jsonl'),
+	]);
+	if (!eventsPath) {
+		throw new Error(`Replay bundle missing events.jsonl or session.jsonl: ${rootDir}`);
+	}
+
+	return buildReplaySource({
+		rootDir,
+		sourceKind: 'bundle',
+		pathLabel: path.basename(rootDir),
+		entries: readEntries(eventsPath),
+		manifest,
+		configPath: resolveFirstExistingPath([path.join(rootDir, 'config.json')]),
+		initialTasksPath: resolveFirstExistingPath([
+			path.join(rootDir, 'tasks.initial.json'),
+			path.join(rootDir, 'tasks-initial.json'),
+		]),
+		finalTasksPath: resolveFirstExistingPath([
+			path.join(rootDir, 'tasks.final.json'),
+			path.join(rootDir, 'tasks.json'),
+		]),
+		artifactsPath: resolveFirstExistingPath([path.join(rootDir, 'artifacts.json')]),
+	});
+}
+
+function loadLegacyReplayFile(filePath: string): LoadedReplaySource {
+	const rootDir = path.dirname(filePath);
+	return buildReplaySource({
+		rootDir,
+		sourceKind: 'journal',
+		pathLabel: path.basename(filePath),
+		entries: readEntries(filePath),
+		manifest: null,
+		configPath: resolveFirstExistingPath([path.join(rootDir, 'config.json')]),
+		initialTasksPath: resolveFirstExistingPath([
+			path.join(rootDir, 'tasks.initial.json'),
+			path.join(rootDir, 'tasks-initial.json'),
+		]),
+		finalTasksPath: resolveFirstExistingPath([
+			path.join(rootDir, 'tasks.final.json'),
+			path.join(rootDir, 'tasks.json'),
+		]),
+		artifactsPath: resolveFirstExistingPath([path.join(rootDir, 'artifacts.json')]),
+		fileName: path.basename(filePath, '.jsonl'),
+	});
+}
+
+function buildReplaySource({
+	rootDir,
+	sourceKind,
+	pathLabel,
+	entries,
+	manifest,
+	configPath,
+	initialTasksPath,
+	finalTasksPath,
+	artifactsPath,
+	fileName,
+}: {
+	rootDir: string;
+	sourceKind: 'journal' | 'bundle';
+	pathLabel: string;
+	entries: JournalEntry[];
+	manifest: ReplayManifest | null;
+	configPath: string | null;
+	initialTasksPath: string | null;
+	finalTasksPath: string | null;
+	artifactsPath: string | null;
+	fileName?: string;
+}): LoadedReplaySource {
+	const normalizedEntries = normalizeEntries(entries);
+	const config = configPath ? readJsonFile<ReplayConfigFile>(configPath) : null;
+	const derivedTasks = deriveTasksFromEntries(normalizedEntries);
+	const initialTasks = initialTasksPath
+		? readJsonFile<TaskInfo[]>(initialTasksPath) ?? derivedTasks.initial
+		: derivedTasks.initial;
+	const finalTasks = finalTasksPath
+		? readJsonFile<TaskInfo[]>(finalTasksPath) ?? derivedTasks.final
+		: derivedTasks.final;
+	const artifacts = artifactsPath ? readJsonFile<ReplayArtifact[]>(artifactsPath) ?? [] : [];
+
+	const teamName = manifest?.teamName
+		?? config?.name
+		?? fileName
+		?? path.basename(rootDir);
+	const team: TeamState = {
+		name: teamName,
+		members: config?.members ?? [],
+	};
+
+	const computedManifest = buildManifest({
+		manifest,
+		team,
+		entries: normalizedEntries,
+		finalTasks,
+		artifacts,
+		sourceKind,
+		pathLabel,
+		rootDir,
+	});
+	const markers = buildMarkers(normalizedEntries, artifacts);
+
+	return {
+		bundle: {
+			manifest: computedManifest,
+			team,
+			entries: normalizedEntries,
+			initialTasks,
+			finalTasks,
+			artifacts,
+			markers,
+		},
+		rootDir,
+		artifactBaseDir: artifacts.length > 0 ? rootDir : null,
+	};
+}
+
+function readEntries(filePath: string): JournalEntry[] {
+	return Journal.readFrom(filePath);
+}
+
+function normalizeEntries(entries: JournalEntry[]): ReplayEntry[] {
+	if (entries.length === 0) {
+		return [];
+	}
+
+	const sorted = [...entries].sort((a, b) => {
+		const seqDiff = a.seq - b.seq;
+		if (seqDiff !== 0) {
+			return seqDiff;
+		}
+		return new Date(a.event.timestamp).getTime() - new Date(b.event.timestamp).getTime();
+	});
+	const baseTs = new Date(sorted[0]!.event.timestamp).getTime();
+
+	return sorted.map((entry, index) => ({
+		seq: index,
+		atMs: Math.max(0, new Date(entry.event.timestamp).getTime() - baseTs),
+		event: entry.event,
+	}));
+}
+
+function deriveTasksFromEntries(entries: ReplayEntry[]): { initial: TaskInfo[]; final: TaskInfo[] } {
+	const firstSeen = new Map<string, TaskInfo>();
+	const lastSeen = new Map<string, TaskInfo>();
+
+	for (const entry of entries) {
+		if (entry.event.type !== 'task-update') {
+			continue;
+		}
+		const task = entry.event.task;
+		if (!firstSeen.has(task.id)) {
+			firstSeen.set(task.id, structuredClone(task));
+		}
+		lastSeen.set(task.id, structuredClone(task));
+	}
+
+	return {
+		initial: sortTasks(Array.from(firstSeen.values())),
+		final: sortTasks(Array.from(lastSeen.values())),
+	};
+}
+
+function sortTasks(tasks: TaskInfo[]): TaskInfo[] {
+	return [...tasks].sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+function buildManifest({
+	manifest,
+	team,
+	entries,
+	finalTasks,
+	artifacts,
+	sourceKind,
+	pathLabel,
+	rootDir,
+}: {
+	manifest: ReplayManifest | null;
+	team: TeamState;
+	entries: ReplayEntry[];
+	finalTasks: TaskInfo[];
+	artifacts: ReplayArtifact[];
+	sourceKind: 'journal' | 'bundle';
+	pathLabel: string;
+	rootDir: string;
+}): ReplayManifest {
+	if (entries.length === 0) {
+		const now = new Date().toISOString();
+		return {
+			version: 1,
+			sessionId: manifest?.sessionId ?? path.basename(rootDir),
+			teamName: manifest?.teamName ?? team.name,
+			startedAt: manifest?.startedAt ?? now,
+			endedAt: manifest?.endedAt ?? now,
+			durationMs: 0,
+			eventCount: 0,
+			memberCount: team.members.length,
+			taskCount: finalTasks.length,
+			hasArtifacts: artifacts.length > 0,
+			source: {
+				kind: sourceKind,
+				pathLabel,
+			},
+		};
+	}
+
+	const startedAt = manifest?.startedAt ?? entries[0]!.event.timestamp;
+	const endedAt = manifest?.endedAt ?? entries[entries.length - 1]!.event.timestamp;
+	const durationMs = manifest?.durationMs
+		?? Math.max(0, new Date(endedAt).getTime() - new Date(startedAt).getTime());
+
+	return {
+		version: 1,
+		sessionId: manifest?.sessionId ?? path.basename(rootDir),
+		teamName: manifest?.teamName ?? team.name,
+		startedAt,
+		endedAt,
+		durationMs,
+		eventCount: manifest?.eventCount ?? entries.length,
+		memberCount: manifest?.memberCount ?? team.members.length,
+		taskCount: manifest?.taskCount ?? finalTasks.length,
+		hasArtifacts: manifest?.hasArtifacts ?? artifacts.length > 0,
+		source: {
+			kind: sourceKind,
+			pathLabel,
+		},
+	};
+}
+
+function buildMarkers(entries: ReplayEntry[], artifacts: ReplayArtifact[]): ReplayMarker[] {
+	const markers: ReplayMarker[] = [];
+
+	if (entries.length > 0) {
+		markers.push({
+			id: 'marker-session-start',
+			kind: 'session-start',
+			atMs: 0,
+			seq: 0,
+			label: 'Session start',
+			eventId: entries[0]!.event.id,
+		});
+	}
+
+	for (const entry of entries) {
+		const marker = buildMarkerFromEvent(entry);
+		if (marker) {
+			markers.push(marker);
+		}
+	}
+
+	for (const artifact of artifacts) {
+		markers.push({
+			id: `marker-artifact-${artifact.id}`,
+			kind: 'artifact',
+			atMs: artifact.createdAtMs,
+			seq: findClosestSeqForMs(entries, artifact.createdAtMs),
+			label: artifact.title,
+			artifactId: artifact.id,
+		});
+	}
+
+	return markers.sort((a, b) => {
+		if (a.atMs !== b.atMs) {
+			return a.atMs - b.atMs;
+		}
+		return a.seq - b.seq;
+	});
+}
+
+function buildMarkerFromEvent(entry: ReplayEntry): ReplayMarker | null {
+	const event = entry.event;
+	if (event.type === 'system') {
+		const markerKind = systemSubtypeToMarkerKind(event.subtype);
+		if (!markerKind) {
+			return null;
+		}
+		return {
+			id: `marker-${markerKind}-${event.id}`,
+			kind: markerKind,
+			atMs: entry.atMs,
+			seq: entry.seq,
+			label: event.taskId ? `${event.text} (#${event.taskId})` : event.text,
+			eventId: event.id,
+			taskId: event.taskId ?? undefined,
+		};
+	}
+
+	if (event.type === 'thread-marker' && event.subtype === 'thread-start') {
+		return {
+			id: `marker-thread-${event.id}`,
+			kind: 'thread-start',
+			atMs: entry.atMs,
+			seq: entry.seq,
+			label: `DM: ${event.participants.join(' ↔ ')}`,
+			eventId: event.id,
+		};
+	}
+
+	if (event.type === 'message' && event.text.startsWith('📋 PLAN:')) {
+		return {
+			id: `marker-plan-${event.id}`,
+			kind: 'plan',
+			atMs: entry.atMs,
+			seq: entry.seq,
+			label: `Plan from ${event.from}`,
+			eventId: event.id,
+		};
+	}
+
+	if (
+		event.type === 'message'
+		&& event.text.startsWith('🔐 ')
+		&& event.text.includes(' wants to run:')
+	) {
+		return {
+			id: `marker-permission-${event.id}`,
+			kind: 'permission',
+			atMs: entry.atMs,
+			seq: entry.seq,
+			label: `Permission: ${event.from}`,
+			eventId: event.id,
+		};
+	}
+
+	return null;
+}
+
+function systemSubtypeToMarkerKindImpl(subtype: string): ReplayMarker['kind'] | null {
+	switch (subtype) {
+		case 'task-created':
+			return 'task-created';
+		case 'task-claimed':
+			return 'task-claimed';
+		case 'task-completed':
+			return 'task-completed';
+		case 'task-unblocked':
+			return 'task-unblocked';
+		case 'all-tasks-completed':
+			return 'all-tasks-completed';
+		default:
+			return null;
+	}
+}
+
+function systemSubtypeToMarkerKind(subtype: string): ReplayMarker['kind'] | null {
+	return systemSubtypeToMarkerKindImpl(subtype);
+}
+
+function findClosestSeqForMs(entries: ReplayEntry[], atMs: number): number {
+	let seq = 0;
+	for (const entry of entries) {
+		if (entry.atMs > atMs) {
+			break;
+		}
+		seq = entry.seq;
+	}
+	return seq;
+}
+
+function resolveFirstExistingPath(paths: string[]): string | null {
+	for (const candidate of paths) {
+		if (fs.existsSync(candidate)) {
+			return candidate;
+		}
+	}
+	return null;
+}
+
+function readJsonFile<T>(filePath: string): T | null {
+	if (!fs.existsSync(filePath)) {
+		return null;
+	}
+	try {
+		return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
+	} catch {
+		return null;
+	}
 }

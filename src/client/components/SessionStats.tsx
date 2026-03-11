@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ChatEvent, TaskInfo } from '../types.js';
-import { formatDuration } from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface SessionStatsProps {
 	events: ChatEvent[];
@@ -15,6 +15,7 @@ export function SessionStats({
 	sessionStart,
 	memberCount,
 }: SessionStatsProps) {
+	const { formatDuration } = useRelativeTime();
 	const contentMessages = events.filter((event) => event.type === 'message').length;
 	const systemMessages = events.filter((event) => event.type === 'system').length;
 	const dmThreads = countDMThreads(events);

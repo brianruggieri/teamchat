@@ -3,10 +3,7 @@ import type { ContentMessage, Reaction } from '../types.js';
 import { getAgentColor } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
 import { ReactionRow } from './ReactionRow.jsx';
-import {
-	formatRelativeTime,
-	formatISOTooltip,
-} from '../hooks/useRelativeTime.js';
+import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface PlanApprovalCardProps {
 	message: ContentMessage;
@@ -20,6 +17,7 @@ export function PlanApprovalCard({
 	reactions,
 }: PlanApprovalCardProps) {
 	const [expanded, setExpanded] = useState(false);
+	const { formatRelativeTime, formatISOTooltip } = useRelativeTime();
 	const agentColor = getAgentColor(message.fromColor);
 	const lines = useMemo(() => planContent.split('\n'), [planContent]);
 	const previewLineCount = Math.min(lines.length, 4);

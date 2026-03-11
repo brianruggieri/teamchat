@@ -3,6 +3,7 @@ import type { TeamState } from '../types.js';
 import { getAgentColor } from '../types.js';
 
 interface PresenceRosterProps {
+	mode?: 'live' | 'replay';
 	team: TeamState | null;
 	presence: Record<string, 'working' | 'idle' | 'offline'>;
 }
@@ -13,12 +14,16 @@ const STATUS_LABELS: Record<string, string> = {
 	offline: 'offline',
 };
 
-export function PresenceRoster({ team, presence }: PresenceRosterProps) {
+export function PresenceRoster({
+	mode = 'live',
+	team,
+	presence,
+}: PresenceRosterProps) {
 	if (!team) return null;
 
 	const liveCount = team.members.filter((member) => {
 		if (member.name === 'team-lead') return true;
-		const status = presence[member.name] ?? 'working';
+		const status = presence[member.name] ?? 'offline';
 		return status !== 'offline';
 	}).length;
 
@@ -26,7 +31,9 @@ export function PresenceRoster({ team, presence }: PresenceRosterProps) {
 		<section className="tc-sidecard tc-team-panel">
 			<div className="tc-sidecard-header">
 				<h3 className="tc-sidecard-title">Team</h3>
-				<span className="tc-sidecard-metric">{liveCount} live</span>
+				<span className="tc-sidecard-metric">
+					{liveCount} {mode === 'replay' ? 'present' : 'live'}
+				</span>
 			</div>
 			<div className="tc-roster-list">
 				<div className="tc-roster-row is-lead">
@@ -44,7 +51,7 @@ export function PresenceRoster({ team, presence }: PresenceRosterProps) {
 					.filter((member) => member.name !== 'team-lead')
 					.map((member) => {
 						const agentColor = getAgentColor(member.color);
-						const status = presence[member.name] ?? 'working';
+						const status = presence[member.name] ?? 'offline';
 						return (
 							<div
 								key={member.name}
