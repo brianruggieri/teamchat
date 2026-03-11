@@ -15,6 +15,7 @@ export type SecretCategory =
 	| 'jwt'
 	| 'github-token'
 	| 'gitlab-token'
+	| 'high-entropy'
 	| 'generic-secret';
 
 interface PatternDef {
@@ -47,6 +48,9 @@ const PATTERNS: PatternDef[] = [
 
 	// .env patterns
 	{ category: 'env-pattern', pattern: /^[A-Z_]*(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)S?\s*[=:]\s*\S+/gm, label: 'Environment variable' },
+
+	// High-entropy base64 blobs (likely secrets or keys)
+	{ category: 'high-entropy', pattern: /(?<![a-zA-Z0-9/:.@_-])[A-Za-z0-9+]{40,}={0,2}(?![a-zA-Z0-9/:.@_-])/g, label: 'High-entropy string' },
 
 	// Generic
 	{ category: 'generic-secret', pattern: /(api[_-]?key|secret|password|passwd|credentials?)\s*[=:]\s*["']?[^\s"']{6,}/gi, label: 'Generic secret' },

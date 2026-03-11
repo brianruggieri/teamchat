@@ -427,9 +427,13 @@ if (args.subcommand === 'export') {
 		args.team,
 	);
 	if (!fs.existsSync(teamDir)) {
-		console.error(`Team directory not found: ${teamDir}`);
-		console.error(`Run 'teamchat setup' to configure auto-launch, or check that the team name is correct.`);
-		process.exit(1);
+		console.error(`Team "${args.team}" not found at ${teamDir}`);
+		console.error('');
+		console.error('To use teamchat with Agent Teams:');
+		console.error('  1. Start a Claude Code session with --team flag');
+		console.error('  2. Or run: teamchat setup  (to auto-launch with new teams)');
+		console.error('  3. Or try: teamchat --replay --demo  (to see a demo session)');
+		process.exit(2);
 	}
 	startTeamSession(args.team, args.port, args.compact, args.noJournal);
 } else {
@@ -439,8 +443,12 @@ if (args.subcommand === 'export') {
 	if (fs.existsSync(defaultWatch)) {
 		startWatchMode(defaultWatch, args.port, args.compact, args.noJournal);
 	} else {
-		console.error('No team specified. Use --team <name>, --watch <dir>, or --replay <file>.');
-		printHelp();
-		process.exit(1);
+		console.error('No teams directory found. Agent Teams may not be configured yet.');
+		console.error('');
+		console.error('Quick start:');
+		console.error('  teamchat --replay --demo    See a demo session');
+		console.error('  teamchat setup              Configure auto-launch hook');
+		console.error('  teamchat --help             Show all options');
+		process.exit(2);
 	}
 }

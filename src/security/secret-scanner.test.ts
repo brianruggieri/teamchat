@@ -102,6 +102,25 @@ describe('Secret Scanner', () => {
 		});
 	});
 
+	describe('high-entropy strings', () => {
+		test('detects long base64 blobs', () => {
+			const blob = 'aVeryLongBase64StringThatIsOverFortyCharactersLongAndLooksLikeASecret1234567890==';
+			const result = scanForSecrets(`config: ${blob}`);
+			expect(result.length).toBeGreaterThanOrEqual(1);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(true);
+		});
+
+		test('does not flag short base64', () => {
+			const result = scanForSecrets('hash: abc123def456');
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+
+		test('does not flag common long strings (URLs, paths)', () => {
+			const result = scanForSecrets('https://github.com/brianruggieri/teamchat/blob/main/src/server/server.ts');
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+	});
+
 	describe('false positives', () => {
 		test('does not flag normal code', () => {
 			const result = scanForSecrets('function processTask(taskId: string) { return taskId; }');
