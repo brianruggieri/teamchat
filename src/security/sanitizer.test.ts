@@ -243,7 +243,14 @@ describe('cleanMetadata', () => {
 		const result = cleanMetadata(bundle);
 
 		expect(result.manifest.sessionId).not.toBe('sess-abc123');
-		expect(result.manifest.sessionId).toBe('demo-session-0000');
+		expect(result.manifest.sessionId).toMatch(/^demo-session-[a-z0-9]+$/);
+	});
+
+	it('sanitizes source pathLabel', () => {
+		const bundle = makeBundle();
+		const result = cleanMetadata(bundle);
+
+		expect(result.manifest.source.pathLabel).toBe('sanitized-source');
 	});
 
 	it('shifts timestamps so the first entry is at epoch', () => {

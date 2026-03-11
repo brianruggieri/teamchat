@@ -55,7 +55,7 @@ This writes a `PostToolUse` hook to `~/.claude/settings.json` that launches team
 
 ## Privacy First
 
-teamchat is entirely local. It makes no network calls, collects no telemetry, and never reads or writes outside `~/.claude/` (read-only) and `~/.teamchat/` (journals). Before sharing a session, run `scan` to check for secrets and `export --sanitize` to scrub them.
+teamchat is entirely local. It makes no network calls and collects no telemetry. During live sessions, it reads Claude team data from `~/.claude/` (read-only) and writes journals to `~/.teamchat/`. Replay (`--replay <file-or-dir>`) and export (`export <path>`) operate only on paths you explicitly provide. Before sharing a session, run `scan` to check for secrets and `export --sanitize` to scrub them.
 
 ## CLI Reference
 

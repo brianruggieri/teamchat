@@ -13,6 +13,11 @@ export interface ExportArgs {
 }
 
 export function runExport(args: ExportArgs): void {
+	if (args.stripContent && !args.sanitize) {
+		console.error('Error: --strip-content requires --sanitize');
+		process.exit(1);
+	}
+
 	let inputPath: string;
 	if (args.latest) {
 		const latest = findLatestSession();
@@ -28,27 +33,33 @@ export function runExport(args: ExportArgs): void {
 		process.exit(1);
 	}
 
-	const result = exportSession(inputPath, {
-		sanitize: args.sanitize,
-		stripContent: args.stripContent,
-	});
+	try {
+		const result = exportSession(inputPath, {
+			sanitize: args.sanitize,
+			stripContent: args.stripContent,
+		});
 
-	const stat = fs.existsSync(inputPath) ? fs.statSync(inputPath) : null;
-	const baseName = stat?.isDirectory()
-		? path.basename(inputPath)
-		: path.basename(inputPath, path.extname(inputPath));
-	const suffix = args.sanitize ? '.sanitized' : '';
-	const outDir = stat?.isDirectory() ? path.dirname(inputPath) : path.dirname(inputPath);
-	const outputPath = path.join(outDir, `${baseName}${suffix}.teamchat-replay`);
+		const stat = fs.existsSync(inputPath) ? fs.statSync(inputPath) : null;
+		const baseName = stat?.isDirectory()
+			? path.basename(inputPath)
+			: path.basename(inputPath, path.extname(inputPath));
+		const suffix = args.sanitize ? '.sanitized' : '';
+		const outDir = stat?.isDirectory() ? path.dirname(inputPath) : path.dirname(inputPath);
+		const outputPath = path.join(outDir, `${baseName}${suffix}.teamchat-replay`);
 
-	writeBundle(result.bundle, outputPath);
+		writeBundle(result.bundle, outputPath);
 
-	if (result.report) {
-		printSanitizationReport(result.report, outputPath);
-	} else {
-		console.error(`Exported: ${outputPath}`);
-		console.error(`  Events: ${result.bundle.entries.length}`);
-		console.error(`  Duration: ${formatDurationMs(result.bundle.manifest.durationMs)}`);
+		if (result.report) {
+			printSanitizationReport(result.report, outputPath);
+		} else {
+			console.error(`Exported: ${outputPath}`);
+			console.error(`  Events: ${result.bundle.entries.length}`);
+			console.error(`  Duration: ${formatDurationMs(result.bundle.manifest.durationMs)}`);
+		}
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error(`Failed to export session from "${inputPath}": ${message}`);
+		process.exit(1);
 	}
 }
 

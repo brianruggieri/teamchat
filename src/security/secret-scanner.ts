@@ -4,7 +4,6 @@ export interface SecretFinding {
 	matchStart: number;
 	matchEnd: number;
 	masked: string;
-	original: string;
 }
 
 export type SecretCategory =
@@ -47,7 +46,7 @@ const PATTERNS: PatternDef[] = [
 	{ category: 'gitlab-token', pattern: /glpat-[A-Za-z0-9_-]{20,}/g, label: 'GitLab token' },
 
 	// .env patterns
-	{ category: 'env-pattern', pattern: /^[A-Z_]*(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)s?\s*[=:]\s*\S+/gm, label: 'Environment variable' },
+	{ category: 'env-pattern', pattern: /^[A-Z_]*(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)S?\s*[=:]\s*\S+/gm, label: 'Environment variable' },
 
 	// Generic
 	{ category: 'generic-secret', pattern: /(api[_-]?key|secret|password|passwd|credentials?)\s*[=:]\s*["']?[^\s"']{6,}/gi, label: 'Generic secret' },
@@ -71,7 +70,6 @@ export function scanForSecrets(text: string): SecretFinding[] {
 				matchStart: match.index,
 				matchEnd: match.index + match[0].length,
 				masked: maskSecret(match[0]),
-				original: match[0],
 			});
 		}
 	}

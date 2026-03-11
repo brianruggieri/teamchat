@@ -107,7 +107,11 @@ export function anonymizeAgentNames(bundle: ReplayBundle): {
 	for (const entry of cloned.entries) {
 		const ev = entry.event;
 		if (ev.type === 'message') {
-			(ev as ContentMessage).from = rename((ev as ContentMessage).from) ?? (ev as ContentMessage).from;
+			const msg = ev as ContentMessage;
+			msg.from = rename(msg.from) ?? msg.from;
+			if (msg.dmParticipants) {
+				msg.dmParticipants = msg.dmParticipants.map((p) => rename(p) ?? p);
+			}
 		} else if (ev.type === 'system') {
 			const sev = ev as { agentName: string | null; taskSubject?: string | null };
 			sev.agentName = rename(sev.agentName);
@@ -191,8 +195,9 @@ export function stripPaths(bundle: ReplayBundle): { bundle: ReplayBundle; count:
 }
 
 /**
- * Replace team name with "demo-team", regenerate session ID, and shift all
- * timestamps so the earliest entry lands at epoch (1970-01-01T00:00:00.000Z).
+ * Replace team name with "demo-team", assign a random session ID, sanitize
+ * source pathLabel, and shift all timestamps so the earliest entry lands at
+ * epoch (1970-01-01T00:00:00.000Z).
  */
 export function cleanMetadata(bundle: ReplayBundle): ReplayBundle {
 	const cloned = deepClone(bundle);
@@ -200,7 +205,11 @@ export function cleanMetadata(bundle: ReplayBundle): ReplayBundle {
 	// Replace team name
 	cloned.team.name = 'demo-team';
 	cloned.manifest.teamName = 'demo-team';
-	cloned.manifest.sessionId = 'demo-session-0000';
+	const randomSuffix = Math.random().toString(36).slice(2, 10);
+	cloned.manifest.sessionId = `demo-session-${randomSuffix}`;
+
+	// Sanitize source path label
+	cloned.manifest.source.pathLabel = 'sanitized-source';
 
 	// Collect all timestamps to find minimum
 	const allTimestamps: number[] = [];
