@@ -468,7 +468,7 @@ code {
 	display: none;
 	min-height: 0;
 	overflow-y: auto;
-	width: 312px;
+	width: 360px;
 	flex-shrink: 0;
 	border-left: 1px solid var(--border-subtle);
 	background: rgba(7, 14, 22, 0.9);
@@ -477,10 +477,10 @@ code {
 
 .tc-rail-frame {
 	display: flex;
-	min-height: 100%;
 	flex-direction: column;
-	gap: var(--space-8);
+	gap: 8px;
 	padding: 12px;
+	height: 100%;
 }
 
 .tc-rail-section {
@@ -490,6 +490,18 @@ code {
 .tc-rail-section.is-middle {
 	overflow-y: auto;
 	padding-right: 2px;
+}
+
+.tc-rail-section.is-growable {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 2px;
+}
+
+.tc-rail-section.is-pinned-bottom {
+	flex-shrink: 0;
+	margin-top: auto;
 }
 
 .tc-workbench-stack {
@@ -917,7 +929,9 @@ code {
 
 .tc-roster-state {
 	color: var(--text-secondary);
-	font-size: 0.66rem;
+	font-size: 0.62rem;
+	min-width: 52px;
+	text-align: right;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 }
@@ -1132,6 +1146,18 @@ code {
 .tc-avatar.is-sm .tc-avatar-core {
 	border-radius: 10px;
 	font-size: 0.72rem;
+}
+
+.tc-avatar.is-xs {
+	height: 20px;
+	width: 20px;
+}
+
+.tc-avatar.is-xs .tc-avatar-core {
+	height: 20px;
+	width: 20px;
+	border-radius: 7px;
+	font-size: 0.6rem;
 }
 
 .tc-avatar-badge {
@@ -1495,6 +1521,12 @@ code {
 	gap: 1px;
 	min-width: 0;
 }
+.tc-thread-avatars {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
 .tc-thread-title {
 	font-size: 0.8rem;
 	font-weight: 600;
@@ -2106,7 +2138,7 @@ code {
 @media (min-width: 1024px) {
 	.tc-app-body {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) 312px;
+		grid-template-columns: minmax(0, 1fr) 360px;
 		height: 100%;
 	}
 
@@ -2231,4 +2263,79 @@ code {
 	to {
 		transform: rotate(360deg);
 	}
+}
+
+/* === Celebration Animations === */
+
+@keyframes confettiFall {
+	0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+	100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes celebrationGlow {
+	0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+	50% { box-shadow: 0 0 16px 4px rgba(34, 197, 94, 0.2); }
+	100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@keyframes resolutionPulse {
+	0% { box-shadow: 0 0 0 0 rgba(91, 109, 247, 0.4); }
+	50% { box-shadow: 0 0 12px 3px rgba(91, 109, 247, 0.2); }
+	100% { box-shadow: 0 0 0 0 rgba(91, 109, 247, 0); }
+}
+
+@keyframes taskCompleteFade {
+	0% { background-color: rgba(34, 197, 94, 0.15); }
+	100% { background-color: transparent; }
+}
+
+@keyframes pulseUnblock {
+	0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
+	50% { box-shadow: 0 0 8px 2px rgba(96, 165, 250, 0.2); }
+	100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+}
+
+.tc-task-card.pulse {
+	animation: pulseUnblock 3s ease-in-out;
+}
+
+.tc-task-card.celebrate {
+	animation: celebrationGlow 2s ease-in-out;
+}
+
+.tc-task-card.celebrate .tc-status-pill.is-completed {
+	animation: taskCompleteFade 2s ease-in-out;
+}
+
+.tc-thread-block.is-resolved {
+	animation: resolutionPulse 2s ease-in-out;
+}
+
+.tc-system-card.is-celebration {
+	border-color: rgba(34, 197, 94, 0.3);
+	background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(91, 109, 247, 0.08));
+}
+
+.tc-system-card.is-celebration .tc-system-icon {
+	font-size: 1.4rem;
+}
+
+.tc-system-card.is-celebration .tc-system-text {
+	font-size: 0.88rem;
+	font-weight: 600;
+}
+
+.tc-confetti-overlay {
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 9999;
+	overflow: hidden;
+}
+
+.tc-confetti-particle {
+	position: absolute;
+	top: -10px;
+	animation: confettiFall linear forwards;
+	will-change: transform;
 }

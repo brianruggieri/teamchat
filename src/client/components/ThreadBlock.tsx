@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { ChatEvent, ContentMessage } from '../../shared/types.js';
+import type { ChatEvent, ContentMessage, AgentInfo } from '../../shared/types.js';
 import type { Reaction } from '../types.js';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
 import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
+import { AgentAvatar } from './AgentAvatar.jsx';
 import { buildMessageLaneItems } from './messageGrouping.js';
 
 interface ThreadBlockProps {
@@ -14,12 +15,18 @@ interface ThreadBlockProps {
 	events: ChatEvent[];
 	reactions: Record<string, Reaction[]>;
 	topic: string;
+	team?: AgentInfo[];
 }
 
-export function ThreadBlock({ threadKey, participants, events, reactions, topic }: ThreadBlockProps) {
+export function ThreadBlock({ threadKey, participants, events, reactions, topic, team }: ThreadBlockProps) {
 	const [expanded, setExpanded] = useState(false);
 	const messageCount = events.filter((e) => e.type === 'message').length;
 	const label = participants.join(' \u2194 ');
+
+	const participantInfos = participants.map((name) => {
+		const member = team?.find((m) => m.name === name);
+		return { name, color: member?.color ?? 'gray' };
+	});
 
 	// Collect beat reactions for summary display
 	const beatEmojis = useMemo(() => {
@@ -44,14 +51,22 @@ export function ThreadBlock({ threadKey, participants, events, reactions, topic 
 
 	const laneItems = useMemo(() => buildMessageLaneItems(events), [events]);
 
+	const isResolved = beatEmojis.includes('🤝');
+
 	return (
-		<div className="tc-thread-block" data-thread-key={threadKey}>
+		<div className={`tc-thread-block ${isResolved ? 'is-resolved' : ''}`} data-thread-key={threadKey}>
 			<button className="tc-thread-toggle" onClick={toggle} type="button">
 				<span className="tc-thread-chevron" data-expanded={expanded}>
 					<svg width="12" height="12" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
 				</span>
 				<span className="tc-thread-heading">
-					<span className="tc-thread-title">{label}</span>
+					<span className="tc-thread-title" title={label} aria-label={label}>
+						<span className="tc-thread-avatars">
+							{participantInfos.map((p) => (
+								<AgentAvatar key={p.name} name={p.name} color={p.color} size="xs" />
+							))}
+						</span>
+					</span>
 					<span className="tc-thread-subtitle">
 						{messageCount} {messageCount === 1 ? 'message' : 'messages'}
 						{beatEmojis.length > 0 && (

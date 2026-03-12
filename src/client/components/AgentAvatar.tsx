@@ -5,7 +5,7 @@ interface AgentAvatarProps {
 	name: string;
 	color: string;
 	isLead?: boolean;
-	size?: 'sm' | 'md';
+	size?: 'xs' | 'sm' | 'md';
 }
 
 export function AgentAvatar({
@@ -18,7 +18,7 @@ export function AgentAvatar({
 	const letter = name.charAt(0).toUpperCase();
 
 	return (
-		<div className={`tc-avatar ${size === 'sm' ? 'is-sm' : ''}`}>
+		<div className={`tc-avatar ${size === 'sm' ? 'is-sm' : size === 'xs' ? 'is-xs' : ''}`}>
 			<div className={`tc-avatar-core ${agentColor.dot}`}>
 				{letter}
 			</div>

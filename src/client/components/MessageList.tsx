@@ -4,6 +4,7 @@ import type {
 	ContentMessage,
 	Reaction,
 } from '../types.js';
+import type { AgentInfo } from '../../shared/types.js';
 import { ThreadBlock } from './ThreadBlock.jsx';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
@@ -15,6 +16,7 @@ import { buildMessageLaneItems, type MessageLaneItem } from './messageGrouping.j
 interface MessageListProps {
 	events: ChatEvent[];
 	reactions: Record<string, Reaction[]>;
+	team?: AgentInfo[];
 }
 
 interface AccumulatedThread {
@@ -33,7 +35,7 @@ interface FlatEventsGroup {
 
 type RenderItem = AccumulatedThread | FlatEventsGroup;
 
-export function MessageList({ events, reactions }: MessageListProps) {
+export function MessageList({ events, reactions, team }: MessageListProps) {
 	const items = useMemo(() => groupEvents(events), [events]);
 
 	return (
@@ -48,6 +50,7 @@ export function MessageList({ events, reactions }: MessageListProps) {
 							events={item.events}
 							reactions={reactions}
 							topic={item.topic}
+							team={team}
 						/>
 					);
 				}

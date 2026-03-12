@@ -9,6 +9,7 @@ interface TaskSidebarProps {
 
 export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 	const [recentlyUnblocked, setRecentlyUnblocked] = useState<Set<string>>(new Set());
+	const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set());
 	const prevTasks = useRef<TaskInfo[]>([]);
 
 	useEffect(() => {
@@ -39,7 +40,16 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 			}
 		}
 
+		const newlyCompleted: string[] = [];
+		for (const task of tasks) {
+			const prevTask = prevMap.get(task.id);
+			if (prevTask && prevTask.status !== 'completed' && task.status === 'completed') {
+				newlyCompleted.push(task.id);
+			}
+		}
+
 		let timerId: ReturnType<typeof setTimeout> | undefined;
+		let compTimerId: ReturnType<typeof setTimeout> | undefined;
 
 		if (newlyUnblocked.length > 0) {
 			setRecentlyUnblocked((previous) => {
@@ -61,11 +71,29 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 			}, 3000);
 		}
 
+		if (newlyCompleted.length > 0) {
+			setRecentlyCompleted((prev) => {
+				const next = new Set(prev);
+				for (const id of newlyCompleted) next.add(id);
+				return next;
+			});
+			compTimerId = setTimeout(() => {
+				setRecentlyCompleted((prev) => {
+					const next = new Set(prev);
+					for (const id of newlyCompleted) next.delete(id);
+					return next;
+				});
+			}, 2500);
+		}
+
 		prevTasks.current = tasks;
 
 		return () => {
 			if (timerId !== undefined) {
 				clearTimeout(timerId);
+			}
+			if (compTimerId !== undefined) {
+				clearTimeout(compTimerId);
 			}
 		};
 	}, [tasks]);
@@ -107,6 +135,7 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 							task={task}
 							onTaskClick={onTaskClick}
 							isPulsing={recentlyUnblocked.has(task.id)}
+							isCelebrating={recentlyCompleted.has(task.id)}
 						/>
 					))
 				)}

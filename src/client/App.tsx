@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useChatReducer } from './hooks/useChatReducer.js';
 import { useWebSocket } from './hooks/useWebSocket.js';
@@ -17,6 +17,7 @@ import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
 import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
+import { ConfettiOverlay } from './components/ConfettiOverlay.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap } from '../shared/replay.js';
 import type { ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
@@ -517,9 +518,22 @@ function TeamChatScaffold({
 	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null }) => void;
 }) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
+	const [confettiTriggered, setConfettiTriggered] = useState(false);
+	const prevAllCompleted = useRef(false);
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
 		state.events.length,
 	]);
+
+	const allTasksCompleted = state.events.some(
+		(e) => e.type === 'system' && e.subtype === 'all-tasks-completed'
+	);
+
+	useEffect(() => {
+		if (allTasksCompleted && !prevAllCompleted.current) {
+			setConfettiTriggered(true);
+		}
+		prevAllCompleted.current = allTasksCompleted;
+	}, [allTasksCompleted]);
 
 	const scrollToThread = useCallback((threadKey: string) => {
 		const el = document.querySelector(`[data-thread-key="${threadKey}"]`);
@@ -651,6 +665,7 @@ function TeamChatScaffold({
 							<MessageList
 								events={state.events}
 								reactions={state.reactions}
+								team={state.team?.members}
 							/>
 						</div>
 					</div>
@@ -679,7 +694,14 @@ function TeamChatScaffold({
 							</div>
 						) : (
 							desktopPanels.map((panel, index) => (
-								<div key={index} className="tc-rail-section">
+								<div
+									key={index}
+									className={`tc-rail-section${
+										index === 1 ? ' is-growable' : ''
+									}${
+										index === desktopPanels.length - 1 ? ' is-pinned-bottom' : ''
+									}`}
+								>
 									{panel}
 								</div>
 							))
@@ -745,6 +767,8 @@ function TeamChatScaffold({
 					</div>
 				</div>
 			)}
+
+			<ConfettiOverlay active={confettiTriggered} />
 		</div>
 	);
 }
