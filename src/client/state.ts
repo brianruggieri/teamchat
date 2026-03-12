@@ -1,5 +1,6 @@
 import type {
 	ChatEvent,
+	ContentMessage,
 	PresenceChange,
 	ReactionEvent,
 	SessionState,
@@ -29,6 +30,10 @@ export function cloneChatState(state: ChatState): ChatState {
 		),
 		planCards: { ...state.planCards },
 		permissionCards: { ...state.permissionCards },
+		threadStatuses: Object.fromEntries(
+			Object.entries(state.threadStatuses).map(([k, v]) => [k, { ...v, beats: [...v.beats], participants: [...v.participants] }]),
+		),
+		activeAgentKey: state.activeAgentKey,
 	};
 }
 
@@ -46,6 +51,9 @@ export function hydrateChatState(session: SessionState, connected = true): ChatS
 		presence: { ...session.presence },
 		sessionStart: session.sessionStart,
 		connected,
+		threadStatuses: Object.fromEntries(
+			(session.threadStatuses ?? []).map((ts) => [ts.threadKey, ts]),
+		),
 	});
 
 	for (const event of session.events) {
@@ -76,6 +84,31 @@ export function applyChatEventInPlace(state: ChatState, event: ChatEvent): void 
 	}
 
 	state.events.push(event);
+
+	// Track DM thread statuses client-side
+	if (event.type === 'message') {
+		const msg = event as ContentMessage;
+		if (msg.isDM && msg.dmParticipants) {
+			const key = [...msg.dmParticipants].sort().join(':');
+			const existing = state.threadStatuses[key];
+			if (existing) {
+				existing.messageCount++;
+				existing.lastMessageTimestamp = msg.timestamp;
+				if (existing.status === 'new') existing.status = 'active';
+			} else {
+				state.threadStatuses[key] = {
+					threadKey: key,
+					participants: [...msg.dmParticipants].sort(),
+					topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+					messageCount: 1,
+					status: 'new',
+					firstMessageTimestamp: msg.timestamp,
+					lastMessageTimestamp: msg.timestamp,
+					beats: [],
+				};
+			}
+		}
+	}
 
 	if (event.type === 'task-update') {
 		applyTaskUpdate(state, event);
