@@ -1,4 +1,5 @@
 import type {
+	BeatType,
 	ChatEvent,
 	ContentMessage,
 	PresenceChange,
@@ -153,6 +154,22 @@ function applyReaction(state: ChatState, event: ReactionEvent): void {
 	};
 	state.events.push(event);
 	state.reactions[event.targetMessageId] = [...existing, reaction];
+
+	// Track beats in thread status
+	if (event.tooltip?.startsWith('beat:')) {
+		const beatType = event.tooltip.slice(5) as BeatType;
+		// Find which thread this reaction belongs to by finding the target message
+		const targetMsg = state.events.find((e) => e.id === event.targetMessageId);
+		if (targetMsg && targetMsg.type === 'message' && (targetMsg as ContentMessage).isDM) {
+			const msg = targetMsg as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			const thread = state.threadStatuses[key];
+			if (thread) {
+				thread.beats.push(beatType);
+				if (beatType === 'resolution') thread.status = 'resolved';
+			}
+		}
+	}
 }
 
 function applyTaskUpdate(state: ChatState, event: TaskUpdate): void {

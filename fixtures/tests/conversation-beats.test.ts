@@ -20,7 +20,7 @@ function makeDM(from: string, to: string, text: string, timestamp = new Date().t
 		text,
 		timestamp,
 		color: "blue",
-		summary: null,
+		read: false,
 	};
 }
 
