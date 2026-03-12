@@ -97,6 +97,8 @@ function App() {
 	return <ReplayWorkspace bootstrap={bootstrap} />;
 }
 
+const AUTO_RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 10000];
+
 function AutoWorkspace({
 	bootstrap,
 	onTeamReady,
@@ -108,25 +110,50 @@ function AutoWorkspace({
 	onTeamReadyRef.current = onTeamReady;
 
 	useEffect(() => {
-		const ws = new WebSocket(bootstrap.wsUrl);
+		let active = true;
+		let ws: WebSocket | null = null;
+		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+		let reconnectAttempt = 0;
 
-		ws.onmessage = (e: MessageEvent<string>) => {
-			try {
-				const msg = JSON.parse(e.data) as { type: string; state?: import('./types.js').SessionState };
-				if (msg.type === 'team-ready' && msg.state) {
-					onTeamReadyRef.current(msg.state);
+		function connect() {
+			if (!active) return;
+			ws = new WebSocket(bootstrap.wsUrl);
+
+			ws.onopen = () => {
+				reconnectAttempt = 0;
+			};
+
+			ws.onmessage = (e: MessageEvent<string>) => {
+				try {
+					const msg = JSON.parse(e.data) as { type: string; state?: import('./types.js').SessionState };
+					if (msg.type === 'team-ready' && msg.state) {
+						onTeamReadyRef.current(msg.state);
+					}
+				} catch {
+					// Ignore malformed messages
 				}
-			} catch {
-				// Ignore malformed messages
-			}
-		};
+			};
 
-		ws.onerror = () => {
-			ws.close();
-		};
+			ws.onclose = () => {
+				if (!active) return;
+				const delay = AUTO_RECONNECT_DELAYS[
+					Math.min(reconnectAttempt, AUTO_RECONNECT_DELAYS.length - 1)
+				]!;
+				reconnectAttempt++;
+				reconnectTimer = setTimeout(connect, delay);
+			};
+
+			ws.onerror = () => {
+				ws?.close();
+			};
+		}
+
+		connect();
 
 		return () => {
-			ws.close();
+			active = false;
+			if (reconnectTimer) clearTimeout(reconnectTimer);
+			if (ws) ws.close();
 		};
 	}, [bootstrap.wsUrl]);
 
@@ -134,7 +161,7 @@ function AutoWorkspace({
 		<div className="tc-app-shell">
 			<StatusPanel
 				title="Waiting for team..."
-				description="Watching for a new Claude Code Agent Team to be created. Start a session with --team to begin."
+				description="Create or start an Agent Team in Claude Code to begin."
 				spinner
 			/>
 		</div>
