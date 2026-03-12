@@ -296,6 +296,7 @@ function startTeamSession(
 	noJournal: boolean,
 ): void {
 	const journal = new Journal(teamName, !noJournal);
+	const sessionStartedAt = Date.now();
 
 	const processor = new EventProcessor((events) => {
 		// Journal each event
@@ -308,6 +309,10 @@ function startTeamSession(
 
 	const watcher = new FileWatcher(teamName, (delta) => {
 		processor.processDelta(delta);
+		// Auto-capture config on every change
+		if (delta.type === 'config' && delta.current) {
+			journal.saveConfig(delta.current as import('../src/shared/types.js').TeamConfig);
+		}
 	});
 
 	const server = new TeamChatServer({
@@ -328,6 +333,8 @@ function startTeamSession(
 			previous: null,
 			current: initialSnapshot.config,
 		});
+		// Auto-capture initial config
+		journal.saveConfig(initialSnapshot.config);
 	}
 
 	// Process existing tasks as a delta (empty → current)
@@ -364,6 +371,21 @@ function startTeamSession(
 	// Handle graceful shutdown
 	const shutdown = (): void => {
 		console.log('\nShutting down...');
+
+		// Save final state for replay
+		const allEvents = processor.getAllEvents();
+		const messageCount = allEvents.filter((e) => e.type === 'message').length;
+		journal.saveTasks(processor.getTasks());
+		journal.saveMetadata({
+			teamName,
+			startedAt: new Date(sessionStartedAt).toISOString(),
+			endedAt: new Date().toISOString(),
+			durationMs: Date.now() - sessionStartedAt,
+			eventCount: allEvents.length,
+			messageCount,
+			presence: processor.getPresence(),
+		});
+
 		watcher.stop();
 		server.stop();
 		process.exit(0);

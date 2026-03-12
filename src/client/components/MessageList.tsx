@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import type {
 	ChatEvent,
+	ContentMessage,
 	Reaction,
-	ThreadMarker,
 } from '../types.js';
 import { ThreadBlock } from './ThreadBlock.jsx';
 import { MessageStack } from './MessageStack.jsx';
@@ -119,60 +119,84 @@ export function MessageList({ events, reactions }: MessageListProps) {
 	);
 }
 
+/**
+ * Group events into thread blocks and flat event groups.
+ *
+ * Threads are formed purely from data — consecutive DM messages
+ * with the same participants get grouped together. No markers needed.
+ * Thread markers are ignored entirely (legacy compat).
+ *
+ * Any non-DM event (system, task-update, general message, presence)
+ * breaks a thread group and goes into flat events.
+ */
 function groupEvents(events: ChatEvent[]): RenderItem[] {
 	const items: RenderItem[] = [];
 	let currentFlatEvents: ChatEvent[] = [];
-	let index = 0;
+	let currentThread: { participants: string[]; events: ChatEvent[] } | null = null;
 
 	const pushFlatEvents = () => {
 		if (currentFlatEvents.length > 0) {
-			const group: FlatEventsGroup = {
+			items.push({
 				kind: 'flat-events',
 				events: currentFlatEvents,
 				laneItems: buildMessageLaneItems(currentFlatEvents),
-			};
-			items.push(group);
+			});
 			currentFlatEvents = [];
 		}
 	};
 
-	while (index < events.length) {
-		const event = events[index];
+	const pushThread = () => {
+		if (currentThread && currentThread.events.length > 0) {
+			items.push({
+				kind: 'thread',
+				participants: currentThread.participants,
+				events: currentThread.events,
+			});
+		}
+		currentThread = null;
+	};
 
+	for (const event of events) {
+		// Skip thread markers — we don't need them anymore
 		if (event.type === 'thread-marker') {
-			const marker = event as ThreadMarker;
-			if (marker.subtype === 'thread-start') {
-				pushFlatEvents();
-				const threadEvents: ChatEvent[] = [];
-				index++;
-				while (index < events.length) {
-					const inner = events[index];
-					if (
-						inner.type === 'thread-marker'
-						&& (inner as ThreadMarker).subtype === 'thread-end'
-					) {
-						index++;
-						break;
-					}
-					threadEvents.push(inner);
-					index++;
-				}
-				items.push({
-					kind: 'thread',
-					participants: marker.participants,
-					events: threadEvents,
-				});
-				continue;
-			}
-
-			index++;
 			continue;
 		}
 
+		// Check if this is a DM message
+		if (event.type === 'message') {
+			const msg = event as ContentMessage;
+			if (msg.isDM && msg.dmParticipants) {
+				const key = msg.dmParticipants.join(':');
+
+				if (currentThread) {
+					const threadKey = currentThread.participants.join(':');
+					if (key === threadKey) {
+						// Same thread — add to it
+						currentThread.events.push(event);
+						continue;
+					}
+					// Different thread — close current, start new
+					pushThread();
+				}
+
+				// Start a new thread
+				pushFlatEvents();
+				currentThread = {
+					participants: msg.dmParticipants,
+					events: [event],
+				};
+				continue;
+			}
+		}
+
+		// Non-DM event — close any active thread, add to flat events
+		pushThread();
 		currentFlatEvents.push(event);
-		index++;
 	}
 
+	// Flush remaining
+	pushThread();
 	pushFlatEvents();
+
 	return items;
 }

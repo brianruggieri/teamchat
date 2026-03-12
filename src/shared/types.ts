@@ -27,9 +27,12 @@ export interface AgentInfo {
 	agentId: string;
 	agentType: string;
 	color: string;
+	model?: string;
+	joinedAt?: number;
 }
 
 export interface TeamConfig {
+	createdAt?: number;
 	members: AgentInfo[];
 }
 
@@ -83,6 +86,7 @@ export interface SystemEvent {
 	timestamp: string;
 	agentName: string | null;
 	agentColor: string | null;
+	agentModel: string | null;
 	taskId: string | null;
 	taskSubject: string | null;
 }
@@ -101,7 +105,10 @@ export type SystemEventType =
 	| 'shutdown-rejected'
 	| 'team-created'
 	| 'team-deleted'
-	| 'idle-surfaced';
+	| 'idle-surfaced'
+	| 'nudge'
+	| 'bottleneck'
+	| 'session-summary';
 
 export interface ReactionEvent {
 	type: 'reaction';

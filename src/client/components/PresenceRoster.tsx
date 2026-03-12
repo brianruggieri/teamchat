@@ -14,6 +14,14 @@ const STATUS_LABELS: Record<string, string> = {
 	offline: 'offline',
 };
 
+function formatModel(model: string): string {
+	if (model.includes('opus')) return 'opus';
+	if (model.includes('sonnet')) return 'sonnet';
+	if (model.includes('haiku')) return 'haiku';
+	// Strip "claude-" prefix and version suffixes for brevity
+	return model.replace(/^claude-/, '').replace(/-\d+$/, '');
+}
+
 export function PresenceRoster({
 	mode = 'live',
 	team,
@@ -36,16 +44,27 @@ export function PresenceRoster({
 				</span>
 			</div>
 			<div className="tc-roster-list">
-				<div className="tc-roster-row is-lead">
-					<div className="tc-roster-identity">
-						<span className="tc-roster-dot is-lead" />
-						<div className="tc-roster-name">team-lead</div>
-					</div>
-					<div className="tc-roster-trailing">
-						<span className="tc-roster-badge">lead</span>
-						<span className="tc-roster-state is-working">working</span>
-					</div>
-				</div>
+				{(() => {
+					const leadMember = team.members.find((m) => m.name === 'team-lead');
+					const leadModel = leadMember?.model;
+					return (
+						<div className="tc-roster-row is-lead">
+							<div className="tc-roster-identity">
+								<span className="tc-roster-dot is-lead" />
+								<div className="tc-roster-name">team-lead</div>
+							</div>
+							<div className="tc-roster-trailing">
+								<span className="tc-roster-badge">lead</span>
+								{leadModel && (
+									<span className="tc-roster-badge is-model" title={leadModel}>
+										{formatModel(leadModel)}
+									</span>
+								)}
+								<span className="tc-roster-state is-working">working</span>
+							</div>
+						</div>
+					);
+				})()}
 
 				{team.members
 					.filter((member) => member.name !== 'team-lead')
@@ -65,6 +84,11 @@ export function PresenceRoster({
 									</div>
 								</div>
 								<div className="tc-roster-trailing">
+									{member.model && (
+										<span className="tc-roster-badge is-model" title={member.model}>
+											{formatModel(member.model)}
+										</span>
+									)}
 									<span className={`tc-roster-state is-${status}`}>
 										{STATUS_LABELS[status]}
 									</span>

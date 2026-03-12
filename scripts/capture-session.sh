@@ -31,7 +31,7 @@ get_team_tmux_session() {
 		fi
 	done
 	# List all tmux sessions and try to find one containing the team name
-	tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -i "$team" | head -1
+	tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -i "$team" | head -1 || true
 }
 
 capture_tmux_panes() {

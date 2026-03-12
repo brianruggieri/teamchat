@@ -24,7 +24,7 @@ export function AgentAvatar({
 			</div>
 			{isLead && (
 				<span className="tc-avatar-badge" title="Team Lead">
-					L
+					👑
 				</span>
 			)}
 		</div>

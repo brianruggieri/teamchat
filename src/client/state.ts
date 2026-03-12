@@ -3,6 +3,7 @@ import type {
 	PresenceChange,
 	ReactionEvent,
 	SessionState,
+	SystemEvent,
 	TaskUpdate,
 } from '../shared/types.js';
 import type { ChatState, Reaction } from './types.js';
@@ -83,6 +84,29 @@ export function applyChatEventInPlace(state: ChatState, event: ChatEvent): void 
 
 	if (event.type === 'presence') {
 		applyPresenceChange(state, event);
+	}
+
+	if (event.type === 'system') {
+		const sysEvent = event as SystemEvent;
+		if (sysEvent.subtype === 'member-joined' && sysEvent.agentName && state.team) {
+			const exists = state.team.members.some((m) => m.name === sysEvent.agentName);
+			if (!exists) {
+				state.team.members.push({
+					name: sysEvent.agentName,
+					agentId: `${sysEvent.agentName}@${state.team.name}`,
+					agentType: 'agent',
+					color: sysEvent.agentColor ?? 'gray',
+					model: sysEvent.agentModel ?? undefined,
+				});
+			} else if (sysEvent.agentModel) {
+				// Backfill model if member was added before model data was available
+				const member = state.team.members.find((m) => m.name === sysEvent.agentName);
+				if (member && !member.model) {
+					member.model = sysEvent.agentModel;
+				}
+			}
+			state.presence[sysEvent.agentName] = 'working';
+		}
 	}
 }
 
