@@ -205,9 +205,7 @@ export class TeamChatServer {
 			tasks: this.processor.getTasks(),
 			presence: this.processor.getPresence(),
 			sessionStart: this.sessionStart,
-			threadStatuses: typeof this.processor.getThreadStatuses === 'function'
-				? this.processor.getThreadStatuses()
-				: [],
+			threadStatuses: this.processor.getThreadStatuses(),
 		};
 	}
 

@@ -87,10 +87,11 @@ function loadReplayDirectory(rootDir: string): LoadedReplaySource {
 function loadBundleFile(filePath: string): LoadedReplaySource {
 	const raw = fs.readFileSync(filePath, 'utf-8');
 	const bundle = JSON.parse(raw) as ReplayBundle;
+	const dir = path.dirname(filePath);
 	return {
 		bundle,
-		rootDir: path.dirname(filePath),
-		artifactBaseDir: null,
+		rootDir: dir,
+		artifactBaseDir: bundle.artifacts.length > 0 ? dir : null,
 	};
 }
 
@@ -267,26 +268,27 @@ function readEntries(filePath: string): JournalEntry[] {
 	return Journal.readFrom(filePath);
 }
 
-function normalizeEntries(entries: JournalEntry[]): ReplayEntry[] {
+export function normalizeEntries(entries: JournalEntry[]): ReplayEntry[] {
 	if (entries.length === 0) {
 		return [];
 	}
 
-	const sorted = [...entries].sort((a, b) => {
-		const tsDiff = new Date(a.event.timestamp).getTime() - new Date(b.event.timestamp).getTime();
-		if (tsDiff !== 0) {
-			return tsDiff;
-		}
-		// Same timestamp — preserve journal recording order
-		return a.seq - b.seq;
-	});
+	// Sort by seq (recording order) — this is the authoritative ordering.
+	// Timestamps may be backdated for config/task events.
+	const sorted = [...entries].sort((a, b) => a.seq - b.seq);
 	const baseTs = new Date(sorted[0]!.event.timestamp).getTime();
 
-	return sorted.map((entry, index) => ({
-		seq: index,
-		atMs: Math.max(0, new Date(entry.event.timestamp).getTime() - baseTs),
-		event: entry.event,
-	}));
+	let maxAtMs = 0;
+	return sorted.map((entry, index) => {
+		const rawAtMs = Math.max(0, new Date(entry.event.timestamp).getTime() - baseTs);
+		// Ensure atMs is monotonically non-decreasing despite backdated timestamps
+		maxAtMs = Math.max(maxAtMs, rawAtMs);
+		return {
+			seq: index,
+			atMs: maxAtMs,
+			event: entry.event,
+		};
+	});
 }
 
 function deriveTasksFromEntries(entries: ReplayEntry[]): { initial: TaskInfo[]; final: TaskInfo[] } {

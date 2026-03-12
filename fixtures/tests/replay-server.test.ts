@@ -39,6 +39,9 @@ describe('Replay Server', () => {
 			getPresence() {
 				return { server: 'working' as const };
 			},
+			getThreadStatuses() {
+				return [];
+			},
 		} as unknown as EventProcessor;
 
 		const server = new TeamChatServer({
