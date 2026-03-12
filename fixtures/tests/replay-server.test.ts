@@ -64,6 +64,40 @@ describe('Replay Server', () => {
 		}
 	});
 
+	test('serves auto bootstrap contract (lobby mode)', async () => {
+		const port = randomPort();
+		const server = new TeamChatServer({ port, mode: 'auto' });
+
+		server.start();
+		try {
+			const response = await fetch(`http://127.0.0.1:${port}/bootstrap`);
+			const payload = await response.json();
+			expect(payload.mode).toBe('auto');
+			expect(payload.wsUrl).toContain('/ws');
+		} finally {
+			server.stop();
+		}
+	});
+
+	test('rejects WebSocket upgrade in replay mode', async () => {
+		const port = randomPort();
+		const replay = loadReplaySource(replayDir);
+		const server = new TeamChatServer({
+			port,
+			teamName: replay.bundle.manifest.teamName,
+			mode: 'replay',
+			replay,
+		});
+
+		server.start();
+		try {
+			const response = await fetch(`http://127.0.0.1:${port}/ws`);
+			expect(response.status).toBe(409);
+		} finally {
+			server.stop();
+		}
+	});
+
 	test('serves replay bootstrap, bundle, and artifact bytes', async () => {
 		const port = randomPort();
 		const replay = loadReplaySource(replayDir);

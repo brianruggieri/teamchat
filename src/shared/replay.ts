@@ -87,4 +87,9 @@ export interface ReplayAppBootstrap {
 	isDemo?: boolean;
 }
 
-export type AppBootstrap = LiveAppBootstrap | ReplayAppBootstrap;
+export interface AutoAppBootstrap {
+	mode: 'auto';
+	wsUrl: string;
+}
+
+export type AppBootstrap = LiveAppBootstrap | ReplayAppBootstrap | AutoAppBootstrap;

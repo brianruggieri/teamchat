@@ -23,6 +23,7 @@ interface CliArgs {
 	help: boolean;
 	version: boolean;
 	demo: boolean;
+	auto: boolean;
 	// Export subcommand
 	subcommand: 'export' | 'scan' | null;
 	subcommandArg: string | null;
@@ -45,6 +46,7 @@ function parseArgs(argv: string[]): CliArgs {
 		help: false,
 		version: false,
 		demo: false,
+		auto: false,
 		subcommand: null,
 		subcommandArg: null,
 		latest: false,
@@ -100,6 +102,9 @@ function parseArgs(argv: string[]): CliArgs {
 			case '--demo':
 				args.demo = true;
 				break;
+			case '--auto':
+				args.auto = true;
+				break;
 			case '--latest':
 				args.latest = true;
 				break;
@@ -134,6 +139,7 @@ teamchat — Group chat visualizer for Claude Code Agent Teams
 
 USAGE:
   teamchat --team <name>           Watch a specific team
+  teamchat --auto                  Wait for a new team to be created (lobby mode)
   teamchat --watch <dir>           Auto-detect teams in directory
   teamchat --replay <file-or-dir>  Replay a recorded session
   teamchat --replay --demo         Replay bundled demo session
@@ -144,7 +150,8 @@ USAGE:
 
 OPTIONS:
   --team, -t <name>       Team name to watch
-  --watch, -w <dir>       Directory to watch for new teams
+  --auto                  Wait for a new team to be created (lobby mode)
+  --watch, -w <dir>       Directory to watch for new teams (spawns a server per team)
   --replay, -r <path>     JSONL file or bundle directory to replay
   --demo                  Use bundled demo session (with --replay)
   --port, -p <port>       Server port (default: 3456)
@@ -246,6 +253,170 @@ function startWatchMode(watchDir: string, port: number, compact: boolean, noJour
 
 	checkForTeams();
 	setInterval(checkForTeams, 2000);
+}
+
+// === Auto mode (lobby — single server, waits for first team) ===
+
+function startAutoMode(teamsDir: string, port: number, compact: boolean, noJournal: boolean): void {
+	const server = new TeamChatServer({ mode: 'auto', port });
+	server.start();
+
+	console.log(`Waiting for a team to be created in ${teamsDir}...`);
+
+	let activatedTeam: string | null = null;
+	let activeWatcher: FileWatcher | null = null;
+	let activeProcessor: EventProcessor | null = null;
+	let activeJournal: Journal | null = null;
+	let sessionStartedAt: number | null = null;
+	let fsWatchHandle: fs.FSWatcher | null = null;
+	let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+	const tryActivate = (teamName: string): void => {
+		if (activatedTeam !== null) return;
+		activatedTeam = teamName;
+
+		// Stop discovery watchers now that we have a team
+		if (fsWatchHandle) {
+			fsWatchHandle.close();
+			fsWatchHandle = null;
+		}
+		if (pollInterval) {
+			clearInterval(pollInterval);
+			pollInterval = null;
+		}
+
+		console.log(`Team detected: ${teamName}. Starting session...`);
+
+		const journal = new Journal(teamName, !noJournal);
+		activeJournal = journal;
+		sessionStartedAt = Date.now();
+
+		const processor = new EventProcessor((events) => {
+			for (const event of events) {
+				journal.append(event);
+			}
+			server.broadcast(events);
+		}, compact);
+		activeProcessor = processor;
+
+		const watcher = new FileWatcher(teamName, (delta) => {
+			processor.processDelta(delta);
+			if (delta.type === 'config' && delta.current) {
+				journal.saveConfig(delta.current as import('../src/shared/types.js').TeamConfig);
+			}
+		});
+		activeWatcher = watcher;
+
+		const initialSnapshot = watcher.readInitialState();
+
+		if (initialSnapshot.config) {
+			processor.processDelta({
+				type: 'config',
+				previous: null,
+				current: initialSnapshot.config,
+			});
+			journal.saveConfig(initialSnapshot.config);
+		}
+
+		if (initialSnapshot.tasks.length > 0) {
+			processor.processDelta({
+				type: 'tasks',
+				previous: [],
+				current: [...initialSnapshot.tasks],
+			});
+		}
+
+		for (const [agentName, messages] of initialSnapshot.inboxes) {
+			if (messages.length > 0) {
+				processor.processDelta({
+					type: 'inbox',
+					agentName,
+					previous: [],
+					current: [...messages],
+				});
+			}
+		}
+
+		server.activateTeam(teamName, processor, watcher);
+		watcher.start();
+
+		if (!noJournal) {
+			console.log(`Journal: ${journal.getFilePath()}`);
+		}
+	};
+
+	const checkForTeam = (): void => {
+		if (activatedTeam !== null) return;
+		try {
+			if (!fs.existsSync(teamsDir)) return;
+			const dirs = fs.readdirSync(teamsDir);
+			for (const dir of dirs) {
+				const configPath = path.join(teamsDir, dir, 'config.json');
+				if (fs.existsSync(configPath)) {
+					tryActivate(dir);
+					return;
+				}
+			}
+		} catch {
+			// Directory doesn't exist yet — ignore
+		}
+	};
+
+	// Check immediately in case a team already exists
+	checkForTeam();
+
+	if (activatedTeam === null) {
+		// Watch for config.json creation using fs.watch (fast detection)
+		try {
+			fs.mkdirSync(teamsDir, { recursive: true });
+			fsWatchHandle = fs.watch(teamsDir, { recursive: true }, (_event, filename) => {
+				if (filename && (filename as string).endsWith('config.json') && activatedTeam === null) {
+					// Small delay to let the file write complete
+					setTimeout(checkForTeam, 50);
+				}
+			});
+		} catch {
+			// fs.watch with recursive may not be supported on all platforms — fall back to polling
+		}
+
+		// Always keep a polling fallback (1-second interval) for reliability
+		pollInterval = setInterval(checkForTeam, 1000);
+	}
+
+	const shutdown = (): void => {
+		console.log('\nShutting down...');
+
+		if (fsWatchHandle) {
+			fsWatchHandle.close();
+		}
+		if (pollInterval) {
+			clearInterval(pollInterval);
+		}
+
+		if (activatedTeam && activeProcessor && activeJournal && sessionStartedAt !== null) {
+			const allEvents = activeProcessor.getAllEvents();
+			const messageCount = allEvents.filter((e) => e.type === 'message').length;
+			activeJournal.saveTasks(activeProcessor.getTasks());
+			activeJournal.saveMetadata({
+				teamName: activatedTeam,
+				startedAt: new Date(sessionStartedAt).toISOString(),
+				endedAt: new Date().toISOString(),
+				durationMs: Date.now() - sessionStartedAt,
+				eventCount: allEvents.length,
+				messageCount,
+				presence: activeProcessor.getPresence(),
+			});
+		}
+
+		if (activeWatcher) {
+			activeWatcher.stop();
+		}
+		server.stop();
+		process.exit(0);
+	};
+
+	process.on('SIGINT', shutdown);
+	process.on('SIGTERM', shutdown);
 }
 
 // === Replay mode ===
@@ -464,6 +635,10 @@ if (args.subcommand === 'export') {
 		process.exit(2);
 	}
 	startTeamSession(args.team, args.port, args.compact, args.noJournal);
+} else if (args.auto) {
+	const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '~';
+	const teamsDir = path.join(homeDir, '.claude', 'teams');
+	startAutoMode(teamsDir, args.port, args.compact, args.noJournal);
 } else {
 	// Default: watch ~/.claude/teams/
 	const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '~';
@@ -474,6 +649,7 @@ if (args.subcommand === 'export') {
 		console.error('No teams directory found. Agent Teams may not be configured yet.');
 		console.error('');
 		console.error('Quick start:');
+		console.error('  teamchat --auto             Wait for a new team to be created');
 		console.error('  teamchat --replay --demo    See a demo session');
 		console.error('  teamchat setup              Configure auto-launch hook');
 		console.error('  teamchat --help             Show all options');

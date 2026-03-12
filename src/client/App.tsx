@@ -17,7 +17,7 @@ import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
 import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
-import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle } from '../shared/replay.js';
+import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap } from '../shared/replay.js';
 import type { ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -75,11 +75,70 @@ function App() {
 		);
 	}
 
+	if (bootstrap.mode === 'auto') {
+		return (
+			<AutoWorkspace
+				bootstrap={bootstrap}
+				onTeamReady={(state) => {
+					setBootstrap({
+						mode: 'live',
+						initialState: state,
+						wsUrl: bootstrap.wsUrl,
+					});
+				}}
+			/>
+		);
+	}
+
 	if (bootstrap.mode === 'live') {
 		return <LiveWorkspace bootstrap={bootstrap} />;
 	}
 
 	return <ReplayWorkspace bootstrap={bootstrap} />;
+}
+
+function AutoWorkspace({
+	bootstrap,
+	onTeamReady,
+}: {
+	bootstrap: AutoAppBootstrap;
+	onTeamReady: (state: import('./types.js').SessionState) => void;
+}) {
+	const onTeamReadyRef = React.useRef(onTeamReady);
+	onTeamReadyRef.current = onTeamReady;
+
+	useEffect(() => {
+		const ws = new WebSocket(bootstrap.wsUrl);
+
+		ws.onmessage = (e: MessageEvent<string>) => {
+			try {
+				const msg = JSON.parse(e.data) as { type: string; state?: import('./types.js').SessionState };
+				if (msg.type === 'team-ready' && msg.state) {
+					onTeamReadyRef.current(msg.state);
+				}
+			} catch {
+				// Ignore malformed messages
+			}
+		};
+
+		ws.onerror = () => {
+			ws.close();
+		};
+
+		return () => {
+			ws.close();
+		};
+	}, [bootstrap.wsUrl]);
+
+	return (
+		<div className="tc-app-shell">
+			<StatusPanel
+				title="Waiting for team..."
+				description="Watching for a new Claude Code Agent Team to be created. Start a session with --team to begin."
+				spinner
+			/>
+		</div>
+	);
 }
 
 function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode: 'live' }> }) {
