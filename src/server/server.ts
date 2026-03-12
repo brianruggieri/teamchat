@@ -20,12 +20,17 @@ interface ReplayServerOptions {
 	replay: LoadedReplaySource;
 }
 
-type ServerOptions = LiveServerOptions | ReplayServerOptions;
+interface AutoServerOptions {
+	port: number;
+	mode: 'auto';
+}
+
+type ServerOptions = LiveServerOptions | ReplayServerOptions | AutoServerOptions;
 
 export class TeamChatServer {
 	private port: number;
 	private teamName: string;
-	private mode: 'live' | 'replay';
+	private mode: 'live' | 'replay' | 'auto';
 	private processor: EventProcessor | null;
 	private watcher: FileWatcher | null;
 	private replay: LoadedReplaySource | null;
@@ -35,18 +40,26 @@ export class TeamChatServer {
 
 	constructor(options: ServerOptions) {
 		this.port = options.port;
-		this.teamName = options.teamName;
 		this.mode = options.mode;
 		if (options.mode === 'live') {
+			this.teamName = options.teamName;
 			this.processor = options.processor;
 			this.watcher = options.watcher;
 			this.replay = null;
 			this.sessionStart = new Date().toISOString();
-		} else {
+		} else if (options.mode === 'replay') {
+			this.teamName = options.teamName;
 			this.processor = null;
 			this.watcher = null;
 			this.replay = options.replay;
 			this.sessionStart = options.replay.bundle.manifest.startedAt;
+		} else {
+			// auto mode — no team yet, waiting for one to be created
+			this.teamName = '';
+			this.processor = null;
+			this.watcher = null;
+			this.replay = null;
+			this.sessionStart = new Date().toISOString();
 		}
 	}
 
@@ -76,7 +89,7 @@ export class TeamChatServer {
 
 						// WebSocket upgrade
 						if (url.pathname === '/ws') {
-							if (serverRef.mode !== 'live') {
+							if (serverRef.mode === 'replay') {
 								return new Response('WebSocket is unavailable in replay mode', { status: 409 });
 							}
 							const upgraded = server.upgrade(req, { data: null });
@@ -141,12 +154,13 @@ export class TeamChatServer {
 					},
 						websocket: {
 							open(ws) {
-								if (serverRef.mode !== 'live') {
-									return;
-								}
 								serverRef.clients.add(ws);
-								const state = serverRef.getSessionState();
-								ws.send(JSON.stringify({ type: 'init', state }));
+								if (serverRef.mode === 'live') {
+									const state = serverRef.getSessionState();
+									ws.send(JSON.stringify({ type: 'init', state }));
+								} else if (serverRef.mode === 'auto') {
+									ws.send(JSON.stringify({ type: 'auto-waiting' }));
+								}
 							},
 						close(ws) {
 							serverRef.clients.delete(ws);
@@ -163,7 +177,11 @@ export class TeamChatServer {
 				this.port = tryPort;
 
 				console.log(`teamchat server running at http://localhost:${this.port}`);
-				console.log(`Watching team: ${this.teamName}`);
+				if (this.mode === 'auto') {
+					console.log('Waiting for team...');
+				} else {
+					console.log(`Watching team: ${this.teamName}`);
+				}
 				return;
 			} catch (err) {
 				lastError = err instanceof Error ? err : new Error(String(err));
@@ -226,6 +244,34 @@ export class TeamChatServer {
 		return this.port;
 	}
 
+	/**
+	 * Transition from auto (lobby) mode to live mode when a team is detected.
+	 * Sends a 'team-ready' message to all currently connected WebSocket clients.
+	 */
+	activateTeam(teamName: string, processor: EventProcessor, watcher: FileWatcher): void {
+		if (this.mode !== 'auto') {
+			throw new Error('activateTeam can only be called in auto mode');
+		}
+		this.teamName = teamName;
+		this.processor = processor;
+		this.watcher = watcher;
+		this.mode = 'live';
+		this.sessionStart = new Date().toISOString();
+
+		// Push the initial state to already-connected lobby clients
+		const state = this.getSessionState();
+		const payload = JSON.stringify({ type: 'team-ready', state });
+		for (const client of this.clients) {
+			try {
+				if (client.readyState === 1) {
+					client.send(payload);
+				}
+			} catch {
+				this.clients.delete(client);
+			}
+		}
+	}
+
 	private getBootstrap(url: URL): AppBootstrap {
 		if (this.mode === 'replay' && this.replay) {
 			return {
@@ -237,6 +283,14 @@ export class TeamChatServer {
 		}
 
 		const protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+
+		if (this.mode === 'auto') {
+			return {
+				mode: 'auto',
+				wsUrl: `${protocol}//${url.host}/ws`,
+			};
+		}
+
 		return {
 			mode: 'live',
 			initialState: this.getSessionState(),

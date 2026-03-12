@@ -17,7 +17,7 @@ import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
 import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
-import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle } from '../shared/replay.js';
+import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap } from '../shared/replay.js';
 import type { ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -75,11 +75,97 @@ function App() {
 		);
 	}
 
+	if (bootstrap.mode === 'auto') {
+		return (
+			<AutoWorkspace
+				bootstrap={bootstrap}
+				onTeamReady={(state) => {
+					setBootstrap({
+						mode: 'live',
+						initialState: state,
+						wsUrl: bootstrap.wsUrl,
+					});
+				}}
+			/>
+		);
+	}
+
 	if (bootstrap.mode === 'live') {
 		return <LiveWorkspace bootstrap={bootstrap} />;
 	}
 
 	return <ReplayWorkspace bootstrap={bootstrap} />;
+}
+
+const AUTO_RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 10000];
+
+function AutoWorkspace({
+	bootstrap,
+	onTeamReady,
+}: {
+	bootstrap: AutoAppBootstrap;
+	onTeamReady: (state: import('./types.js').SessionState) => void;
+}) {
+	const onTeamReadyRef = React.useRef(onTeamReady);
+	onTeamReadyRef.current = onTeamReady;
+
+	useEffect(() => {
+		let active = true;
+		let ws: WebSocket | null = null;
+		let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+		let reconnectAttempt = 0;
+
+		function connect() {
+			if (!active) return;
+			ws = new WebSocket(bootstrap.wsUrl);
+
+			ws.onopen = () => {
+				reconnectAttempt = 0;
+			};
+
+			ws.onmessage = (e: MessageEvent<string>) => {
+				try {
+					const msg = JSON.parse(e.data) as { type: string; state?: import('./types.js').SessionState };
+					if (msg.type === 'team-ready' && msg.state) {
+						onTeamReadyRef.current(msg.state);
+					}
+				} catch {
+					// Ignore malformed messages
+				}
+			};
+
+			ws.onclose = () => {
+				if (!active) return;
+				const delay = AUTO_RECONNECT_DELAYS[
+					Math.min(reconnectAttempt, AUTO_RECONNECT_DELAYS.length - 1)
+				]!;
+				reconnectAttempt++;
+				reconnectTimer = setTimeout(connect, delay);
+			};
+
+			ws.onerror = () => {
+				ws?.close();
+			};
+		}
+
+		connect();
+
+		return () => {
+			active = false;
+			if (reconnectTimer) clearTimeout(reconnectTimer);
+			if (ws) ws.close();
+		};
+	}, [bootstrap.wsUrl]);
+
+	return (
+		<div className="tc-app-shell">
+			<StatusPanel
+				title="Waiting for team..."
+				description="Create or start an Agent Team in Claude Code to begin."
+				spinner
+			/>
+		</div>
+	);
 }
 
 function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode: 'live' }> }) {
