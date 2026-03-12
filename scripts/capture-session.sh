@@ -16,6 +16,17 @@ METAFILE="/tmp/teamchat-capture.meta"
 
 # ---- Helpers ----
 
+# Portable millisecond timestamp (macOS lacks %N)
+millis() {
+	if date +%s%3N 2>/dev/null | grep -qv N; then
+		date +%s%3N
+	else
+		# macOS/BSD fallback: seconds + zero-padded counter
+		python3 -c "import time; print(int(time.time()*1000))" 2>/dev/null \
+			|| echo "$(date +%s)000"
+	fi
+}
+
 log() { echo "[capture] $(date +%H:%M:%S) $*" >&2; }
 
 ensure_dir() { mkdir -p "$1"; }
@@ -178,7 +189,7 @@ cmd_start() {
 		if [ -d "$inbox_dir" ]; then
 			fswatch -0 "$inbox_dir" 2>/dev/null | while IFS= read -r -d '' _; do
 				local seq
-				seq=$(date +%s%3N)
+				seq=$(millis)
 				capture_inbox_snapshot "$team" "$capture_dir" "$seq"
 			done &
 			local fswatch_inbox_pid=$!
@@ -189,7 +200,7 @@ cmd_start() {
 		if [ -d "$task_dir" ]; then
 			fswatch -0 "$task_dir" 2>/dev/null | while IFS= read -r -d '' _; do
 				local seq
-				seq=$(date +%s%3N)
+				seq=$(millis)
 				capture_task_snapshot "$team" "$capture_dir" "$seq"
 			done &
 			local fswatch_task_pid=$!

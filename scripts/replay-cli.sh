@@ -5,17 +5,15 @@ set -euo pipefail
 # Used to produce the "CLI chaos" side of the comparison asset.
 #
 # Usage:
-#   ./scripts/replay-cli.sh <capture-dir> [--speed 1|2|5|10] [--record <output.cast>]
+#   ./scripts/replay-cli.sh <capture-dir> [--speed 1|2|5|10]
 
-CAPTURE_DIR="${1:?Usage: replay-cli.sh <capture-dir> [--speed N] [--record output.cast]}"
+CAPTURE_DIR="${1:?Usage: replay-cli.sh <capture-dir> [--speed N]}"
 shift
 
 SPEED=1
-RECORD=""
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--speed) SPEED="$2"; shift 2 ;;
-		--record) RECORD="$2"; shift 2 ;;
 		*) shift ;;
 	esac
 done
@@ -82,16 +80,6 @@ echo "Snapshots to replay: ${SNAPSHOT_COUNT}"
 
 # Calculate delay between frames
 DELAY=$(echo "scale=2; 10 / $SPEED" | bc)
-
-# If recording with asciinema, wrap the replay
-if [ -n "$RECORD" ]; then
-	if ! command -v asciinema &>/dev/null; then
-		echo "Error: asciinema required for --record. Install with: brew install asciinema" >&2
-		exit 1
-	fi
-	echo "Recording to: ${RECORD}"
-	echo "Will record for the duration of the replay..."
-fi
 
 # Replay loop — send each snapshot's content to the corresponding pane
 for seq_file in $(ls "${CLI_DIR}/${PANES[0]}-"*.txt 2>/dev/null | sort); do
