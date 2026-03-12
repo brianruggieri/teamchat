@@ -1547,6 +1547,81 @@ code {
 	white-space: nowrap;
 }
 
+/* === Agent Profile (sidebar drill-in) === */
+.tc-agent-back {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	font: inherit;
+	font-size: 0.75rem;
+	cursor: pointer;
+	padding: 4px 0;
+	margin-bottom: 8px;
+}
+.tc-agent-back:hover { color: var(--text-primary); }
+.tc-agent-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 0;
+}
+.tc-agent-header-info { display: flex; flex-direction: column; gap: 2px; }
+.tc-agent-header-name { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+.tc-agent-header-meta { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-muted); }
+.tc-agent-section { margin-top: 12px; }
+.tc-agent-section-title {
+	font-size: 0.7rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+	margin-bottom: 6px;
+}
+.tc-agent-thread-row {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 8px;
+	margin-bottom: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	width: 100%;
+	cursor: pointer;
+	transition: border-color 150ms ease;
+}
+.tc-agent-thread-row:hover { border-color: rgba(99, 102, 241, 0.4); }
+.tc-agent-thread-header { display: flex; justify-content: space-between; font-size: 0.78rem; font-weight: 500; }
+.tc-agent-thread-topic { font-size: 0.72rem; color: var(--text-secondary); }
+.tc-agent-thread-meta { font-size: 0.68rem; color: var(--text-muted); }
+.tc-thread-status.is-resolved { color: #22c55e; }
+.tc-thread-status.is-active { color: #60a5fa; }
+.tc-thread-status.is-new { color: #fbbf24; }
+.tc-agent-task-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 0;
+	font-size: 0.76rem;
+}
+.tc-agent-task-subject { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tc-agent-stats-strip { display: flex; gap: 6px; }
+.tc-stat-chip {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 6px 12px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 8px;
+	flex: 1;
+}
+.tc-stat-label { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.03em; }
+.tc-stat-value { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+.tc-roster-row.is-clickable:hover { background: rgba(99, 102, 241, 0.08); }
+
 .tc-system-group {
 	width: 100%;
 }
