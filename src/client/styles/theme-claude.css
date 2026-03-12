@@ -1,0 +1,211 @@
+/*
+ * Claude Theme — Anthropic's warm brand palette applied to teamchat
+ *
+ * Official brand colors:
+ *   Dark: #141413    Light: #faf9f5    Mid Gray: #b0aea5    Light Gray: #e8e6dc
+ *   Orange: #d97757  Blue: #6a9bcc     Green: #788c5d       Logo: #C15F3C
+ *
+ * Design philosophy: "Evening conversation rather than cold terminal"
+ * — warm surfaces, terracotta accent, cream text, parchment undertones
+ *
+ * Activated via ?theme=claude or data-theme="claude" on <html>
+ */
+
+[data-theme="claude"] {
+	/* Surface tokens — warm dark browns from #141413 family */
+	--surface-app: #191816;
+	--surface-panel: #1f1e1b;
+	--surface-elevated: #282623;
+	--surface-background: #110f0e;
+
+	/* Text — warm cream from #faf9f5 family */
+	--text-primary: #ede9e0;
+	--text-secondary: #b0aea5;
+	--text-muted: #827e74;
+
+	/* Borders — warm gray from brand mid-gray */
+	--border-subtle: rgba(176, 174, 165, 0.14);
+	--border-strong: rgba(176, 174, 165, 0.28);
+
+	/* Accent — brand terracotta orange #d97757 */
+	--accent-lead: #d97757;
+	--accent-lead-soft: rgba(217, 119, 87, 0.16);
+
+	/* Shadows & chrome */
+	--shadow-panel: 0 18px 60px rgba(0, 0, 0, 0.28);
+	--scrollbar-thumb: #352f28;
+	--scrollbar-track: #13120f;
+}
+
+/* Body gradient — warm terracotta glow replaces cool indigo */
+[data-theme="claude"] body {
+	background:
+		radial-gradient(circle at top, rgba(217, 119, 87, 0.1), transparent 40%),
+		linear-gradient(180deg, #191816 0%, #110f0e 100%);
+}
+
+/* App shell mode gradients */
+[data-theme="claude"] .tc-app-shell.is-live {
+	background:
+		radial-gradient(circle at 0% 0%, rgba(120, 140, 93, 0.1), transparent 28%),
+		radial-gradient(circle at 100% 0%, rgba(106, 155, 204, 0.08), transparent 36%),
+		var(--surface-app);
+}
+
+[data-theme="claude"] .tc-app-shell.is-replay {
+	background:
+		radial-gradient(circle at 0% 0%, rgba(217, 119, 87, 0.12), transparent 30%),
+		radial-gradient(circle at 100% 0%, rgba(193, 95, 60, 0.08), transparent 42%),
+		var(--surface-app);
+}
+
+/* Header — warm dark with parchment border */
+[data-theme="claude"] .tc-header {
+	background: rgba(25, 24, 22, 0.95);
+	border-bottom-color: rgba(176, 174, 165, 0.1);
+}
+
+/* Right rail — warm dark sidebar */
+[data-theme="claude"] .tc-right-rail {
+	background: rgba(17, 15, 14, 0.94);
+	border-left-color: rgba(176, 174, 165, 0.08);
+}
+
+/* Sidecards — warm elevated */
+[data-theme="claude"] .tc-sidecard {
+	background: rgba(31, 30, 27, 0.94);
+}
+
+/* Chat bubbles — peer in warm stone, lead in terracotta tint */
+[data-theme="claude"] .tc-chat-bubble.is-peer {
+	background: rgba(40, 38, 35, 0.88);
+	border-color: rgba(176, 174, 165, 0.1);
+}
+
+[data-theme="claude"] .tc-chat-bubble.is-lead {
+	background: rgba(217, 119, 87, 0.1);
+	border-color: rgba(217, 119, 87, 0.18);
+}
+
+/* System event cards — warm tones */
+[data-theme="claude"] .tc-system-card {
+	background: rgba(31, 30, 27, 0.88);
+	border-color: rgba(176, 174, 165, 0.1);
+}
+
+[data-theme="claude"] .tc-system-card.is-celebration {
+	border-color: rgba(120, 140, 93, 0.3);
+	background: linear-gradient(135deg, rgba(120, 140, 93, 0.08), rgba(217, 119, 87, 0.06));
+}
+
+/* Mode banner */
+[data-theme="claude"] .tc-mode-banner {
+	background: rgba(31, 30, 27, 0.94);
+	border-color: rgba(176, 174, 165, 0.1);
+}
+
+/* Live mode banner gradient */
+[data-theme="claude"] .tc-mode-banner.is-live {
+	background:
+		linear-gradient(180deg, rgba(18, 22, 18, 0.94), rgba(20, 18, 16, 0.82)),
+		radial-gradient(circle at top right, rgba(120, 140, 93, 0.12), transparent 34%);
+}
+
+/* Replay mode banner gradient */
+[data-theme="claude"] .tc-mode-banner.is-replay {
+	background:
+		linear-gradient(180deg, rgba(32, 22, 14, 0.94), rgba(22, 18, 14, 0.88)),
+		radial-gradient(circle at top right, rgba(217, 119, 87, 0.14), transparent 38%);
+}
+
+/* Thread blocks */
+[data-theme="claude"] .tc-thread-block {
+	background: rgba(31, 30, 27, 0.88);
+}
+
+[data-theme="claude"] .tc-thread-toggle {
+	border-color: rgba(176, 174, 165, 0.08);
+}
+
+/* Replay toolbar buttons */
+[data-theme="claude"] .tc-replay-toolbar button {
+	border-color: rgba(176, 174, 165, 0.16);
+	background: rgba(40, 38, 35, 0.6);
+}
+
+[data-theme="claude"] .tc-replay-toolbar button:hover {
+	background: rgba(50, 47, 42, 0.7);
+	border-color: rgba(176, 174, 165, 0.24);
+}
+
+/* Progress bars — terracotta gradient */
+[data-theme="claude"] .tc-progress-fill {
+	background: linear-gradient(90deg, rgba(217, 119, 87, 0.8), rgba(217, 119, 87, 0.95));
+}
+
+/* Scrubber */
+[data-theme="claude"] .tc-scrubber-fill {
+	background: linear-gradient(90deg, rgba(217, 119, 87, 0.72), rgba(230, 150, 110, 0.88));
+}
+
+[data-theme="claude"] .tc-scrubber-track {
+	background: rgba(40, 38, 35, 0.6);
+}
+
+/* Badges and metrics — terracotta tint */
+[data-theme="claude"] .tc-replay-badge {
+	background: rgba(217, 119, 87, 0.14);
+	color: #e4a080;
+}
+
+/* Marker chips */
+[data-theme="claude"] .tc-marker-chip {
+	background: rgba(40, 38, 35, 0.8);
+	border-color: rgba(176, 174, 165, 0.12);
+}
+
+[data-theme="claude"] .tc-marker-chip.is-active {
+	background: rgba(217, 119, 87, 0.16);
+	border-color: rgba(217, 119, 87, 0.36);
+}
+
+/* Bottom sheet overlay */
+[data-theme="claude"] .tc-bottom-sheet {
+	background: linear-gradient(180deg, rgba(25, 24, 22, 0.98), rgba(17, 15, 14, 0.98));
+}
+
+/* Status dots — use brand secondary colors */
+[data-theme="claude"] .tc-status-dot.is-working,
+[data-theme="claude"] .tc-roster-state.is-working {
+	color: #788c5d;
+}
+
+/* Permission/plan cards */
+[data-theme="claude"] .tc-permission-card,
+[data-theme="claude"] .tc-plan-card {
+	background: rgba(31, 30, 27, 0.92);
+	border-color: rgba(176, 174, 165, 0.12);
+}
+
+/* Scrollbar hover */
+[data-theme="claude"] *::-webkit-scrollbar-thumb:hover {
+	background: #443c34;
+}
+
+/* Inline code */
+[data-theme="claude"] .tc-inline-code {
+	background: rgba(40, 38, 35, 0.7);
+	border-color: rgba(176, 174, 165, 0.12);
+}
+
+/* Agent profile panel */
+[data-theme="claude"] .tc-agent-header {
+	background: rgba(40, 38, 35, 0.5);
+}
+
+/* Artifact viewer */
+[data-theme="claude"] .tc-artifact-modal-backdrop {
+	background:
+		linear-gradient(180deg, rgba(17, 15, 14, 0.92), rgba(13, 11, 10, 0.88)),
+		radial-gradient(circle at top right, rgba(217, 119, 87, 0.08), transparent 42%);
+}

@@ -210,6 +210,7 @@ function ReplayWorkspaceLoaded({
 		stepForward,
 		stepBack,
 		restart,
+		seek,
 		setSpeed,
 	} = controller;
 	const visibleArtifacts = controller.derivedState.visibleArtifacts;
@@ -274,12 +275,22 @@ function ReplayWorkspaceLoaded({
 			}
 			if (event.key === '5') {
 				setSpeed(5);
+				return;
+			}
+			if (event.key === 'Home') {
+				event.preventDefault();
+				restart();
+				return;
+			}
+			if (event.key === 'End') {
+				event.preventDefault();
+				seek(controller.state.durationMs);
 			}
 		};
 
 		window.addEventListener('keydown', handleKeydown);
 		return () => window.removeEventListener('keydown', handleKeydown);
-	}, [artifactViewerOpen, toggle, nextMarker, prevMarker, stepForward, stepBack, restart, setSpeed]);
+	}, [artifactViewerOpen, toggle, nextMarker, prevMarker, stepForward, stepBack, restart, seek, setSpeed, controller.state.durationMs]);
 
 	useEffect(() => {
 		const nextSelectedId = resolveSelectedArtifactId(visibleArtifacts, selectedArtifactId);

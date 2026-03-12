@@ -41,6 +41,7 @@ fs.copyFileSync(path.join(srcClient, 'index.html'), path.join(outDir, 'index.htm
 const stylesDir = path.join(outDir, 'styles');
 fs.mkdirSync(stylesDir, { recursive: true });
 fs.copyFileSync(path.join(srcClient, 'styles', 'index.css'), path.join(stylesDir, 'index.css'));
+fs.copyFileSync(path.join(srcClient, 'styles', 'theme-claude.css'), path.join(stylesDir, 'theme-claude.css'));
 
 console.log(`Client built to ${outDir}`);
 for (const artifact of result.outputs) {
