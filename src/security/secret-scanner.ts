@@ -56,6 +56,20 @@ const PATTERNS: PatternDef[] = [
 	{ category: 'generic-secret', pattern: /(api[_-]?key|secret|password|passwd|credentials?)\s*[=:]\s*["']?[^\s"']{6,}/gi, label: 'Generic secret' },
 ];
 
+/** Calculate Shannon entropy in bits per character. */
+export function shannonEntropy(s: string): number {
+	const freq = new Map<string, number>();
+	for (const c of s) {
+		freq.set(c, (freq.get(c) ?? 0) + 1);
+	}
+	let entropy = 0;
+	for (const count of freq.values()) {
+		const p = count / s.length;
+		entropy -= p * Math.log2(p);
+	}
+	return entropy;
+}
+
 export function scanForSecrets(text: string): SecretFinding[] {
 	const findings: SecretFinding[] = [];
 	const seen = new Set<string>();
@@ -64,6 +78,18 @@ export function scanForSecrets(text: string): SecretFinding[] {
 		const regex = new RegExp(def.pattern.source, def.pattern.flags);
 		let match: RegExpExecArray | null;
 		while ((match = regex.exec(text)) !== null) {
+			if (def.category === 'high-entropy') {
+				const matched = match[0];
+				// Skip git SHAs (40 or 64 hex chars)
+				if (/^[a-fA-F0-9]{40}$/.test(matched) || /^[a-fA-F0-9]{64}$/.test(matched)) {
+					continue;
+				}
+				// Require actual high entropy (random base64 ≈ 5.17 bits/char)
+				if (shannonEntropy(matched) < 4.0) {
+					continue;
+				}
+			}
+
 			const key = `${def.category}:${match.index}:${match[0].length}`;
 			if (seen.has(key)) continue;
 			seen.add(key);
