@@ -144,6 +144,25 @@ export interface TaskUpdate {
 	timestamp: string;
 }
 
+// === Beat Detection (conversational structure) ===
+export type BeatType =
+	| 'proposal'
+	| 'agreement'
+	| 'counter-proposal'
+	| 'acknowledgement'
+	| 'resolution';
+
+export interface ThreadStatus {
+	threadKey: string; // sorted participant pair, e.g. "auth:gateway"
+	participants: string[];
+	topic: string; // first ~60 chars of first message
+	messageCount: number;
+	status: 'new' | 'active' | 'resolved';
+	firstMessageTimestamp: string;
+	lastMessageTimestamp: string;
+	beats: BeatType[];
+}
+
 // === Initial State (REST endpoint GET /state) ===
 export interface SessionState {
 	team: TeamState;
@@ -151,6 +170,7 @@ export interface SessionState {
 	tasks: TaskInfo[];
 	presence: Record<string, 'working' | 'idle' | 'offline'>;
 	sessionStart: string;
+	threadStatuses: ThreadStatus[];
 }
 
 // === Plan Approval Card Data ===
