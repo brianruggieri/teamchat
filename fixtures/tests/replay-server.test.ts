@@ -42,6 +42,9 @@ describe('Replay Server', () => {
 			getThreadStatuses() {
 				return [];
 			},
+			getSuppressionStats() {
+				return { idlePingCount: 0, idleSurfacedCount: 0 };
+			},
 		} as unknown as EventProcessor;
 
 		const server = new TeamChatServer({
@@ -152,6 +155,7 @@ describe('Replay Server', () => {
 				getTasks() { return []; },
 				getPresence() { return { worker: 'working' as const }; },
 				getThreadStatuses() { return []; },
+				getSuppressionStats() { return { idlePingCount: 0, idleSurfacedCount: 0 }; },
 			} as unknown as EventProcessor;
 
 			// Activate the team — should transition to live mode
@@ -202,6 +206,7 @@ describe('Replay Server', () => {
 				getTasks() { return []; },
 				getPresence() { return {}; },
 				getThreadStatuses() { return []; },
+				getSuppressionStats() { return { idlePingCount: 0, idleSurfacedCount: 0 }; },
 			} as unknown as EventProcessor;
 
 			server.activateTeam('broadcast-team', processor, watcher);

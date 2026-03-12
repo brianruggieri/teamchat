@@ -52,6 +52,7 @@ export interface ChatState {
 	permissionCards: Record<string, PermissionRequestCard>;
 	threadStatuses: Record<string, ThreadStatus>;
 	activeAgentKey: string | null; // agent name for sidebar drill-in
+	suppressionStats: { idlePingCount: number; idleSurfacedCount: number };
 }
 
 export type ChatAction =
@@ -72,6 +73,7 @@ export const INITIAL_STATE: ChatState = {
 	permissionCards: {},
 	threadStatuses: {},
 	activeAgentKey: null,
+	suppressionStats: { idlePingCount: 0, idleSurfacedCount: 0 },
 };
 
 export interface AgentColor {

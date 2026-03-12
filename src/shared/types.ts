@@ -163,6 +163,57 @@ export interface ThreadStatus {
 	beats: BeatType[];
 }
 
+// === Post-Mortem Data (derived client-side from ChatState) ===
+
+export interface PostMortemData {
+	sessionDurationMs: number;
+	signalNoise: {
+		totalRawEvents: number;
+		meaningfulEvents: number;
+		idlePingsAbsorbed: number;
+		compressionRatio: number;
+	};
+	agents: AgentContribution[];
+	coordinationMatrix: CoordinationCell[];
+	keyMoments: KeyMoment[];
+	summary: {
+		taskCount: number;
+		completedCount: number;
+		messageCount: number;
+		broadcastCount: number;
+		dmThreadCount: number;
+		resolvedThreadCount: number;
+		bottleneckCount: number;
+	};
+}
+
+export interface AgentContribution {
+	name: string;
+	color: string;
+	tasksCompleted: number;
+	tasksTotal: number;
+	messagesSent: number;
+	dmThreads: number;
+	joinedAt: string | null;
+}
+
+export interface CoordinationCell {
+	agentA: string;
+	agentB: string;
+	messageCount: number;
+	threadCount: number;
+	resolvedCount: number;
+}
+
+export interface KeyMoment {
+	timestamp: string;
+	atMs: number;
+	kind: string;
+	label: string;
+	agentName: string | null;
+	taskId: string | null;
+}
+
 // === Initial State (REST endpoint GET /state) ===
 export interface SessionState {
 	team: TeamState;
@@ -171,6 +222,7 @@ export interface SessionState {
 	presence: Record<string, 'working' | 'idle' | 'offline'>;
 	sessionStart: string;
 	threadStatuses: ThreadStatus[];
+	suppressionStats: { idlePingCount: number; idleSurfacedCount: number };
 }
 
 // === Plan Approval Card Data ===

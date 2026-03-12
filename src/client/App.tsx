@@ -18,6 +18,8 @@ import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
 import { ConfettiOverlay } from './components/ConfettiOverlay.jsx';
+import { SessionPostMortem } from './components/SessionPostMortem.jsx';
+import { derivePostMortem } from './postmortem.js';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap } from '../shared/replay.js';
 import type { ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
@@ -304,7 +306,6 @@ function ReplayWorkspaceLoaded({
 	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
 	const [activeAgentKey, setActiveAgentKey] = useState<string | null>(null);
-
 	const handleSelectAgent = useCallback((action: { type: 'SELECT_AGENT'; agentName: string | null }) => {
 		setActiveAgentKey(action.agentName);
 	}, []);
@@ -519,10 +520,16 @@ function TeamChatScaffold({
 }) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
 	const [confettiTriggered, setConfettiTriggered] = useState(false);
+	const [showPostMortem, setShowPostMortem] = useState(false);
 	const prevAllCompleted = useRef(false);
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
 		state.events.length,
 	]);
+
+	const postMortem = useMemo(
+		() => derivePostMortem(state),
+		[state.events, state.tasks, state.threadStatuses, state.suppressionStats],
+	);
 
 	const allTasksCompleted = state.events.some(
 		(e) => e.type === 'system' && e.subtype === 'all-tasks-completed'
@@ -531,6 +538,9 @@ function TeamChatScaffold({
 	useEffect(() => {
 		if (allTasksCompleted && !prevAllCompleted.current) {
 			setConfettiTriggered(true);
+			// Auto-show post-mortem 2s after confetti
+			const timer = setTimeout(() => setShowPostMortem(true), 2000);
+			return () => clearTimeout(timer);
 		}
 		prevAllCompleted.current = allTasksCompleted;
 	}, [allTasksCompleted]);
@@ -628,6 +638,15 @@ function TeamChatScaffold({
 				statusText={headerStatusText}
 			>
 				{headerChildren}
+				{postMortem && (
+					<button
+						type="button"
+						className="tc-recap-btn"
+						onClick={() => setShowPostMortem(true)}
+					>
+						View Recap
+					</button>
+				)}
 			</Header>
 
 			{topContent && (
@@ -769,6 +788,13 @@ function TeamChatScaffold({
 			)}
 
 			<ConfettiOverlay active={confettiTriggered} />
+			{showPostMortem && postMortem && state.team && (
+				<SessionPostMortem
+					data={postMortem}
+					team={state.team}
+					onDismiss={() => setShowPostMortem(false)}
+				/>
+			)}
 		</div>
 	);
 }

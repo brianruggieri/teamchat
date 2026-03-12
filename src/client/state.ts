@@ -35,6 +35,7 @@ export function cloneChatState(state: ChatState): ChatState {
 			Object.entries(state.threadStatuses).map(([k, v]) => [k, { ...v, beats: [...v.beats], participants: [...v.participants] }]),
 		),
 		activeAgentKey: state.activeAgentKey,
+		suppressionStats: { ...state.suppressionStats },
 	};
 }
 
@@ -55,6 +56,7 @@ export function hydrateChatState(session: SessionState, connected = true): ChatS
 		threadStatuses: Object.fromEntries(
 			(session.threadStatuses ?? []).map((ts) => [ts.threadKey, ts]),
 		),
+		suppressionStats: session.suppressionStats ?? { idlePingCount: 0, idleSurfacedCount: 0 },
 	});
 
 	for (const event of session.events) {

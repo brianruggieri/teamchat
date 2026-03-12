@@ -228,6 +228,7 @@ export class TeamChatServer {
 			presence: this.processor.getPresence(),
 			sessionStart: this.sessionStart,
 			threadStatuses: this.processor.getThreadStatuses(),
+			suppressionStats: this.processor.getSuppressionStats(),
 		};
 	}
 

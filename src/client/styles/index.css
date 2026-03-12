@@ -2135,6 +2135,342 @@ code {
 	white-space: pre-wrap;
 }
 
+/* === Post-Mortem Overlay === */
+
+@keyframes slideUpOverlay {
+	from { transform: translateY(100%); opacity: 0; }
+	to { transform: translateY(0); opacity: 1; }
+}
+
+.tc-postmortem-overlay {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	max-height: 60vh;
+	z-index: 200;
+	background: var(--surface-primary);
+	border-top: 1px solid var(--border-primary);
+	box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.4);
+	animation: slideUpOverlay 0.4s ease-out both;
+	overflow-y: auto;
+}
+
+.tc-postmortem-inner {
+	max-width: 720px;
+	margin: 0 auto;
+	padding: 20px 24px 28px;
+}
+
+.tc-postmortem-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 16px;
+}
+
+.tc-postmortem-header-text {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+}
+
+.tc-postmortem-title {
+	font-size: 1.1rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	margin: 0;
+}
+
+.tc-postmortem-duration {
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+}
+
+.tc-postmortem-dismiss {
+	font-size: 0.75rem;
+	color: var(--text-tertiary);
+	background: transparent;
+	border: 1px solid var(--border-secondary);
+	border-radius: 6px;
+	padding: 4px 12px;
+	cursor: pointer;
+	transition: color 0.15s, border-color 0.15s;
+}
+
+.tc-postmortem-dismiss:hover {
+	color: var(--text-primary);
+	border-color: var(--border-primary);
+}
+
+.tc-postmortem-section {
+	margin-bottom: 16px;
+}
+
+.tc-postmortem-section-title {
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-tertiary);
+	margin: 0 0 8px;
+}
+
+/* Signal-to-Noise Card */
+.tc-postmortem-signal {
+	background: linear-gradient(135deg, var(--surface-secondary), var(--surface-primary));
+	border: 1px solid var(--border-primary);
+	border-radius: 8px;
+	padding: 14px 16px;
+}
+
+.tc-postmortem-signal-text {
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+	margin-bottom: 10px;
+	line-height: 1.4;
+}
+
+.tc-postmortem-signal-text strong {
+	color: var(--text-primary);
+	font-weight: 600;
+}
+
+.tc-postmortem-signal-bar {
+	display: flex;
+	height: 8px;
+	border-radius: 4px;
+	overflow: hidden;
+	gap: 2px;
+}
+
+.tc-postmortem-signal-segment.is-absorbed {
+	background: var(--text-tertiary);
+	opacity: 0.35;
+	border-radius: 4px 0 0 4px;
+}
+
+.tc-postmortem-signal-segment.is-signal {
+	background: var(--accent-primary);
+	border-radius: 0 4px 4px 0;
+}
+
+.tc-postmortem-signal-legend {
+	display: flex;
+	gap: 16px;
+	margin-top: 8px;
+	font-size: 0.68rem;
+}
+
+.tc-postmortem-legend-item {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	color: var(--text-tertiary);
+}
+
+.tc-postmortem-legend-item::before {
+	content: '';
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+}
+
+.tc-postmortem-legend-item.is-absorbed::before {
+	background: var(--text-tertiary);
+	opacity: 0.35;
+}
+
+.tc-postmortem-legend-item.is-signal::before {
+	background: var(--accent-primary);
+}
+
+/* Stats Strip */
+.tc-postmortem-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+	gap: 8px;
+}
+
+.tc-stat-chip {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 8px 6px;
+	border: 1px solid var(--border-secondary);
+	border-radius: 6px;
+	background: var(--surface-secondary);
+}
+
+.tc-stat-chip-value {
+	font-size: 0.9rem;
+	font-weight: 600;
+	color: var(--text-primary);
+}
+
+.tc-stat-chip-label {
+	font-size: 0.62rem;
+	color: var(--text-tertiary);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Key Moments Timeline */
+.tc-postmortem-moments {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-left: 4px;
+}
+
+.tc-postmortem-moment {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 3px 0;
+	font-size: 0.75rem;
+}
+
+.tc-postmortem-moment-time {
+	min-width: 36px;
+	text-align: right;
+	color: var(--text-tertiary);
+	font-variant-numeric: tabular-nums;
+	font-size: 0.68rem;
+}
+
+.tc-postmortem-moment-dot {
+	width: 16px;
+	text-align: center;
+	font-size: 0.7rem;
+	color: var(--text-secondary);
+}
+
+.tc-postmortem-moment.is-all-tasks-completed .tc-postmortem-moment-dot {
+	color: var(--accent-primary);
+}
+
+.tc-postmortem-moment.is-bottleneck .tc-postmortem-moment-dot {
+	color: #eab308;
+}
+
+.tc-postmortem-moment-label {
+	color: var(--text-secondary);
+	flex: 1;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Coordination Map */
+.tc-postmortem-coord {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.tc-coord-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 8px;
+	border: 1px solid var(--border-secondary);
+	border-radius: 6px;
+	background: var(--surface-secondary);
+}
+
+.tc-coord-pair {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.tc-coord-arrow {
+	color: var(--text-tertiary);
+	font-size: 0.75rem;
+}
+
+.tc-coord-stats {
+	display: flex;
+	gap: 10px;
+	font-size: 0.68rem;
+	color: var(--text-tertiary);
+}
+
+.tc-coord-resolved {
+	color: var(--accent-primary);
+}
+
+/* Agent Contribution Cards */
+.tc-postmortem-agents {
+	display: flex;
+	gap: 8px;
+	overflow-x: auto;
+	padding-bottom: 4px;
+}
+
+.tc-postmortem-agent-card {
+	flex: 0 0 auto;
+	min-width: 120px;
+	border: 1px solid var(--border-secondary);
+	border-top-width: 2px;
+	border-radius: 6px;
+	padding: 10px 12px;
+	background: var(--surface-secondary);
+}
+
+.tc-postmortem-agent-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.tc-postmortem-agent-name {
+	font-size: 0.78rem;
+	font-weight: 500;
+	color: var(--text-primary);
+}
+
+.tc-postmortem-agent-stats {
+	display: flex;
+	gap: 12px;
+}
+
+.tc-postmortem-agent-stats > div {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.tc-postmortem-agent-stats .tc-stat-chip-value {
+	font-size: 0.8rem;
+}
+
+.tc-postmortem-agent-stats .tc-stat-chip-label {
+	font-size: 0.58rem;
+}
+
+/* View Recap button in header */
+.tc-recap-btn {
+	font-size: 0.7rem;
+	color: var(--text-tertiary);
+	background: transparent;
+	border: 1px solid var(--border-secondary);
+	border-radius: 6px;
+	padding: 3px 10px;
+	cursor: pointer;
+	transition: color 0.15s, border-color 0.15s;
+	white-space: nowrap;
+}
+
+.tc-recap-btn:hover {
+	color: var(--text-primary);
+	border-color: var(--border-primary);
+}
+
 @media (min-width: 1024px) {
 	.tc-app-body {
 		display: grid;

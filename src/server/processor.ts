@@ -100,6 +100,7 @@ export class EventProcessor {
 	private recentLeadMessages: { id: string; text: string; timestamp: string }[] = [];
 	private threadStatuses: Map<string, ThreadStatus> = new Map();
 	private allEvents: ChatEvent[] = [];
+	private broadcastCount = 0;
 	private broadcastHoldMs = 500;
 	private idleSurfaceMs = 30_000;
 	private taskClaimWindowMs = 120_000;
@@ -152,6 +153,16 @@ export class EventProcessor {
 	/** Get current thread status tracking. */
 	getThreadStatuses(): ThreadStatus[] {
 		return Array.from(this.threadStatuses.values());
+	}
+
+	/** Get idle ping suppression stats. */
+	getSuppressionStats(): { idlePingCount: number; idleSurfacedCount: number } {
+		return { idlePingCount: this.idlePingCount, idleSurfacedCount: this.idleSurfacedCount };
+	}
+
+	/** Get count of broadcast messages emitted. */
+	getBroadcastCount(): number {
+		return this.broadcastCount;
 	}
 
 	// === Config changes (member join/leave) ===
@@ -523,6 +534,7 @@ export class EventProcessor {
 		this.pendingBroadcasts.delete(key);
 
 		const isBroadcast = pending.inboxes.size >= 3;
+		if (isBroadcast) this.broadcastCount++;
 		const senderIsTeammate = !isLeadAgent(pending.from);
 
 		// DM: teammate→teammate message that appeared in only one inbox
