@@ -46,8 +46,7 @@ export type MessageLaneItem =
 	| PlanCardItem
 	| PermissionCardItem
 	| SystemRowItem
-	| SystemGroupItem
-	| AccumulatedThreadItem;
+	| SystemGroupItem;
 
 export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];

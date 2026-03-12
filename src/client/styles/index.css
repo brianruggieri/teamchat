@@ -1461,88 +1461,90 @@ code {
 	line-height: 1.5;
 }
 
+/* === Thread Blocks (accumulated DM conversations) === */
 .tc-thread-block {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	padding: 12px 12px 10px;
-	border: 1px solid rgba(91, 109, 247, 0.16);
-	border-radius: var(--radius-14);
-	background: rgba(9, 16, 24, 0.72);
+	border: 1px solid var(--border-subtle);
+	border-radius: 12px;
+	margin: 6px 0;
+	overflow: hidden;
 }
-
 .tc-thread-toggle {
 	display: flex;
+	align-items: center;
+	gap: 8px;
 	width: 100%;
-	align-items: center;
-	gap: var(--space-12);
-	padding: 0;
-	background: transparent;
-	color: inherit;
+	padding: 8px 12px;
+	background: rgba(14, 22, 32, 0.6);
+	border: none;
+	color: var(--text-primary);
 	cursor: pointer;
+	text-align: left;
+	font: inherit;
+	transition: background 150ms ease;
 }
-
+.tc-thread-toggle:hover { background: rgba(14, 22, 32, 0.85); }
 .tc-thread-chevron {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	border: 1px solid var(--border-subtle);
-	border-radius: 999px;
-	background: rgba(18, 30, 45, 0.78);
-	color: var(--text-secondary);
-	transition: transform 150ms ease;
+	flex-shrink: 0;
+	transition: transform 200ms ease;
+	opacity: 0.5;
 }
-
-.tc-thread-chevron.is-open {
-	transform: rotate(90deg);
-}
-
+.tc-thread-chevron[data-expanded="true"] { transform: rotate(90deg); }
 .tc-thread-heading {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	text-align: left;
+	gap: 1px;
+	min-width: 0;
 }
-
 .tc-thread-title {
-	font-size: 0.84rem;
-	font-weight: 700;
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--text-primary);
 }
-
-.tc-thread-subtitle,
-.tc-thread-footer {
-	color: var(--text-secondary);
-	font-size: 0.78rem;
+.tc-thread-subtitle {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+	display: flex;
+	align-items: center;
+	gap: 4px;
 }
-
+.tc-thread-beats { letter-spacing: 1px; }
+.tc-thread-topic {
+	margin-left: auto;
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	opacity: 0.7;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 200px;
+}
 .tc-thread-content {
 	display: grid;
-	grid-template-rows: 1fr;
-	overflow: hidden;
-	opacity: 1;
-	transition: grid-template-rows 220ms ease, opacity 180ms ease;
-}
-
-.tc-thread-content.is-collapsed {
 	grid-template-rows: 0fr;
-	opacity: 0;
+	transition: grid-template-rows 200ms ease;
 }
-
+.tc-thread-content[data-expanded="true"] { grid-template-rows: 1fr; }
+.tc-thread-content > * { overflow: hidden; }
 .tc-thread-lane {
-	display: flex;
-	min-height: 0;
-	flex-direction: column;
-	gap: 12px;
-	margin-left: 6px;
-	padding-left: 12px;
-	border-left: 1px solid rgba(91, 109, 247, 0.18);
-	overflow: hidden;
+	padding: 4px 12px 8px;
+	border-left: 2px solid rgba(99, 102, 241, 0.3);
+	margin-left: 16px;
 }
-
-.tc-thread-footer {
-	padding-left: 28px;
+.tc-thread-preview {
+	padding: 4px 12px 8px;
+	font-size: 0.78rem;
+	color: var(--text-secondary);
+	display: flex;
+	gap: 6px;
+}
+.tc-thread-preview-from {
+	font-weight: 600;
+	flex-shrink: 0;
+}
+.tc-thread-preview-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .tc-system-group {
