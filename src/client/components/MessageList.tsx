@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import type {
 	ChatEvent,
+	ContentMessage,
 	Reaction,
-	ThreadMarker,
 } from '../types.js';
 import { ThreadBlock } from './ThreadBlock.jsx';
 import { MessageStack } from './MessageStack.jsx';
@@ -17,10 +17,12 @@ interface MessageListProps {
 	reactions: Record<string, Reaction[]>;
 }
 
-interface ThreadGroup {
-	kind: 'thread';
+interface AccumulatedThread {
+	kind: 'accumulated-thread';
+	threadKey: string;
 	participants: string[];
 	events: ChatEvent[];
+	topic: string;
 }
 
 interface FlatEventsGroup {
@@ -29,7 +31,7 @@ interface FlatEventsGroup {
 	laneItems: MessageLaneItem[];
 }
 
-type RenderItem = ThreadGroup | FlatEventsGroup;
+type RenderItem = AccumulatedThread | FlatEventsGroup;
 
 export function MessageList({ events, reactions }: MessageListProps) {
 	const items = useMemo(() => groupEvents(events), [events]);
@@ -37,13 +39,15 @@ export function MessageList({ events, reactions }: MessageListProps) {
 	return (
 		<div className="tc-message-list">
 			{items.map((item, index) => {
-				if (item.kind === 'thread') {
+				if (item.kind === 'accumulated-thread') {
 					return (
 						<ThreadBlock
-							key={`thread-${index}`}
+							key={item.threadKey}
+							threadKey={item.threadKey}
 							participants={item.participants}
 							events={item.events}
 							reactions={reactions}
+							topic={item.topic}
 						/>
 					);
 				}
@@ -119,60 +123,70 @@ export function MessageList({ events, reactions }: MessageListProps) {
 	);
 }
 
+/**
+ * Group events into accumulated thread blocks and flat event groups.
+ *
+ * All DMs for each participant pair are accumulated into a single
+ * thread block, placed at the position of the first DM for that pair.
+ * Thread markers are ignored entirely (legacy compat).
+ */
 function groupEvents(events: ChatEvent[]): RenderItem[] {
 	const items: RenderItem[] = [];
-	let currentFlatEvents: ChatEvent[] = [];
-	let index = 0;
+	const dmsByPair = new Map<string, ChatEvent[]>();
+	const dmPairInserted = new Set<string>();
+	let flatBuffer: ChatEvent[] = [];
 
-	const pushFlatEvents = () => {
-		if (currentFlatEvents.length > 0) {
-			const group: FlatEventsGroup = {
+	const pushFlat = () => {
+		if (flatBuffer.length > 0) {
+			items.push({
 				kind: 'flat-events',
-				events: currentFlatEvents,
-				laneItems: buildMessageLaneItems(currentFlatEvents),
-			};
-			items.push(group);
-			currentFlatEvents = [];
+				events: flatBuffer,
+				laneItems: buildMessageLaneItems(flatBuffer),
+			});
+			flatBuffer = [];
 		}
 	};
 
-	while (index < events.length) {
-		const event = events[index];
+	// Pre-collect all DMs by pair
+	for (const event of events) {
+		if (event.type === 'message' && (event as ContentMessage).isDM) {
+			const msg = event as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			if (!dmsByPair.has(key)) dmsByPair.set(key, []);
+			dmsByPair.get(key)!.push(event);
+		}
+	}
 
-		if (event.type === 'thread-marker') {
-			const marker = event as ThreadMarker;
-			if (marker.subtype === 'thread-start') {
-				pushFlatEvents();
-				const threadEvents: ChatEvent[] = [];
-				index++;
-				while (index < events.length) {
-					const inner = events[index];
-					if (
-						inner.type === 'thread-marker'
-						&& (inner as ThreadMarker).subtype === 'thread-end'
-					) {
-						index++;
-						break;
-					}
-					threadEvents.push(inner);
-					index++;
-				}
+	// Build timeline with accumulated thread blocks
+	for (const event of events) {
+		// Skip thread markers entirely
+		if (event.type === 'thread-marker') continue;
+
+		if (event.type === 'message' && (event as ContentMessage).isDM) {
+			const msg = event as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+
+			if (!dmPairInserted.has(key)) {
+				// First DM for this pair — insert the accumulated block here
+				pushFlat();
+				dmPairInserted.add(key);
+				const allDMs = dmsByPair.get(key) ?? [];
 				items.push({
-					kind: 'thread',
-					participants: marker.participants,
-					events: threadEvents,
+					kind: 'accumulated-thread',
+					threadKey: key,
+					participants: [...(msg.dmParticipants ?? [])].sort(),
+					events: allDMs,
+					topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
 				});
-				continue;
 			}
-
-			index++;
+			// Subsequent DMs for this pair are already in the accumulated block — skip
 			continue;
 		}
 
-		currentFlatEvents.push(event);
-		index++;
+		// Non-DM event — add to flat buffer
+		flatBuffer.push(event);
 	}
 
-	pushFlatEvents();
+	pushFlat();
 	return items;
 }

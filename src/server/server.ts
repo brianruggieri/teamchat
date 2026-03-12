@@ -63,92 +63,113 @@ export class TeamChatServer {
 			}
 			: {};
 
-		this.server = Bun.serve({
-			port: this.port,
-			fetch(req, server) {
-				const url = new URL(req.url);
+		const maxRetries = 10;
+		let lastError: Error | null = null;
 
-				// WebSocket upgrade
-				if (url.pathname === '/ws') {
-					if (serverRef.mode !== 'live') {
-						return new Response('WebSocket is unavailable in replay mode', { status: 409 });
-					}
-					const upgraded = server.upgrade(req, { data: null });
-					if (!upgraded) {
-						return new Response('WebSocket upgrade failed', { status: 400 });
-					}
-					return undefined as unknown as Response;
-				}
+		for (let attempt = 0; attempt < maxRetries; attempt++) {
+			const tryPort = this.port + attempt;
+			try {
+				this.server = Bun.serve({
+					port: tryPort,
+					fetch(req, server) {
+						const url = new URL(req.url);
 
-				if (url.pathname === '/bootstrap') {
-					return Response.json(serverRef.getBootstrap(url));
-				}
-
-				if (serverRef.mode === 'replay' && url.pathname === '/replay/bundle') {
-					return Response.json(serverRef.replay?.bundle ?? null);
-				}
-
-				if (serverRef.mode === 'replay' && url.pathname.startsWith('/replay/artifacts/')) {
-					const artifactId = decodeURIComponent(url.pathname.slice('/replay/artifacts/'.length));
-					return serverRef.serveReplayArtifact(artifactId);
-				}
-
-				// REST API: session state for initial hydration
-				if (url.pathname === '/state') {
-					if (serverRef.mode !== 'live') {
-						return new Response('State endpoint is only available in live mode', { status: 409 });
-					}
-					return Response.json(serverRef.getSessionState());
-				}
-
-				// Health check
-				if (url.pathname === '/health') {
-					return Response.json({ status: 'ok', team: serverRef.teamName });
-				}
-
-				// Static file serving for the client
-				let filePath = url.pathname;
-				if (filePath === '/' || filePath === '') {
-					filePath = '/index.html';
-				}
-
-				const fullPath = path.join(clientDir, filePath);
-				const file = Bun.file(fullPath);
-				return file.exists().then((exists) => {
-					if (exists) {
-						return new Response(file, { headers: noCacheHeaders });
-					}
-					// SPA fallback
-					const indexPath = path.join(clientDir, 'index.html');
-					const indexFile = Bun.file(indexPath);
-					return indexFile.exists().then((indexExists) => {
-						if (indexExists) {
-							return new Response(indexFile, { headers: noCacheHeaders });
+						// WebSocket upgrade
+						if (url.pathname === '/ws') {
+							if (serverRef.mode !== 'live') {
+								return new Response('WebSocket is unavailable in replay mode', { status: 409 });
+							}
+							const upgraded = server.upgrade(req, { data: null });
+							if (!upgraded) {
+								return new Response('WebSocket upgrade failed', { status: 400 });
+							}
+							return undefined as unknown as Response;
 						}
-						return new Response('Not Found', { status: 404 });
-					});
-				});
-			},
-				websocket: {
-					open(ws) {
-						if (serverRef.mode !== 'live') {
-							return;
+
+						if (url.pathname === '/bootstrap') {
+							return Response.json(serverRef.getBootstrap(url));
 						}
-						serverRef.clients.add(ws);
-						const state = serverRef.getSessionState();
-						ws.send(JSON.stringify({ type: 'init', state }));
+
+						if (serverRef.mode === 'replay' && url.pathname === '/replay/bundle') {
+							return Response.json(serverRef.replay?.bundle ?? null);
+						}
+
+						if (serverRef.mode === 'replay' && url.pathname.startsWith('/replay/artifacts/')) {
+							const artifactId = decodeURIComponent(url.pathname.slice('/replay/artifacts/'.length));
+							return serverRef.serveReplayArtifact(artifactId);
+						}
+
+						// REST API: session state for initial hydration
+						if (url.pathname === '/state') {
+							if (serverRef.mode !== 'live') {
+								return new Response('State endpoint is only available in live mode', { status: 409 });
+							}
+							return Response.json(serverRef.getSessionState());
+						}
+
+						// Health check
+						if (url.pathname === '/health') {
+							return Response.json({ status: 'ok', team: serverRef.teamName });
+						}
+
+						// Static file serving for the client
+						let filePath = url.pathname;
+						if (filePath === '/' || filePath === '') {
+							filePath = '/index.html';
+						}
+
+						const fullPath = path.join(clientDir, filePath);
+						const file = Bun.file(fullPath);
+						return file.exists().then((exists) => {
+							if (exists) {
+								return new Response(file, { headers: noCacheHeaders });
+							}
+							// SPA fallback
+							const indexPath = path.join(clientDir, 'index.html');
+							const indexFile = Bun.file(indexPath);
+							return indexFile.exists().then((indexExists) => {
+								if (indexExists) {
+									return new Response(indexFile, { headers: noCacheHeaders });
+								}
+								return new Response('Not Found', { status: 404 });
+							});
+						});
 					},
-				close(ws) {
-					serverRef.clients.delete(ws);
-				},
-				message(_ws, _message) {
-					// Client → server messages not used in v1
-				},
-			},
-		});
+						websocket: {
+							open(ws) {
+								if (serverRef.mode !== 'live') {
+									return;
+								}
+								serverRef.clients.add(ws);
+								const state = serverRef.getSessionState();
+								ws.send(JSON.stringify({ type: 'init', state }));
+							},
+						close(ws) {
+							serverRef.clients.delete(ws);
+						},
+						message(_ws, _message) {
+							// Client → server messages not used in v1
+						},
+					},
+				});
 
-		console.log(`teamchat server running at http://localhost:${this.port}`);
-		console.log(`Watching team: ${this.teamName}`);
+				if (attempt > 0) {
+					console.error(`Port ${this.port} in use, using ${tryPort} instead`);
+				}
+				this.port = tryPort;
+
+				console.log(`teamchat server running at http://localhost:${this.port}`);
+				console.log(`Watching team: ${this.teamName}`);
+				return;
+			} catch (err) {
+				lastError = err instanceof Error ? err : new Error(String(err));
+				if (!lastError.message.includes('EADDRINUSE') && !lastError.message.includes('address already in use')) {
+					throw lastError;
+				}
+			}
+		}
+
+		throw new Error(`Could not find an available port (tried ${this.port}-${this.port + maxRetries - 1})`);
 	}
 
 	/** Broadcast ChatEvents to all connected WebSocket clients. */
@@ -184,6 +205,7 @@ export class TeamChatServer {
 			tasks: this.processor.getTasks(),
 			presence: this.processor.getPresence(),
 			sessionStart: this.sessionStart,
+			threadStatuses: this.processor.getThreadStatuses(),
 		};
 	}
 

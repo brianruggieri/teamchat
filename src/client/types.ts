@@ -11,6 +11,7 @@ import type {
 	SessionState,
 	PlanApprovalCard,
 	PermissionRequestCard,
+	ThreadStatus,
 } from '../shared/types.js';
 
 // Re-export shared types used by components
@@ -27,6 +28,7 @@ export type {
 	SessionState,
 	PlanApprovalCard,
 	PermissionRequestCard,
+	ThreadStatus,
 };
 
 // === Client-Only Types ===
@@ -48,12 +50,15 @@ export interface ChatState {
 	connected: boolean;
 	planCards: Record<string, PlanApprovalCard>;
 	permissionCards: Record<string, PermissionRequestCard>;
+	threadStatuses: Record<string, ThreadStatus>;
+	activeAgentKey: string | null; // agent name for sidebar drill-in
 }
 
 export type ChatAction =
 	| { type: 'HYDRATE'; state: SessionState }
 	| { type: 'EVENT'; event: ChatEvent }
-	| { type: 'CONNECTION_CHANGE'; connected: boolean };
+	| { type: 'CONNECTION_CHANGE'; connected: boolean }
+	| { type: 'SELECT_AGENT'; agentName: string | null };
 
 export const INITIAL_STATE: ChatState = {
 	events: [],
@@ -65,6 +70,8 @@ export const INITIAL_STATE: ChatState = {
 	connected: false,
 	planCards: {},
 	permissionCards: {},
+	threadStatuses: {},
+	activeAgentKey: null,
 };
 
 export interface AgentColor {

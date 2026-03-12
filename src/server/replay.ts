@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { JournalEntry, TaskInfo, TeamConfig, TeamState } from '../shared/types.js';
+import type { AgentInfo, JournalEntry, TaskInfo, TeamConfig, TeamState } from '../shared/types.js';
 import type {
 	ReplayArtifact,
 	ReplayBundle,
@@ -9,9 +9,20 @@ import type {
 	ReplayMarker,
 } from '../shared/replay.js';
 import { Journal } from './journal.js';
+import { isLeadAgent } from '../shared/parse.js';
 
 interface ReplayConfigFile extends TeamConfig {
 	name?: string;
+}
+
+interface SessionMetadataFile {
+	teamName: string;
+	startedAt: string;
+	endedAt: string;
+	durationMs: number;
+	eventCount: number;
+	messageCount: number;
+	presence: Record<string, 'working' | 'idle' | 'offline'>;
 }
 
 export interface LoadedReplaySource {
@@ -33,6 +44,10 @@ export function loadReplaySource(inputPath: string): LoadedReplaySource {
 
 	if (stat.isFile() && resolvedInput.endsWith('.jsonl')) {
 		return loadLegacyReplayFile(resolvedInput);
+	}
+
+	if (stat.isFile() && resolvedInput.endsWith('.teamchat-replay')) {
+		return loadBundleFile(resolvedInput);
 	}
 
 	throw new Error(`Unsupported replay source: ${resolvedInput}`);
@@ -65,28 +80,53 @@ function loadReplayDirectory(rootDir: string): LoadedReplaySource {
 			path.join(rootDir, 'tasks.json'),
 		]),
 		artifactsPath: resolveFirstExistingPath([path.join(rootDir, 'artifacts.json')]),
+		metadataPath: resolveFirstExistingPath([path.join(rootDir, 'meta.json')]),
 	});
+}
+
+function loadBundleFile(filePath: string): LoadedReplaySource {
+	const raw = fs.readFileSync(filePath, 'utf-8');
+	const bundle = JSON.parse(raw) as ReplayBundle;
+	const dir = path.dirname(filePath);
+	return {
+		bundle,
+		rootDir: dir,
+		artifactBaseDir: bundle.artifacts.length > 0 ? dir : null,
+	};
 }
 
 function loadLegacyReplayFile(filePath: string): LoadedReplaySource {
 	const rootDir = path.dirname(filePath);
+	const baseName = path.basename(filePath, '.jsonl');
 	return buildReplaySource({
 		rootDir,
 		sourceKind: 'journal',
 		pathLabel: path.basename(filePath),
 		entries: readEntries(filePath),
 		manifest: null,
-		configPath: resolveFirstExistingPath([path.join(rootDir, 'config.json')]),
+		// Check team-prefixed sibling first (e.g. taskboard.config.json), then generic
+		configPath: resolveFirstExistingPath([
+			path.join(rootDir, `${baseName}.config.json`),
+			path.join(rootDir, 'config.json'),
+		]),
 		initialTasksPath: resolveFirstExistingPath([
+			path.join(rootDir, `${baseName}.tasks.initial.json`),
 			path.join(rootDir, 'tasks.initial.json'),
 			path.join(rootDir, 'tasks-initial.json'),
 		]),
 		finalTasksPath: resolveFirstExistingPath([
+			path.join(rootDir, `${baseName}.tasks.json`),
 			path.join(rootDir, 'tasks.final.json'),
 			path.join(rootDir, 'tasks.json'),
 		]),
-		artifactsPath: resolveFirstExistingPath([path.join(rootDir, 'artifacts.json')]),
-		fileName: path.basename(filePath, '.jsonl'),
+		artifactsPath: resolveFirstExistingPath([
+			path.join(rootDir, `${baseName}.artifacts.json`),
+			path.join(rootDir, 'artifacts.json'),
+		]),
+		metadataPath: resolveFirstExistingPath([
+			path.join(rootDir, `${baseName}.meta.json`),
+		]),
+		fileName: baseName,
 	});
 }
 
@@ -100,6 +140,7 @@ function buildReplaySource({
 	initialTasksPath,
 	finalTasksPath,
 	artifactsPath,
+	metadataPath,
 	fileName,
 }: {
 	rootDir: string;
@@ -111,10 +152,12 @@ function buildReplaySource({
 	initialTasksPath: string | null;
 	finalTasksPath: string | null;
 	artifactsPath: string | null;
+	metadataPath?: string | null;
 	fileName?: string;
 }): LoadedReplaySource {
 	const normalizedEntries = normalizeEntries(entries);
 	const config = configPath ? readJsonFile<ReplayConfigFile>(configPath) : null;
+	const metadata = metadataPath ? readJsonFile<SessionMetadataFile>(metadataPath) : null;
 	const derivedTasks = deriveTasksFromEntries(normalizedEntries);
 	const initialTasks = initialTasksPath
 		? readJsonFile<TaskInfo[]>(initialTasksPath) ?? derivedTasks.initial
@@ -126,11 +169,17 @@ function buildReplaySource({
 
 	const teamName = manifest?.teamName
 		?? config?.name
+		?? metadata?.teamName
 		?? fileName
 		?? path.basename(rootDir);
+	const configMembers = config?.members ?? [];
+	// If no config, infer members from event 'from' fields
+	const members = configMembers.length > 0
+		? configMembers
+		: inferMembersFromEntries(normalizedEntries);
 	const team: TeamState = {
 		name: teamName,
-		members: config?.members ?? [],
+		members,
 	};
 
 	const computedManifest = buildManifest({
@@ -142,6 +191,7 @@ function buildReplaySource({
 		sourceKind,
 		pathLabel,
 		rootDir,
+		metadata,
 	});
 	const markers = buildMarkers(normalizedEntries, artifacts);
 
@@ -160,29 +210,85 @@ function buildReplaySource({
 	};
 }
 
+const INFERRED_COLORS = ['blue', 'green', 'purple', 'yellow', 'red', 'cyan', 'orange', 'pink'];
+
+function inferMembersFromEntries(entries: ReplayEntry[]): AgentInfo[] {
+	const seen = new Map<string, { firstType: string; color: string; model?: string }>();
+	let colorIdx = 0;
+
+	for (const entry of entries) {
+		const ev = entry.event;
+
+		if (ev.type === 'message') {
+			const msg = ev as { from: string; fromColor?: string; isLead?: boolean };
+			const name = msg.from;
+			if (name && !seen.has(name)) {
+				const isLead = msg.isLead || isLeadAgent(name);
+				seen.set(name, {
+					firstType: isLead ? 'lead' : 'worker',
+					color: msg.fromColor ?? INFERRED_COLORS[colorIdx++ % INFERRED_COLORS.length]!,
+				});
+			}
+		} else if (ev.type === 'system') {
+			const sys = ev as { subtype?: string; agentName?: string | null; agentColor?: string | null; agentModel?: string | null };
+			if (sys.agentName && !isLeadAgent(sys.agentName)) {
+				if (!seen.has(sys.agentName)) {
+					seen.set(sys.agentName, {
+						firstType: 'worker',
+						color: sys.agentColor ?? INFERRED_COLORS[colorIdx++ % INFERRED_COLORS.length]!,
+					});
+				}
+				// Enrich with model from member-joined events
+				if (sys.subtype === 'member-joined' && sys.agentModel) {
+					const existing = seen.get(sys.agentName)!;
+					existing.model = sys.agentModel;
+				}
+			}
+		} else if (ev.type === 'presence') {
+			const pres = ev as { agentName: string };
+			if (pres.agentName && !seen.has(pres.agentName) && !isLeadAgent(pres.agentName)) {
+				seen.set(pres.agentName, {
+					firstType: 'worker',
+					color: INFERRED_COLORS[colorIdx++ % INFERRED_COLORS.length]!,
+				});
+			}
+		}
+	}
+
+	return Array.from(seen.entries()).map(([name, info]) => ({
+		name,
+		agentId: `inferred-${name}`,
+		agentType: info.firstType,
+		color: info.color,
+		model: info.model,
+	}));
+}
+
 function readEntries(filePath: string): JournalEntry[] {
 	return Journal.readFrom(filePath);
 }
 
-function normalizeEntries(entries: JournalEntry[]): ReplayEntry[] {
+export function normalizeEntries(entries: JournalEntry[]): ReplayEntry[] {
 	if (entries.length === 0) {
 		return [];
 	}
 
-	const sorted = [...entries].sort((a, b) => {
-		const seqDiff = a.seq - b.seq;
-		if (seqDiff !== 0) {
-			return seqDiff;
-		}
-		return new Date(a.event.timestamp).getTime() - new Date(b.event.timestamp).getTime();
-	});
+	// Sort by seq (recording order) — this is the authoritative ordering.
+	// Timestamps may be backdated for config/task events.
+	const sorted = [...entries].sort((a, b) => a.seq - b.seq);
 	const baseTs = new Date(sorted[0]!.event.timestamp).getTime();
 
-	return sorted.map((entry, index) => ({
-		seq: index,
-		atMs: Math.max(0, new Date(entry.event.timestamp).getTime() - baseTs),
-		event: entry.event,
-	}));
+	let maxAtMs = 0;
+	return sorted.map((entry, index) => {
+		const rawAtMs = Math.max(0, new Date(entry.event.timestamp).getTime() - baseTs);
+		// Ensure atMs is monotonically non-decreasing despite backdated timestamps
+		maxAtMs = Math.max(maxAtMs, rawAtMs);
+		return {
+			seq: index,
+			atMs: maxAtMs,
+			event: entry.event,
+		};
+	});
 }
 
 function deriveTasksFromEntries(entries: ReplayEntry[]): { initial: TaskInfo[]; final: TaskInfo[] } {
@@ -219,6 +325,7 @@ function buildManifest({
 	sourceKind,
 	pathLabel,
 	rootDir,
+	metadata,
 }: {
 	manifest: ReplayManifest | null;
 	team: TeamState;
@@ -228,17 +335,18 @@ function buildManifest({
 	sourceKind: 'journal' | 'bundle';
 	pathLabel: string;
 	rootDir: string;
+	metadata?: SessionMetadataFile | null;
 }): ReplayManifest {
 	if (entries.length === 0) {
 		const now = new Date().toISOString();
 		return {
 			version: 1,
 			sessionId: manifest?.sessionId ?? path.basename(rootDir),
-			teamName: manifest?.teamName ?? team.name,
-			startedAt: manifest?.startedAt ?? now,
-			endedAt: manifest?.endedAt ?? now,
-			durationMs: 0,
-			eventCount: 0,
+			teamName: manifest?.teamName ?? metadata?.teamName ?? team.name,
+			startedAt: manifest?.startedAt ?? metadata?.startedAt ?? now,
+			endedAt: manifest?.endedAt ?? metadata?.endedAt ?? now,
+			durationMs: metadata?.durationMs ?? 0,
+			eventCount: metadata?.eventCount ?? 0,
 			memberCount: team.members.length,
 			taskCount: finalTasks.length,
 			hasArtifacts: artifacts.length > 0,
@@ -249,19 +357,20 @@ function buildManifest({
 		};
 	}
 
-	const startedAt = manifest?.startedAt ?? entries[0]!.event.timestamp;
-	const endedAt = manifest?.endedAt ?? entries[entries.length - 1]!.event.timestamp;
+	const startedAt = manifest?.startedAt ?? metadata?.startedAt ?? entries[0]!.event.timestamp;
+	const endedAt = manifest?.endedAt ?? metadata?.endedAt ?? entries[entries.length - 1]!.event.timestamp;
 	const durationMs = manifest?.durationMs
+		?? metadata?.durationMs
 		?? Math.max(0, new Date(endedAt).getTime() - new Date(startedAt).getTime());
 
 	return {
 		version: 1,
 		sessionId: manifest?.sessionId ?? path.basename(rootDir),
-		teamName: manifest?.teamName ?? team.name,
+		teamName: manifest?.teamName ?? metadata?.teamName ?? team.name,
 		startedAt,
 		endedAt,
 		durationMs,
-		eventCount: manifest?.eventCount ?? entries.length,
+		eventCount: manifest?.eventCount ?? metadata?.eventCount ?? entries.length,
 		memberCount: manifest?.memberCount ?? team.members.length,
 		taskCount: manifest?.taskCount ?? finalTasks.length,
 		hasArtifacts: manifest?.hasArtifacts ?? artifacts.length > 0,

@@ -33,6 +33,14 @@ export interface SystemGroupItem {
 	events: SystemEvent[];
 }
 
+export interface AccumulatedThreadItem {
+	kind: 'accumulated-thread';
+	threadKey: string;
+	participants: string[];
+	events: ChatEvent[];
+	topic: string;
+}
+
 export type MessageLaneItem =
 	| MessageStackItem
 	| PlanCardItem

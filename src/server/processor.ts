@@ -1,4 +1,5 @@
 import type {
+	BeatType,
 	ChatEvent,
 	ContentMessage,
 	PresenceChange,
@@ -10,6 +11,7 @@ import type {
 	TaskUpdate,
 	TeamConfig,
 	ThreadMarker,
+	ThreadStatus,
 } from '../shared/types.js';
 import {
 	generateEventId,
@@ -35,6 +37,31 @@ const ACK_PHRASES: Record<string, string> = {
 	'thanks': '🙏',
 	'good catch': '🙏',
 };
+
+/** Conversational beat patterns — structural dialogue markers derived from real content. */
+const BEAT_PATTERNS: { type: BeatType; emoji: string; patterns: RegExp[] }[] = [
+	// Check "resolution" BEFORE plain "agreement" (ordering matters)
+	{
+		type: 'resolution',
+		emoji: '🤝',
+		patterns: [/\bwe'?re aligned\b/i, /\bconfirmed\b/i, /\bimplementation matches\b/i, /\bfully aligned\b/i],
+	},
+	{
+		type: 'counter-proposal',
+		emoji: '🔄',
+		patterns: [/\bwhat about\b/i, /\binstead\b/i, /\bmy preference\b/i, /\bi'?d suggest\b/i, /\bprefer\b.*\binstead\b/i],
+	},
+	{
+		type: 'agreement',
+		emoji: '✅',
+		patterns: [/\bagreed\b/i, /\bsounds good\b/i, /\blet'?s go with\b/i, /\bthis works\b/i, /\bworks for me\b/i],
+	},
+	{
+		type: 'acknowledgement',
+		emoji: '👍',
+		patterns: [/\bgot it\b/i, /\bunderstood\b/i, /\bnoted\b/i, /\bmakes sense\b/i],
+	},
+];
 
 interface PendingBroadcast {
 	text: string;
@@ -63,8 +90,15 @@ export class EventProcessor {
 	private idleStates: Map<string, IdleState> = new Map();
 	private presence: Map<string, 'working' | 'idle' | 'offline'> = new Map();
 	private previousTasks: Map<string, RawTaskData> = new Map();
+	private emittedBottlenecks: Set<string> = new Set();
 	private previousMembers: Set<string> = new Set();
+	private shutdownApproved: Set<string> = new Set();
+	private teamCreatedEmitted = false;
+	private emittedTaskIds: Set<string> = new Set();
+	private idlePingCount = 0;
+	private idleSurfacedCount = 0;
 	private recentLeadMessages: { id: string; text: string; timestamp: string }[] = [];
+	private threadStatuses: Map<string, ThreadStatus> = new Map();
 	private allEvents: ChatEvent[] = [];
 	private broadcastHoldMs = 500;
 	private idleSurfaceMs = 30_000;
@@ -115,6 +149,11 @@ export class EventProcessor {
 		return Array.from(this.previousTasks.values()).map((t) => ({ ...t }));
 	}
 
+	/** Get current thread status tracking. */
+	getThreadStatuses(): ThreadStatus[] {
+		return Array.from(this.threadStatuses.values());
+	}
+
 	// === Config changes (member join/leave) ===
 
 	private processConfigChange(
@@ -135,48 +174,65 @@ export class EventProcessor {
 
 		const events: ChatEvent[] = [];
 
-		// Team created (first config)
-		if (!previous && current) {
+		// Team created (first config, emit only once)
+		if (!previous && current && !this.teamCreatedEmitted) {
+			this.teamCreatedEmitted = true;
+			const createdTs = current.createdAt
+				? new Date(current.createdAt).toISOString()
+				: undefined;
 			events.push(
 				this.makeSystemEvent(
 					'team-created',
 					`Team created`,
 					null,
 					null,
+					undefined,
+					undefined,
+					createdTs,
 				),
 			);
 		}
 
-		// Members joined
+		// Members joined — use joinedAt for accurate timestamps
+		// Use previousMembers (cumulative) instead of prevNames (per-diff) to prevent re-emitting
 		for (const name of currNames) {
-			if (!prevNames.has(name) && !isLeadAgent(name)) {
+			if (!this.previousMembers.has(name) && !isLeadAgent(name)) {
 				const member = currByName.get(name)!;
 				this.presence.set(name, 'working');
 				this.previousMembers.add(name);
+				const joinedTs = member.joinedAt
+					? new Date(member.joinedAt).toISOString()
+					: undefined;
 				events.push(
 					this.makeSystemEvent(
 						'member-joined',
 						`${name} joined the chat`,
 						name,
 						member.color,
+						undefined,
+						undefined,
+						joinedTs,
+						member.model,
 					),
 				);
 			}
 		}
 
-		// Members left
+		// Members left (suppress if shutdown-approved already fired)
 		for (const name of prevNames) {
 			if (!currNames.has(name) && !isLeadAgent(name)) {
 				this.presence.set(name, 'offline');
 				this.previousMembers.delete(name);
-				events.push(
-					this.makeSystemEvent(
-						'member-left',
-						`${name} left the chat`,
-						name,
-						null,
-					),
-				);
+				if (!this.shutdownApproved.has(name)) {
+					events.push(
+						this.makeSystemEvent(
+							'member-left',
+							`${name} left the chat`,
+							name,
+							null,
+						),
+					);
+				}
 			}
 		}
 
@@ -236,6 +292,7 @@ export class EventProcessor {
 
 			case 'shutdown_approved':
 				this.presence.set(msg.from, 'offline');
+				this.shutdownApproved.add(msg.from);
 				this.emit([
 					this.makeSystemEvent(
 						'shutdown-approved',
@@ -356,43 +413,44 @@ export class EventProcessor {
 	}
 
 	private processContentMessage(inboxOwner: string, msg: RawInboxMessage): void {
-		const fromLead = isLeadAgent(msg.from);
-		const toLeadInbox = isLeadAgent(inboxOwner);
 		const senderIsTeammate = !isLeadAgent(msg.from);
-		const recipientIsTeammate = !isLeadAgent(inboxOwner);
+		const ownerIsTeammate = !isLeadAgent(inboxOwner);
 
-		// DM detection: message in a teammate's inbox from another teammate (not lead)
-		const isDM = senderIsTeammate && recipientIsTeammate;
-
-		// Broadcast detection: check if this message appears in multiple inboxes.
-		// Use hold window to accumulate matches before deciding.
-		if (!isDM) {
-			const broadcastKey = `${msg.from}:${msg.text.slice(0, 100)}:${msg.timestamp}`;
-			const existing = this.pendingBroadcasts.get(broadcastKey);
-			if (existing) {
-				existing.inboxes.add(inboxOwner);
-				// Don't emit yet — the timer will handle it
-				return;
-			}
-			// Start a new broadcast detection window
-			const pending: PendingBroadcast = {
-				text: msg.text,
-				timestamp: msg.timestamp,
-				from: msg.from,
-				fromColor: msg.color,
-				summary: msg.summary ?? null,
-				inboxes: new Set([inboxOwner]),
-				timer: setTimeout(() => {
-					this.finalizeBroadcastCheck(broadcastKey);
-				}, this.broadcastHoldMs),
-			};
-			this.pendingBroadcasts.set(broadcastKey, pending);
+		// Teammate→teammate: always a DM — emit immediately, no hold window needed.
+		// Each inbox gets its own DM event. This preserves synchronous emission
+		// for presence transitions (clearIdleState) and compact mode ack detection.
+		if (senderIsTeammate && ownerIsTeammate) {
+			this.emitDM(inboxOwner, msg);
 			return;
 		}
 
-		// It's a DM — emit thread markers and the message
+		// Lead-involved messages (lead→teammate or teammate→lead) go through
+		// broadcast detection. Lead broadcasts appear in 3+ teammate inboxes
+		// within the hold window — we need to deduplicate those.
+		const broadcastKey = `${msg.from}:${msg.text.slice(0, 100)}:${msg.timestamp}`;
+		const existing = this.pendingBroadcasts.get(broadcastKey);
+		if (existing) {
+			existing.inboxes.add(inboxOwner);
+			return;
+		}
+		const pending: PendingBroadcast = {
+			text: msg.text,
+			timestamp: msg.timestamp,
+			from: msg.from,
+			fromColor: msg.color,
+			summary: msg.summary ?? null,
+			inboxes: new Set([inboxOwner]),
+			timer: setTimeout(() => {
+				this.finalizeBroadcastCheck(broadcastKey);
+			}, this.broadcastHoldMs),
+		};
+		this.pendingBroadcasts.set(broadcastKey, pending);
+	}
+
+	private emitDM(inboxOwner: string, msg: RawInboxMessage): void {
 		const events: ChatEvent[] = [];
 		const participants = [msg.from, inboxOwner].sort();
+		const threadKey = participants.join(':');
 
 		// Check if we need a thread-start marker
 		if (!this.isInActiveThread(participants)) {
@@ -408,13 +466,47 @@ export class EventProcessor {
 		const contentMsg = this.buildContentMessage(msg, false, true, participants);
 		events.push(contentMsg);
 
-		// Compact mode: check for acknowledgment phrases
-		if (this.compactMode && msg.text.length < 50) {
+		// Track thread status
+		const existing = this.threadStatuses.get(threadKey);
+		if (existing) {
+			existing.messageCount++;
+			existing.lastMessageTimestamp = msg.timestamp;
+			if (existing.status === 'new') existing.status = 'active';
+		} else {
+			this.threadStatuses.set(threadKey, {
+				threadKey,
+				participants,
+				topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+				messageCount: 1,
+				status: 'new',
+				firstMessageTimestamp: msg.timestamp,
+				lastMessageTimestamp: msg.timestamp,
+				beats: [],
+			});
+		}
+
+		// Beat detection — detect conversational structure from message content
+		const thread = this.threadStatuses.get(threadKey)!;
+		const beat = this.detectBeat(thread, msg.text);
+		if (beat) {
+			thread.beats.push(beat.type);
+			// Resolution marks thread resolved
+			if (beat.type === 'resolution') {
+				thread.status = 'resolved';
+			}
+			events.push(
+				this.makeReaction(contentMsg.id, beat.emoji, msg.from, msg.color, msg.timestamp, `beat:${beat.type}`),
+			);
+		}
+
+		// Compact mode: check for acknowledgment phrases (existing behavior)
+		// Beat detection takes priority — if a beat was detected, skip ack detection
+		if (!beat && this.compactMode && msg.text.length < 50) {
 			const ackEmoji = this.detectAcknowledgment(msg.text);
 			if (ackEmoji) {
 				const recentMsg = this.findRecentMessageFrom(inboxOwner, msg.timestamp, 30_000);
 				if (recentMsg) {
-					events.length = 0; // Remove the content message
+					events.length = 0;
 					events.push(
 						this.makeReaction(recentMsg, ackEmoji, msg.from, msg.color, msg.timestamp, msg.text),
 					);
@@ -431,6 +523,25 @@ export class EventProcessor {
 		this.pendingBroadcasts.delete(key);
 
 		const isBroadcast = pending.inboxes.size >= 3;
+		const senderIsTeammate = !isLeadAgent(pending.from);
+
+		// DM: teammate→teammate message that appeared in only one inbox
+		if (senderIsTeammate && pending.inboxes.size === 1) {
+			const inboxOwner = [...pending.inboxes][0]!;
+			if (!isLeadAgent(inboxOwner)) {
+				// It's a true DM — emit via the DM path
+				const rawMsg: RawInboxMessage = {
+					from: pending.from,
+					text: pending.text,
+					timestamp: pending.timestamp,
+					color: pending.fromColor,
+					summary: pending.summary ?? undefined,
+					read: true,
+				};
+				this.emitDM(inboxOwner, rawMsg);
+				return;
+			}
+		}
 
 		const msg: ContentMessage = {
 			type: 'message',
@@ -459,6 +570,23 @@ export class EventProcessor {
 			// Keep only last 50 lead messages
 			if (this.recentLeadMessages.length > 50) {
 				this.recentLeadMessages.shift();
+			}
+
+			// Nudge detection: lead → single idle agent (non-assignment message)
+			if (!isBroadcast && pending.inboxes.size === 1) {
+				const target = [...pending.inboxes][0]!;
+				const isIdle = this.presence.get(target) === 'idle';
+				const isAssignment = pending.text.includes('"type":"task_assignment"');
+				if (isIdle && !isAssignment && !isLeadAgent(target)) {
+					events.push(
+						this.makeSystemEvent(
+							'nudge',
+							`team-lead nudged ${target}`,
+							target,
+							null,
+						),
+					);
+				}
 			}
 		}
 
@@ -493,9 +621,10 @@ export class EventProcessor {
 		const currMap = new Map(current.map((t) => [t.id, t]));
 		const events: ChatEvent[] = [];
 
-		// Detect new tasks
+		// Detect new tasks (deduplicate — replay can re-fire)
 		for (const [id, task] of currMap) {
-			if (!prevMap.has(id)) {
+			if (!prevMap.has(id) && !this.emittedTaskIds.has(id)) {
+				this.emittedTaskIds.add(id);
 				events.push(
 					this.makeSystemEvent(
 						'task-created',
@@ -504,6 +633,7 @@ export class EventProcessor {
 						null,
 						task.id,
 						task.subject,
+						task.created || undefined,
 					),
 				);
 				events.push(this.makeTaskUpdate(task));
@@ -543,8 +673,8 @@ export class EventProcessor {
 					events.push(
 						this.makeSystemEvent(
 							'task-completed',
-							`${curr.owner ?? 'Someone'} completed #${curr.id}: ${curr.subject}`,
-							curr.owner,
+							`${curr.owner ?? curr.subject ?? 'Someone'} completed #${curr.id}${curr.owner ? `: ${curr.subject}` : ''}`,
+							curr.owner ?? curr.subject,
 							null,
 							curr.id,
 							curr.subject,
@@ -574,6 +704,47 @@ export class EventProcessor {
 		const unblockedEvents = this.computeUnblocks(currMap);
 		events.push(...unblockedEvents);
 
+		// Bottleneck detection: 2+ idle agents blocked on the same incomplete task
+		const blockerCounts = new Map<string, string[]>();
+		for (const [, task] of currMap) {
+			if (task.status !== 'completed' && task.owner && this.presence.get(task.owner) !== 'idle') {
+				// This task is in-progress by a working agent — check who it blocks
+				continue;
+			}
+			// Find tasks blocked by incomplete tasks where the owner is idle
+			if (task.blockedBy) {
+				for (const blockerId of task.blockedBy) {
+					const blocker = currMap.get(blockerId);
+					if (blocker && blocker.status !== 'completed' && blocker.owner) {
+						const waiters = blockerCounts.get(blockerId) ?? [];
+						if (task.owner && !waiters.includes(task.owner)) {
+							waiters.push(task.owner);
+						}
+						blockerCounts.set(blockerId, waiters);
+					}
+				}
+			}
+		}
+		for (const [blockerId, waiters] of blockerCounts) {
+			if (waiters.length >= 2 && waiters.some((w) => this.presence.get(w) === 'idle')) {
+				const blocker = currMap.get(blockerId);
+				const bottleneckKey = `bottleneck:${blockerId}`;
+				if (blocker && !this.emittedBottlenecks.has(bottleneckKey)) {
+					this.emittedBottlenecks.add(bottleneckKey);
+					events.push(
+						this.makeSystemEvent(
+							'bottleneck',
+							`${blocker.owner ?? 'Task #' + blockerId} is a bottleneck — ${waiters.join(', ')} waiting`,
+							blocker.owner,
+							null,
+							blockerId,
+							blocker.subject,
+						),
+					);
+				}
+			}
+		}
+
 		// Update stored tasks
 		this.previousTasks = currMap;
 
@@ -598,6 +769,34 @@ export class EventProcessor {
 						this.makeReaction(lastComplete.id, '🎉', 'teamchat', '', new Date().toISOString()),
 					);
 				}
+
+				// Session summary
+				const allEvents = this.getAllEvents();
+				const messageCount = allEvents.filter((e) => e.type === 'message').length;
+				const dmCount = allEvents.filter((e) => e.type === 'message' && (e as ContentMessage).isDM).length;
+				const broadcastCount = allEvents.filter((e) => e.type === 'message' && (e as ContentMessage).isBroadcast).length;
+				const memberCount = this.previousMembers.size;
+				const taskCount = current.filter((t) => !this.isInternalTask(t)).length;
+				const idleSuppressed = this.idlePingCount - (this.idleSurfacedCount ?? 0);
+				const firstEvent = allEvents[0];
+				const duration = firstEvent
+					? Math.round((Date.now() - new Date(firstEvent.timestamp).getTime()) / 60_000)
+					: 0;
+
+				const lines = [
+					`${taskCount} tasks completed by ${memberCount} agents in ~${duration}min`,
+					`${messageCount} messages (${dmCount} DMs, ${broadcastCount} broadcasts)`,
+					idleSuppressed > 0 ? `${idleSuppressed} idle pings suppressed` : null,
+				].filter(Boolean);
+
+				events.push(
+					this.makeSystemEvent(
+						'session-summary',
+						lines.join(' · '),
+						null,
+						null,
+					),
+				);
 			}
 		}
 
@@ -656,6 +855,7 @@ export class EventProcessor {
 		parsed: { completedTaskId?: string; completedStatus?: string; idleReason?: string },
 	): void {
 		this.presence.set(agentName, 'idle');
+		this.idlePingCount++;
 
 		const existing = this.idleStates.get(agentName);
 		if (!existing) {
@@ -668,6 +868,7 @@ export class EventProcessor {
 		// Check if we should surface the idle message (after 30s)
 		if (!existing.surfaced && !isWithinWindow(existing.firstSeen, timestamp, this.idleSurfaceMs)) {
 			existing.surfaced = true;
+			this.idleSurfacedCount++;
 			this.emit([
 				this.makeSystemEvent(
 					'idle-surfaced',
@@ -820,6 +1021,22 @@ export class EventProcessor {
 		return ACK_PHRASES[normalized] ?? null;
 	}
 
+	private detectBeat(thread: ThreadStatus, text: string): { type: BeatType; emoji: string } | null {
+		// First message in a thread is always a proposal
+		if (thread.messageCount === 1) {
+			return { type: 'proposal', emoji: '📋' };
+		}
+
+		// Check beat patterns in priority order
+		for (const { type, emoji, patterns } of BEAT_PATTERNS) {
+			if (patterns.some((p) => p.test(text))) {
+				return { type, emoji };
+			}
+		}
+
+		return null;
+	}
+
 	// === Event creation helpers ===
 
 	private makeSystemEvent(
@@ -829,15 +1046,18 @@ export class EventProcessor {
 		agentColor: string | null,
 		taskId?: string,
 		taskSubject?: string,
+		timestamp?: string,
+		agentModel?: string,
 	): SystemEvent {
 		return {
 			type: 'system',
 			id: generateEventId(),
 			subtype,
 			text,
-			timestamp: new Date().toISOString(),
+			timestamp: timestamp ?? new Date().toISOString(),
 			agentName,
 			agentColor,
+			agentModel: agentModel ?? null,
 			taskId: taskId ?? null,
 			taskSubject: taskSubject ?? null,
 		};
@@ -884,6 +1104,11 @@ export class EventProcessor {
 			task: { ...task },
 			timestamp: new Date().toISOString(),
 		};
+	}
+
+	/** Check if a task is an internal agent-tracking task (subject = agent name). */
+	private isInternalTask(task: RawTaskData): boolean {
+		return this.previousMembers.has(task.subject) || isLeadAgent(task.subject);
 	}
 
 	private emit(events: ChatEvent[]): void {

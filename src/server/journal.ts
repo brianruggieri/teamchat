@@ -1,20 +1,33 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { ChatEvent, JournalEntry } from '../shared/types.js';
+import type { ChatEvent, JournalEntry, TaskInfo, TeamConfig } from '../shared/types.js';
+
+export interface SessionMetadata {
+	teamName: string;
+	startedAt: string;
+	endedAt: string;
+	durationMs: number;
+	eventCount: number;
+	messageCount: number;
+	presence: Record<string, 'working' | 'idle' | 'offline'>;
+}
 
 export class Journal {
 	private filePath: string;
+	private sessionsDir: string;
+	private teamName: string;
 	private seq: number = 0;
 	private enabled: boolean;
 
 	constructor(teamName: string, enabled = true) {
 		this.enabled = enabled;
+		this.teamName = teamName;
 		const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '~';
-		const sessionsDir = path.join(homeDir, '.teamchat', 'sessions');
+		this.sessionsDir = path.join(homeDir, '.teamchat', 'sessions');
 		if (enabled) {
-			fs.mkdirSync(sessionsDir, { recursive: true });
+			fs.mkdirSync(this.sessionsDir, { recursive: true });
 		}
-		this.filePath = path.join(sessionsDir, `${teamName}.jsonl`);
+		this.filePath = path.join(this.sessionsDir, `${teamName}.jsonl`);
 	}
 
 	/** Append a ChatEvent to the journal file. */
@@ -25,6 +38,27 @@ export class Journal {
 			event,
 		};
 		fs.appendFileSync(this.filePath, JSON.stringify(entry) + '\n');
+	}
+
+	/** Save a config snapshot alongside the journal (called on startup + config changes). */
+	saveConfig(config: TeamConfig): void {
+		if (!this.enabled) return;
+		const configPath = path.join(this.sessionsDir, `${this.teamName}.config.json`);
+		fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+	}
+
+	/** Save final task state alongside the journal (called on shutdown). */
+	saveTasks(tasks: TaskInfo[]): void {
+		if (!this.enabled) return;
+		const tasksPath = path.join(this.sessionsDir, `${this.teamName}.tasks.json`);
+		fs.writeFileSync(tasksPath, JSON.stringify(tasks, null, 2));
+	}
+
+	/** Save session metadata alongside the journal (called on shutdown). */
+	saveMetadata(metadata: SessionMetadata): void {
+		if (!this.enabled) return;
+		const metaPath = path.join(this.sessionsDir, `${this.teamName}.meta.json`);
+		fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
 	}
 
 	/** Read all journal entries from the file. */

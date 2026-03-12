@@ -64,9 +64,15 @@ function parseArgs(argv: string[]): CliArgs {
 				args.watch = argv[++i] ?? null;
 				break;
 			case '--replay':
-			case '-r':
-				args.replay = argv[++i] ?? null;
+			case '-r': {
+				const next = argv[i + 1];
+				if (next && !next.startsWith('--')) {
+					args.replay = argv[++i] ?? null;
+				} else {
+					args.replay = '__demo_placeholder__';
+				}
 				break;
+			}
 			case '--port':
 			case '-p':
 				args.port = parseInt(argv[++i] ?? '3456', 10);
@@ -290,6 +296,7 @@ function startTeamSession(
 	noJournal: boolean,
 ): void {
 	const journal = new Journal(teamName, !noJournal);
+	const sessionStartedAt = Date.now();
 
 	const processor = new EventProcessor((events) => {
 		// Journal each event
@@ -302,6 +309,10 @@ function startTeamSession(
 
 	const watcher = new FileWatcher(teamName, (delta) => {
 		processor.processDelta(delta);
+		// Auto-capture config on every change
+		if (delta.type === 'config' && delta.current) {
+			journal.saveConfig(delta.current as import('../src/shared/types.js').TeamConfig);
+		}
 	});
 
 	const server = new TeamChatServer({
@@ -322,6 +333,8 @@ function startTeamSession(
 			previous: null,
 			current: initialSnapshot.config,
 		});
+		// Auto-capture initial config
+		journal.saveConfig(initialSnapshot.config);
 	}
 
 	// Process existing tasks as a delta (empty → current)
@@ -358,6 +371,21 @@ function startTeamSession(
 	// Handle graceful shutdown
 	const shutdown = (): void => {
 		console.log('\nShutting down...');
+
+		// Save final state for replay
+		const allEvents = processor.getAllEvents();
+		const messageCount = allEvents.filter((e) => e.type === 'message').length;
+		journal.saveTasks(processor.getTasks());
+		journal.saveMetadata({
+			teamName,
+			startedAt: new Date(sessionStartedAt).toISOString(),
+			endedAt: new Date().toISOString(),
+			durationMs: Date.now() - sessionStartedAt,
+			eventCount: allEvents.length,
+			messageCount,
+			presence: processor.getPresence(),
+		});
+
 		watcher.stop();
 		server.stop();
 		process.exit(0);
@@ -414,7 +442,7 @@ if (args.subcommand === 'export') {
 	runScan(args.subcommandArg);
 } else if (args.replay) {
 	const replayPath = args.demo
-		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/teamchat-build-session')
+		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/demo/session.teamchat-replay')
 		: args.replay;
 	startReplayMode(replayPath, args.port, args.demo);
 } else if (args.watch) {
@@ -427,9 +455,13 @@ if (args.subcommand === 'export') {
 		args.team,
 	);
 	if (!fs.existsSync(teamDir)) {
-		console.error(`Team directory not found: ${teamDir}`);
-		console.error(`Run 'teamchat setup' to configure auto-launch, or check that the team name is correct.`);
-		process.exit(1);
+		console.error(`Team "${args.team}" not found at ${teamDir}`);
+		console.error('');
+		console.error('To use teamchat with Agent Teams:');
+		console.error('  1. Start a Claude Code session with --team flag');
+		console.error('  2. Or run: teamchat setup  (to auto-launch with new teams)');
+		console.error('  3. Or try: teamchat --replay --demo  (to see a demo session)');
+		process.exit(2);
 	}
 	startTeamSession(args.team, args.port, args.compact, args.noJournal);
 } else {
@@ -439,8 +471,12 @@ if (args.subcommand === 'export') {
 	if (fs.existsSync(defaultWatch)) {
 		startWatchMode(defaultWatch, args.port, args.compact, args.noJournal);
 	} else {
-		console.error('No team specified. Use --team <name>, --watch <dir>, or --replay <file>.');
-		printHelp();
-		process.exit(1);
+		console.error('No teams directory found. Agent Teams may not be configured yet.');
+		console.error('');
+		console.error('Quick start:');
+		console.error('  teamchat --replay --demo    See a demo session');
+		console.error('  teamchat setup              Configure auto-launch hook');
+		console.error('  teamchat --help             Show all options');
+		process.exit(2);
 	}
 }

@@ -16,6 +16,7 @@ import { ReplayTimeline } from './components/ReplayTimeline.jsx';
 import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
 import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
+import { AgentProfile } from './components/AgentProfile.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle } from '../shared/replay.js';
 import type { ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
@@ -114,8 +115,17 @@ function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode:
 				)}
 				emptyTitle="Waiting for messages"
 				emptyDescription="Connect a team or load a replay to populate the conversation."
-				renderPanels={(onTaskClick) => [
-					<PresenceRoster key="presence" mode="live" team={state.team} presence={state.presence} />,
+				dispatch={dispatch}
+				renderPanels={(onTaskClick, onAgentClick) => [
+					<PresenceRoster
+						key="presence"
+						mode="live"
+						team={state.team}
+						presence={state.presence}
+						threadStatuses={state.threadStatuses}
+						tasks={state.tasks}
+						onAgentClick={onAgentClick}
+					/>,
 					<TaskSidebar key="tasks" tasks={state.tasks} onTaskClick={onTaskClick} />,
 					<SessionStats
 						key="stats"
@@ -205,6 +215,11 @@ function ReplayWorkspaceLoaded({
 	const visibleArtifacts = controller.derivedState.visibleArtifacts;
 	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
+	const [activeAgentKey, setActiveAgentKey] = useState<string | null>(null);
+
+	const handleSelectAgent = useCallback((action: { type: 'SELECT_AGENT'; agentName: string | null }) => {
+		setActiveAgentKey(action.agentName);
+	}, []);
 
 	useEffect(() => {
 		const handleKeydown = (event: KeyboardEvent) => {
@@ -336,13 +351,14 @@ function ReplayWorkspaceLoaded({
 		<TimeProvider nowMs={controller.state.virtualNowMs}>
 			<>
 				<TeamChatScaffold
-					state={controller.derivedState.chatState}
+					state={{ ...controller.derivedState.chatState, activeAgentKey }}
 					mode="replay"
 					headerStatusText={replayStatusText}
 					topContent={replayTopContent}
 					emptyTitle="Replay ready"
 					emptyDescription="Press play, step through the session, or scrub the timeline."
-					renderPanels={(onTaskClick) => [
+					dispatch={handleSelectAgent}
+					renderPanels={(onTaskClick, onAgentClick) => [
 						<ReplayArtifactPanel
 							key="artifacts"
 							artifacts={visibleArtifacts}
@@ -356,6 +372,9 @@ function ReplayWorkspaceLoaded({
 							mode="replay"
 							team={controller.derivedState.chatState.team}
 							presence={controller.derivedState.chatState.presence}
+							threadStatuses={controller.derivedState.chatState.threadStatuses}
+							tasks={controller.derivedState.chatState.tasks}
+							onAgentClick={onAgentClick}
 						/>,
 						<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
 						<SessionStats
@@ -388,6 +407,7 @@ function TeamChatScaffold({
 	emptyTitle,
 	emptyDescription,
 	renderPanels,
+	dispatch,
 }: {
 	state: ChatState;
 	mode: 'live' | 'replay';
@@ -396,12 +416,34 @@ function TeamChatScaffold({
 	topContent?: React.ReactNode;
 	emptyTitle: string;
 	emptyDescription: string;
-	renderPanels: (onTaskClick: (taskId: string) => void) => React.ReactNode[];
+	renderPanels: (onTaskClick: (taskId: string) => void, onAgentClick?: (name: string) => void) => React.ReactNode[];
+	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null }) => void;
 }) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
 		state.events.length,
 	]);
+
+	const scrollToThread = useCallback((threadKey: string) => {
+		const el = document.querySelector(`[data-thread-key="${threadKey}"]`);
+		if (el) {
+			el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			const content = el.querySelector('.tc-thread-content');
+			if (content && content.getAttribute('data-expanded') !== 'true') {
+				const toggle = el.querySelector('.tc-thread-toggle') as HTMLElement;
+				if (toggle) toggle.click();
+			}
+		}
+		dispatch?.({ type: 'SELECT_AGENT', agentName: null });
+	}, [dispatch]);
+
+	const handleAgentClick = useCallback((name: string) => {
+		dispatch?.({ type: 'SELECT_AGENT', agentName: name });
+	}, [dispatch]);
+
+	const handleAgentBack = useCallback(() => {
+		dispatch?.({ type: 'SELECT_AGENT', agentName: null });
+	}, [dispatch]);
 
 	const handleTaskClick = useCallback((taskId: string) => {
 		setWorkbenchOpen(false);
@@ -427,12 +469,12 @@ function TeamChatScaffold({
 		}
 	}, [containerRef]);
 	const desktopPanels = useMemo(
-		() => renderPanels(handleTaskClick),
-		[handleTaskClick, renderPanels],
+		() => renderPanels(handleTaskClick, dispatch ? handleAgentClick : undefined),
+		[handleTaskClick, handleAgentClick, renderPanels, dispatch],
 	);
 	const sheetPanels = useMemo(
-		() => renderPanels(handleTaskClick),
-		[handleTaskClick, renderPanels],
+		() => renderPanels(handleTaskClick, dispatch ? handleAgentClick : undefined),
+		[handleTaskClick, handleAgentClick, renderPanels, dispatch],
 	);
 	const onlineCount = getOnlineCount(state);
 	const hasEvents = state.events.length > 0;
@@ -526,11 +568,25 @@ function TeamChatScaffold({
 
 				<aside className="tc-right-rail" aria-label="Team and task panel">
 					<div className="tc-rail-frame">
-						{desktopPanels.map((panel, index) => (
-							<div key={index} className="tc-rail-section">
-								{panel}
+						{state.activeAgentKey && state.team ? (
+							<div className="tc-rail-section">
+								<AgentProfile
+									agentName={state.activeAgentKey}
+									team={state.team}
+									presence={state.presence}
+									threadStatuses={state.threadStatuses}
+									tasks={state.tasks}
+									onBack={handleAgentBack}
+									onThreadClick={scrollToThread}
+								/>
 							</div>
-						))}
+						) : (
+							desktopPanels.map((panel, index) => (
+								<div key={index} className="tc-rail-section">
+									{panel}
+								</div>
+							))
+						)}
 					</div>
 				</aside>
 			</div>

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { scanForSecrets, type SecretFinding } from './secret-scanner.js';
+import { scanForSecrets, shannonEntropy, type SecretFinding } from './secret-scanner.js';
 
 describe('Secret Scanner', () => {
 	describe('AWS credentials', () => {
@@ -102,6 +102,50 @@ describe('Secret Scanner', () => {
 		});
 	});
 
+	describe('high-entropy strings', () => {
+		test('detects long base64 blobs', () => {
+			const blob = 'aVeryLongBase64StringThatIsOverFortyCharactersLongAndLooksLikeASecret1234567890==';
+			const result = scanForSecrets(`config: ${blob}`);
+			expect(result.length).toBeGreaterThanOrEqual(1);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(true);
+		});
+
+		test('does not flag short base64', () => {
+			const result = scanForSecrets('hash: abc123def456');
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+
+		test('does not flag common long strings (URLs, paths)', () => {
+			const result = scanForSecrets('https://github.com/brianruggieri/teamchat/blob/main/src/server/server.ts');
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+
+		test('does not flag git SHA-1 hashes', () => {
+			const sha = '59d335b4a7c1e2f3d4e5f6a7b8c9d0e1f2a3b4c5';
+			const result = scanForSecrets(`commit ${sha} merged`);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+
+		test('does not flag git SHA-256 hashes', () => {
+			const sha = '59d335b4a7c1e2f3d4e5f6a7b8c9d0e1f2a3b4c559d335b4a7c1e2f3d4e5f6a7';
+			const result = scanForSecrets(`object ${sha}`);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+
+		test('does not flag low-entropy long strings', () => {
+			// Repeated patterns have low entropy
+			const result = scanForSecrets('aaaaaabbbbbbccccccddddddeeeeeeffffffgggggg');
+			expect(result.some(f => f.category === 'high-entropy')).toBe(false);
+		});
+
+		test('still flags actual high-entropy base64 secrets', () => {
+			// This is a random base64 string with high entropy
+			const secret = 'Kj7mNx2pQr9sWvYz4bCdEfGhIjLkMnOpRsTuVwXy5aB3';
+			const result = scanForSecrets(`token: ${secret}`);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(true);
+		});
+	});
+
 	describe('false positives', () => {
 		test('does not flag normal code', () => {
 			const result = scanForSecrets('function processTask(taskId: string) { return taskId; }');
@@ -115,6 +159,11 @@ describe('Secret Scanner', () => {
 
 		test('does not flag short strings', () => {
 			const result = scanForSecrets('token count: 1500');
+			expect(result.length).toBe(0);
+		});
+
+		test('does not flag commit hashes in normal messages', () => {
+			const result = scanForSecrets('merged commit 59d335b4a7c1e2f3d4e5f6a7b8c9d0e1f2a3b4c5 to main');
 			expect(result.length).toBe(0);
 		});
 	});

@@ -1,8 +1,11 @@
 import type {
+	BeatType,
 	ChatEvent,
+	ContentMessage,
 	PresenceChange,
 	ReactionEvent,
 	SessionState,
+	SystemEvent,
 	TaskUpdate,
 } from '../shared/types.js';
 import type { ChatState, Reaction } from './types.js';
@@ -28,6 +31,10 @@ export function cloneChatState(state: ChatState): ChatState {
 		),
 		planCards: { ...state.planCards },
 		permissionCards: { ...state.permissionCards },
+		threadStatuses: Object.fromEntries(
+			Object.entries(state.threadStatuses).map(([k, v]) => [k, { ...v, beats: [...v.beats], participants: [...v.participants] }]),
+		),
+		activeAgentKey: state.activeAgentKey,
 	};
 }
 
@@ -45,6 +52,9 @@ export function hydrateChatState(session: SessionState, connected = true): ChatS
 		presence: { ...session.presence },
 		sessionStart: session.sessionStart,
 		connected,
+		threadStatuses: Object.fromEntries(
+			(session.threadStatuses ?? []).map((ts) => [ts.threadKey, ts]),
+		),
 	});
 
 	for (const event of session.events) {
@@ -76,6 +86,31 @@ export function applyChatEventInPlace(state: ChatState, event: ChatEvent): void 
 
 	state.events.push(event);
 
+	// Track DM thread statuses client-side
+	if (event.type === 'message') {
+		const msg = event as ContentMessage;
+		if (msg.isDM && msg.dmParticipants) {
+			const key = [...msg.dmParticipants].sort().join(':');
+			const existing = state.threadStatuses[key];
+			if (existing) {
+				existing.messageCount++;
+				existing.lastMessageTimestamp = msg.timestamp;
+				if (existing.status === 'new') existing.status = 'active';
+			} else {
+				state.threadStatuses[key] = {
+					threadKey: key,
+					participants: [...msg.dmParticipants].sort(),
+					topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+					messageCount: 1,
+					status: 'new',
+					firstMessageTimestamp: msg.timestamp,
+					lastMessageTimestamp: msg.timestamp,
+					beats: [],
+				};
+			}
+		}
+	}
+
 	if (event.type === 'task-update') {
 		applyTaskUpdate(state, event);
 		return;
@@ -83,6 +118,29 @@ export function applyChatEventInPlace(state: ChatState, event: ChatEvent): void 
 
 	if (event.type === 'presence') {
 		applyPresenceChange(state, event);
+	}
+
+	if (event.type === 'system') {
+		const sysEvent = event as SystemEvent;
+		if (sysEvent.subtype === 'member-joined' && sysEvent.agentName && state.team) {
+			const exists = state.team.members.some((m) => m.name === sysEvent.agentName);
+			if (!exists) {
+				state.team.members.push({
+					name: sysEvent.agentName,
+					agentId: `${sysEvent.agentName}@${state.team.name}`,
+					agentType: 'agent',
+					color: sysEvent.agentColor ?? 'gray',
+					model: sysEvent.agentModel ?? undefined,
+				});
+			} else if (sysEvent.agentModel) {
+				// Backfill model if member was added before model data was available
+				const member = state.team.members.find((m) => m.name === sysEvent.agentName);
+				if (member && !member.model) {
+					member.model = sysEvent.agentModel;
+				}
+			}
+			state.presence[sysEvent.agentName] = 'working';
+		}
 	}
 }
 
@@ -96,6 +154,22 @@ function applyReaction(state: ChatState, event: ReactionEvent): void {
 	};
 	state.events.push(event);
 	state.reactions[event.targetMessageId] = [...existing, reaction];
+
+	// Track beats in thread status
+	if (event.tooltip?.startsWith('beat:')) {
+		const beatType = event.tooltip.slice(5) as BeatType;
+		// Find which thread this reaction belongs to by finding the target message
+		const targetMsg = state.events.find((e) => e.id === event.targetMessageId);
+		if (targetMsg && targetMsg.type === 'message' && (targetMsg as ContentMessage).isDM) {
+			const msg = targetMsg as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			const thread = state.threadStatuses[key];
+			if (thread) {
+				thread.beats.push(beatType);
+				if (beatType === 'resolution') thread.status = 'resolved';
+			}
+		}
+	}
 }
 
 function applyTaskUpdate(state: ChatState, event: TaskUpdate): void {

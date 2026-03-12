@@ -1,0 +1,5 @@
+scripts/capture-session.sh
+scripts/replay-cli.sh
+scripts/install-capture-deps.sh
+showcase/
+.claude/

@@ -4,7 +4,7 @@ import type {
 	ChatAction,
 } from '../types.js';
 import { INITIAL_STATE } from '../types.js';
-import { applyChatEvent, hydrateChatState } from '../state.js';
+import { applyChatEvent, cloneChatState, hydrateChatState } from '../state.js';
 
 function chatReducer(state: ChatState, action: ChatAction): ChatState {
 	switch (action.type) {
@@ -19,6 +19,12 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 				...state,
 				connected: action.connected,
 			};
+
+		case 'SELECT_AGENT': {
+			const next = cloneChatState(state);
+			next.activeAgentKey = action.agentName;
+			return next;
+		}
 
 		default:
 			return state;
