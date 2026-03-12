@@ -33,12 +33,21 @@ export interface SystemGroupItem {
 	events: SystemEvent[];
 }
 
+export interface AccumulatedThreadItem {
+	kind: 'accumulated-thread';
+	threadKey: string;
+	participants: string[];
+	events: ChatEvent[];
+	topic: string;
+}
+
 export type MessageLaneItem =
 	| MessageStackItem
 	| PlanCardItem
 	| PermissionCardItem
 	| SystemRowItem
-	| SystemGroupItem;
+	| SystemGroupItem
+	| AccumulatedThreadItem;
 
 export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];

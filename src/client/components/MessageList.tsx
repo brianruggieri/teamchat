@@ -17,10 +17,12 @@ interface MessageListProps {
 	reactions: Record<string, Reaction[]>;
 }
 
-interface ThreadGroup {
-	kind: 'thread';
+interface AccumulatedThread {
+	kind: 'accumulated-thread';
+	threadKey: string;
 	participants: string[];
 	events: ChatEvent[];
+	topic: string;
 }
 
 interface FlatEventsGroup {
@@ -29,7 +31,7 @@ interface FlatEventsGroup {
 	laneItems: MessageLaneItem[];
 }
 
-type RenderItem = ThreadGroup | FlatEventsGroup;
+type RenderItem = AccumulatedThread | FlatEventsGroup;
 
 export function MessageList({ events, reactions }: MessageListProps) {
 	const items = useMemo(() => groupEvents(events), [events]);
@@ -37,13 +39,15 @@ export function MessageList({ events, reactions }: MessageListProps) {
 	return (
 		<div className="tc-message-list">
 			{items.map((item, index) => {
-				if (item.kind === 'thread') {
+				if (item.kind === 'accumulated-thread') {
 					return (
 						<ThreadBlock
-							key={`thread-${index}`}
+							key={item.threadKey}
+							threadKey={item.threadKey}
 							participants={item.participants}
 							events={item.events}
 							reactions={reactions}
+							topic={item.topic}
 						/>
 					);
 				}
@@ -120,83 +124,69 @@ export function MessageList({ events, reactions }: MessageListProps) {
 }
 
 /**
- * Group events into thread blocks and flat event groups.
+ * Group events into accumulated thread blocks and flat event groups.
  *
- * Threads are formed purely from data — consecutive DM messages
- * with the same participants get grouped together. No markers needed.
+ * All DMs for each participant pair are accumulated into a single
+ * thread block, placed at the position of the first DM for that pair.
  * Thread markers are ignored entirely (legacy compat).
- *
- * Any non-DM event (system, task-update, general message, presence)
- * breaks a thread group and goes into flat events.
  */
 function groupEvents(events: ChatEvent[]): RenderItem[] {
 	const items: RenderItem[] = [];
-	let currentFlatEvents: ChatEvent[] = [];
-	let currentThread: { participants: string[]; events: ChatEvent[] } | null = null;
+	const dmsByPair = new Map<string, ChatEvent[]>();
+	const dmPairInserted = new Set<string>();
+	let flatBuffer: ChatEvent[] = [];
 
-	const pushFlatEvents = () => {
-		if (currentFlatEvents.length > 0) {
+	const pushFlat = () => {
+		if (flatBuffer.length > 0) {
 			items.push({
 				kind: 'flat-events',
-				events: currentFlatEvents,
-				laneItems: buildMessageLaneItems(currentFlatEvents),
+				events: flatBuffer,
+				laneItems: buildMessageLaneItems(flatBuffer),
 			});
-			currentFlatEvents = [];
+			flatBuffer = [];
 		}
 	};
 
-	const pushThread = () => {
-		if (currentThread && currentThread.events.length > 0) {
-			items.push({
-				kind: 'thread',
-				participants: currentThread.participants,
-				events: currentThread.events,
-			});
-		}
-		currentThread = null;
-	};
-
+	// Pre-collect all DMs by pair
 	for (const event of events) {
-		// Skip thread markers — we don't need them anymore
-		if (event.type === 'thread-marker') {
+		if (event.type === 'message' && (event as ContentMessage).isDM) {
+			const msg = event as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			if (!dmsByPair.has(key)) dmsByPair.set(key, []);
+			dmsByPair.get(key)!.push(event);
+		}
+	}
+
+	// Build timeline with accumulated thread blocks
+	for (const event of events) {
+		// Skip thread markers entirely
+		if (event.type === 'thread-marker') continue;
+
+		if (event.type === 'message' && (event as ContentMessage).isDM) {
+			const msg = event as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+
+			if (!dmPairInserted.has(key)) {
+				// First DM for this pair — insert the accumulated block here
+				pushFlat();
+				dmPairInserted.add(key);
+				const allDMs = dmsByPair.get(key) ?? [];
+				items.push({
+					kind: 'accumulated-thread',
+					threadKey: key,
+					participants: [...(msg.dmParticipants ?? [])].sort(),
+					events: allDMs,
+					topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+				});
+			}
+			// Subsequent DMs for this pair are already in the accumulated block — skip
 			continue;
 		}
 
-		// Check if this is a DM message
-		if (event.type === 'message') {
-			const msg = event as ContentMessage;
-			if (msg.isDM && msg.dmParticipants) {
-				const key = msg.dmParticipants.join(':');
-
-				if (currentThread) {
-					const threadKey = currentThread.participants.join(':');
-					if (key === threadKey) {
-						// Same thread — add to it
-						currentThread.events.push(event);
-						continue;
-					}
-					// Different thread — close current, start new
-					pushThread();
-				}
-
-				// Start a new thread
-				pushFlatEvents();
-				currentThread = {
-					participants: msg.dmParticipants,
-					events: [event],
-				};
-				continue;
-			}
-		}
-
-		// Non-DM event — close any active thread, add to flat events
-		pushThread();
-		currentFlatEvents.push(event);
+		// Non-DM event — add to flat buffer
+		flatBuffer.push(event);
 	}
 
-	// Flush remaining
-	pushThread();
-	pushFlatEvents();
-
+	pushFlat();
 	return items;
 }
