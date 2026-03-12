@@ -73,6 +73,14 @@
 		};
 	</script>
 	<link rel="stylesheet" href="/styles/index.css" />
+	<link rel="stylesheet" href="/styles/theme-claude.css" />
+	<script>
+		// Apply theme from ?theme= query param before first paint
+		(function() {
+			var t = new URLSearchParams(window.location.search).get('theme');
+			if (t) document.documentElement.setAttribute('data-theme', t);
+		})();
+	</script>
 </head>
 <body class="bg-surface-app text-text-primary antialiased">
 	<div id="root"></div>

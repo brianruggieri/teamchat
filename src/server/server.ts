@@ -99,6 +99,10 @@ export class TeamChatServer {
 							return serverRef.serveReplayArtifact(artifactId);
 						}
 
+						if (serverRef.mode === 'replay' && url.pathname === '/replay/seek') {
+							return serverRef.serveReplaySeek(url);
+						}
+
 						// REST API: session state for initial hydration
 						if (url.pathname === '/state') {
 							if (serverRef.mode !== 'live') {
@@ -238,6 +242,45 @@ export class TeamChatServer {
 			initialState: this.getSessionState(),
 			wsUrl: `${protocol}//${url.host}/ws`,
 		};
+	}
+
+	private serveReplaySeek(url: URL): Response {
+		if (!this.replay) {
+			return new Response('No replay loaded', { status: 404 });
+		}
+		const bundle = this.replay.bundle;
+		const durationMs = bundle.manifest.durationMs;
+		const raw = url.searchParams.get('at') ?? 'end';
+		let atMs: number;
+		if (raw === 'end') {
+			atMs = durationMs;
+		} else if (raw.endsWith('%')) {
+			const pct = parseFloat(raw.slice(0, -1));
+			atMs = Number.isNaN(pct) ? 0 : Math.round((pct / 100) * durationMs);
+		} else {
+			atMs = parseInt(raw, 10);
+			if (Number.isNaN(atMs)) atMs = 0;
+		}
+		atMs = Math.min(Math.max(atMs, 0), durationMs);
+
+		// Find the entry index at this position
+		let entryIndex = -1;
+		for (let i = bundle.entries.length - 1; i >= 0; i--) {
+			if (bundle.entries[i]!.atMs <= atMs) {
+				entryIndex = i;
+				break;
+			}
+		}
+
+		return Response.json({
+			atMs,
+			durationMs,
+			entryIndex,
+			totalEntries: bundle.entries.length,
+			eventsAtPosition: entryIndex + 1,
+			pct: durationMs > 0 ? Math.round((atMs / durationMs) * 100) : 0,
+			hint: 'Use ?seek=end|50%|<ms> on the client URL to auto-seek on load',
+		});
 	}
 
 	private serveReplayArtifact(artifactId: string): Response {

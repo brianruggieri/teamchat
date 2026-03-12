@@ -37,12 +37,16 @@ export function useReplayController(bundle: ReplayBundle) {
 	const lastFrameRef = useRef<number | null>(null);
 
 	useEffect(() => {
+		const initialAtMs = parseSeekParam(durationMs);
+		const initialCursor = initialAtMs > 0
+			? getReplayCursorAtMs(bundle, initialAtMs)
+			: { atMs: 0, seq: -1 };
 		setState({
 			status: 'paused',
 			speed: 1,
-			cursor: { atMs: 0, seq: -1 },
+			cursor: initialCursor,
 			durationMs,
-			virtualNowMs: new Date(bundle.manifest.startedAt).getTime(),
+			virtualNowMs: new Date(bundle.manifest.startedAt).getTime() + initialCursor.atMs,
 		});
 	}, [bundle, durationMs]);
 
@@ -197,4 +201,18 @@ export function useReplayController(bundle: ReplayBundle) {
 		prevMarker,
 		setSpeed,
 	};
+}
+
+function parseSeekParam(durationMs: number): number {
+	const params = new URLSearchParams(window.location.search);
+	const raw = params.get('seek');
+	if (!raw) return 0;
+	if (raw === 'end') return durationMs;
+	if (raw.endsWith('%')) {
+		const pct = parseFloat(raw.slice(0, -1));
+		if (!Number.isNaN(pct)) return Math.round((pct / 100) * durationMs);
+	}
+	const ms = parseInt(raw, 10);
+	if (!Number.isNaN(ms)) return ms;
+	return 0;
 }
