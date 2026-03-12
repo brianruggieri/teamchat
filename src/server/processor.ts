@@ -1,4 +1,5 @@
 import type {
+	BeatType,
 	ChatEvent,
 	ContentMessage,
 	PresenceChange,
@@ -10,6 +11,7 @@ import type {
 	TaskUpdate,
 	TeamConfig,
 	ThreadMarker,
+	ThreadStatus,
 } from '../shared/types.js';
 import {
 	generateEventId,
@@ -35,6 +37,31 @@ const ACK_PHRASES: Record<string, string> = {
 	'thanks': '🙏',
 	'good catch': '🙏',
 };
+
+/** Conversational beat patterns — structural dialogue markers derived from real content. */
+const BEAT_PATTERNS: { type: BeatType; emoji: string; patterns: RegExp[] }[] = [
+	// Check "resolution" BEFORE plain "agreement" (ordering matters)
+	{
+		type: 'resolution',
+		emoji: '🤝',
+		patterns: [/\bwe'?re aligned\b/i, /\bconfirmed\b/i, /\bimplementation matches\b/i, /\bfully aligned\b/i],
+	},
+	{
+		type: 'counter-proposal',
+		emoji: '🔄',
+		patterns: [/\bwhat about\b/i, /\binstead\b/i, /\bmy preference\b/i, /\bi'?d suggest\b/i, /\bprefer\b.*\binstead\b/i],
+	},
+	{
+		type: 'agreement',
+		emoji: '✅',
+		patterns: [/\bagreed\b/i, /\bsounds good\b/i, /\blet'?s go with\b/i, /\bthis works\b/i, /\bworks for me\b/i],
+	},
+	{
+		type: 'acknowledgement',
+		emoji: '👍',
+		patterns: [/\bgot it\b/i, /\bunderstood\b/i, /\bnoted\b/i, /\bmakes sense\b/i],
+	},
+];
 
 interface PendingBroadcast {
 	text: string;
@@ -71,6 +98,7 @@ export class EventProcessor {
 	private idlePingCount = 0;
 	private idleSurfacedCount = 0;
 	private recentLeadMessages: { id: string; text: string; timestamp: string }[] = [];
+	private threadStatuses: Map<string, ThreadStatus> = new Map();
 	private allEvents: ChatEvent[] = [];
 	private broadcastHoldMs = 500;
 	private idleSurfaceMs = 30_000;
@@ -119,6 +147,11 @@ export class EventProcessor {
 	/** Get current task state. */
 	getTasks(): TaskInfo[] {
 		return Array.from(this.previousTasks.values()).map((t) => ({ ...t }));
+	}
+
+	/** Get current thread status tracking. */
+	getThreadStatuses(): ThreadStatus[] {
+		return Array.from(this.threadStatuses.values());
 	}
 
 	// === Config changes (member join/leave) ===
@@ -415,9 +448,9 @@ export class EventProcessor {
 	}
 
 	private emitDM(inboxOwner: string, msg: RawInboxMessage): void {
-		// It's a DM — emit thread markers and the message
 		const events: ChatEvent[] = [];
 		const participants = [msg.from, inboxOwner].sort();
+		const threadKey = participants.join(':');
 
 		// Check if we need a thread-start marker
 		if (!this.isInActiveThread(participants)) {
@@ -433,13 +466,47 @@ export class EventProcessor {
 		const contentMsg = this.buildContentMessage(msg, false, true, participants);
 		events.push(contentMsg);
 
-		// Compact mode: check for acknowledgment phrases
-		if (this.compactMode && msg.text.length < 50) {
+		// Track thread status
+		const existing = this.threadStatuses.get(threadKey);
+		if (existing) {
+			existing.messageCount++;
+			existing.lastMessageTimestamp = msg.timestamp;
+			if (existing.status === 'new') existing.status = 'active';
+		} else {
+			this.threadStatuses.set(threadKey, {
+				threadKey,
+				participants,
+				topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+				messageCount: 1,
+				status: 'new',
+				firstMessageTimestamp: msg.timestamp,
+				lastMessageTimestamp: msg.timestamp,
+				beats: [],
+			});
+		}
+
+		// Beat detection — detect conversational structure from message content
+		const thread = this.threadStatuses.get(threadKey)!;
+		const beat = this.detectBeat(thread, msg.text);
+		if (beat) {
+			thread.beats.push(beat.type);
+			// Resolution marks thread resolved
+			if (beat.type === 'resolution') {
+				thread.status = 'resolved';
+			}
+			events.push(
+				this.makeReaction(contentMsg.id, beat.emoji, msg.from, msg.color, msg.timestamp, `beat:${beat.type}`),
+			);
+		}
+
+		// Compact mode: check for acknowledgment phrases (existing behavior)
+		// Beat detection takes priority — if a beat was detected, skip ack detection
+		if (!beat && this.compactMode && msg.text.length < 50) {
 			const ackEmoji = this.detectAcknowledgment(msg.text);
 			if (ackEmoji) {
 				const recentMsg = this.findRecentMessageFrom(inboxOwner, msg.timestamp, 30_000);
 				if (recentMsg) {
-					events.length = 0; // Remove the content message
+					events.length = 0;
 					events.push(
 						this.makeReaction(recentMsg, ackEmoji, msg.from, msg.color, msg.timestamp, msg.text),
 					);
@@ -952,6 +1019,22 @@ export class EventProcessor {
 	private detectAcknowledgment(text: string): string | null {
 		const normalized = text.trim().toLowerCase().replace(/[.!?]+$/, '');
 		return ACK_PHRASES[normalized] ?? null;
+	}
+
+	private detectBeat(thread: ThreadStatus, text: string): { type: BeatType; emoji: string } | null {
+		// First message in a thread is always a proposal
+		if (thread.messageCount === 1) {
+			return { type: 'proposal', emoji: '📋' };
+		}
+
+		// Check beat patterns in priority order
+		for (const { type, emoji, patterns } of BEAT_PATTERNS) {
+			if (patterns.some((p) => p.test(text))) {
+				return { type, emoji };
+			}
+		}
+
+		return null;
 	}
 
 	// === Event creation helpers ===
