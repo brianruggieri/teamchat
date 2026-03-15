@@ -21,7 +21,9 @@
 	--space-32: 32px;
 	--shadow-panel: 0 18px 60px rgba(0, 0, 0, 0.22);
 	--scrollbar-thumb: #223244;
+	--scrollbar-thumb-hover: #2c4157;
 	--scrollbar-track: #09131d;
+	--replay-badge-text: #8fa4c8;
 	--thread-max-width: 960px;
 	--thread-card-max-width: 56rem;
 	--message-max-width: 46rem;
@@ -48,7 +50,7 @@
 }
 
 *::-webkit-scrollbar-thumb:hover {
-	background: #2c4157;
+	background: var(--scrollbar-thumb-hover);
 }
 
 html,

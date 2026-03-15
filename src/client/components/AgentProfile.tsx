@@ -5,7 +5,7 @@ import { AgentAvatar } from './AgentAvatar.jsx';
 interface AgentProfileProps {
 	agentName: string;
 	team: TeamState;
-	presence: Record<string, string>;
+	presence: Record<string, 'working' | 'idle' | 'offline'>;
 	threadStatuses: Record<string, ThreadStatus>;
 	tasks: TaskInfo[];
 	onBack: () => void;

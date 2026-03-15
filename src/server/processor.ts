@@ -506,8 +506,12 @@ export class EventProcessor {
 			if (ackEmoji) {
 				const recentMsg = this.findRecentMessageFrom(inboxOwner, msg.timestamp, 30_000);
 				if (recentMsg) {
+					// Replace the content message with a reaction, but preserve
+					// thread-start markers that were pushed earlier in this call.
+					const preserved = events.filter((e) => e.type === 'thread-marker');
 					events.length = 0;
 					events.push(
+						...preserved,
 						this.makeReaction(recentMsg, ackEmoji, msg.from, msg.color, msg.timestamp, msg.text),
 					);
 				}
@@ -932,7 +936,7 @@ export class EventProcessor {
 	}
 
 	private isInActiveThread(participants: string[]): boolean {
-		const key = participants.sort().join(':');
+		const key = [...participants].sort().join(':');
 		// Check recent events for an active thread with these participants
 		for (let i = this.allEvents.length - 1; i >= 0; i--) {
 			const ev = this.allEvents[i]!;
