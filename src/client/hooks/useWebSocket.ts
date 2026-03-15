@@ -7,7 +7,7 @@ const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000];
 
 export function useWebSocket(
 	dispatch: React.Dispatch<ChatAction>,
-	wsUrl: string = `ws://${window.location.host}/ws`,
+	wsUrl: string = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`,
 ) {
 	const wsRef = useRef<WebSocket | null>(null);
 	const reconnectAttempt = useRef(0);

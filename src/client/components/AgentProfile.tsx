@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ThreadStatus, TaskInfo, TeamState } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
+import { formatModel } from './PresenceRoster.jsx';
 
 interface AgentProfileProps {
 	agentName: string;
@@ -35,7 +36,7 @@ export function AgentProfile({
 					<span className="tc-agent-header-meta">
 						<span className={`tc-presence-dot is-${status}`} />
 						{status}
-						{member.model && <span className="tc-roster-badge is-model">{member.model.includes('opus') ? 'opus' : member.model.includes('sonnet') ? 'sonnet' : member.model.includes('haiku') ? 'haiku' : member.model}</span>}
+						{member.model && <span className="tc-roster-badge is-model">{formatModel(member.model)}</span>}
 					</span>
 				</div>
 			</div>

@@ -194,7 +194,7 @@ export class EventProcessor {
 		}
 
 		// Members joined — use joinedAt for accurate timestamps
-		// Use previousMembers (cumulative) instead of prevNames (per-diff) to prevent re-emitting
+		// Use previousMembers (tracks current members) instead of prevNames (per-diff) to prevent re-emitting
 		for (const name of currNames) {
 			if (!this.previousMembers.has(name) && !isLeadAgent(name)) {
 				const member = currByName.get(name)!;
@@ -257,6 +257,12 @@ export class EventProcessor {
 				continue;
 			}
 			this.processedMessageKeys.add(msgKey);
+
+			// Prune to prevent unbounded growth — keep the most recent half
+			if (this.processedMessageKeys.size > 10_000) {
+				const keys = Array.from(this.processedMessageKeys);
+				this.processedMessageKeys = new Set(keys.slice(keys.length - 5_000));
+			}
 
 			// Try parsing as system event
 			const sysEvent = tryParseSystemEvent(msg.text);

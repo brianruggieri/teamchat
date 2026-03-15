@@ -212,6 +212,13 @@ function buildReplaySource({
 
 const INFERRED_COLORS = ['blue', 'green', 'purple', 'yellow', 'red', 'cyan', 'orange', 'pink'];
 
+/**
+ * Infer team members from replay entries when no config file is available.
+ *
+ * NOTE: Lead agents are inferred with `name: 'team-lead'`. The PresenceRoster
+ * component filters on `member.name === 'team-lead'` to render the lead row
+ * specially — keep these in sync if renaming.
+ */
 function inferMembersFromEntries(entries: ReplayEntry[]): AgentInfo[] {
 	const seen = new Map<string, { firstType: string; color: string; model?: string }>();
 	let colorIdx = 0;
@@ -479,7 +486,7 @@ function buildMarkerFromEvent(entry: ReplayEntry): ReplayMarker | null {
 	return null;
 }
 
-function systemSubtypeToMarkerKindImpl(subtype: string): ReplayMarker['kind'] | null {
+function systemSubtypeToMarkerKind(subtype: string): ReplayMarker['kind'] | null {
 	switch (subtype) {
 		case 'task-created':
 			return 'task-created';
@@ -494,10 +501,6 @@ function systemSubtypeToMarkerKindImpl(subtype: string): ReplayMarker['kind'] | 
 		default:
 			return null;
 	}
-}
-
-function systemSubtypeToMarkerKind(subtype: string): ReplayMarker['kind'] | null {
-	return systemSubtypeToMarkerKindImpl(subtype);
 }
 
 function findClosestSeqForMs(entries: ReplayEntry[], atMs: number): number {

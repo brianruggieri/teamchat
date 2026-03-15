@@ -56,7 +56,7 @@ const PATTERNS: PatternDef[] = [
 	{ category: 'generic-secret', pattern: /(api[_-]?key|secret|password|passwd|credentials?)\s*[=:]\s*["']?[^\s"']{6,}/gi, label: 'Generic secret' },
 ];
 
-/** Calculate Shannon entropy in bits per character. */
+/** Calculate Shannon entropy in bits per character. Returns 0 for empty or single-character strings. */
 export function shannonEntropy(s: string): number {
 	const freq = new Map<string, number>();
 	for (const c of s) {

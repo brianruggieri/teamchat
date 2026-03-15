@@ -192,8 +192,9 @@ cmd_start() {
 				seq=$(millis)
 				capture_inbox_snapshot "$team" "$capture_dir" "$seq"
 			done &
-			local fswatch_inbox_pid=$!
-			log "Watching inboxes (pid: $fswatch_inbox_pid)"
+			# Note: $! here is the PID of the pipeline subshell, not fswatch itself.
+			# Cleanup uses `pkill -f` in cmd_stop instead, so we only log for diagnostics.
+			log "Watching inboxes (pid: $!)"
 		fi
 
 		# Watch tasks
@@ -203,8 +204,9 @@ cmd_start() {
 				seq=$(millis)
 				capture_task_snapshot "$team" "$capture_dir" "$seq"
 			done &
-			local fswatch_task_pid=$!
-			log "Watching tasks (pid: $fswatch_task_pid)"
+			# Note: $! here is the PID of the pipeline subshell, not fswatch itself.
+			# Cleanup uses `pkill -f` in cmd_stop instead, so we only log for diagnostics.
+			log "Watching tasks (pid: $!)"
 		fi
 	else
 		log "fswatch not available — inbox/task snapshots will be periodic only"
