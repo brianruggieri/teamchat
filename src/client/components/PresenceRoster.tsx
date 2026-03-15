@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 	offline: 'offline',
 };
 
-function formatModel(model: string): string {
+export function formatModel(model: string): string {
 	if (model.includes('opus')) return 'opus';
 	if (model.includes('sonnet')) return 'sonnet';
 	if (model.includes('haiku')) return 'haiku';

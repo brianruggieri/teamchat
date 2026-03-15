@@ -87,18 +87,23 @@ describe('Replay Server', () => {
 		try {
 			const msg = await new Promise<{ type: string }>((resolve, reject) => {
 				const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
-				ws.onmessage = (e) => {
-					resolve(JSON.parse(e.data as string));
-					ws.close();
-				};
-				ws.onerror = () => {
-					reject(new Error('WebSocket error'));
-					ws.close();
-				};
-				setTimeout(() => {
+				const timer = setTimeout(() => {
 					reject(new Error('Timed out waiting for auto-waiting message'));
 					ws.close();
 				}, 2000);
+				ws.onmessage = (e) => {
+					const parsed = JSON.parse(e.data as string) as { type: string };
+					if (parsed.type === 'auto-waiting') {
+						clearTimeout(timer);
+						resolve(parsed);
+						ws.close();
+					}
+				};
+				ws.onerror = () => {
+					clearTimeout(timer);
+					reject(new Error('WebSocket error'));
+					ws.close();
+				};
 			});
 			expect(msg.type).toBe('auto-waiting');
 		} finally {
@@ -116,19 +121,30 @@ describe('Replay Server', () => {
 			const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
 
 			// Wait for the auto-waiting message first
-			await new Promise<void>((resolve) => {
+			await new Promise<void>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					reject(new Error('Timed out waiting for auto-waiting'));
+					ws.close();
+				}, 2000);
 				ws.onmessage = (e) => {
 					const msg = JSON.parse(e.data as string) as { type: string };
-					if (msg.type === 'auto-waiting') resolve();
+					if (msg.type === 'auto-waiting') {
+						clearTimeout(timer);
+						resolve();
+					}
 				};
 			});
 
 			// Set up listener for team-ready before calling activateTeam
 			const teamReadyPromise = new Promise<{ type: string; state: { team: { name: string }; events: unknown[] } }>((resolve, reject) => {
+				const timer = setTimeout(() => { ws.close(); reject(new Error('Timed out waiting for team-ready')); }, 2000);
 				ws.onmessage = (e) => {
-					resolve(JSON.parse(e.data as string));
+					const parsed = JSON.parse(e.data as string) as { type: string; state: { team: { name: string }; events: unknown[] } };
+					if (parsed.type === 'team-ready') {
+						clearTimeout(timer);
+						resolve(parsed);
+					}
 				};
-				setTimeout(() => reject(new Error('Timed out waiting for team-ready')), 2000);
 			});
 
 			// Create mock processor and watcher for activation
@@ -183,8 +199,18 @@ describe('Replay Server', () => {
 			const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
 
 			// Wait for auto-waiting
-			await new Promise<void>((resolve) => {
-				ws.onmessage = () => resolve();
+			await new Promise<void>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					reject(new Error('Timed out waiting for auto-waiting'));
+					ws.close();
+				}, 2000);
+				ws.onmessage = (e) => {
+					const msg = JSON.parse(e.data as string) as { type: string };
+					if (msg.type === 'auto-waiting') {
+						clearTimeout(timer);
+						resolve();
+					}
+				};
 			});
 
 			const watcher = {
@@ -207,22 +233,46 @@ describe('Replay Server', () => {
 			server.activateTeam('broadcast-team', processor, watcher);
 
 			// Wait for team-ready
-			await new Promise<void>((resolve) => {
+			await new Promise<void>((resolve, reject) => {
+				const timer = setTimeout(() => {
+					reject(new Error('Timed out waiting for team-ready'));
+					ws.close();
+				}, 2000);
 				ws.onmessage = (e) => {
 					const msg = JSON.parse(e.data as string) as { type: string };
-					if (msg.type === 'team-ready') resolve();
+					if (msg.type === 'team-ready') {
+						clearTimeout(timer);
+						resolve();
+					}
 				};
 			});
 
 			// Now broadcast events — should reach the connected client
 			const broadcastPromise = new Promise<{ type: string; events: { type: string; id: string }[] }>((resolve, reject) => {
+				const timer = setTimeout(() => { ws.close(); reject(new Error('Timed out waiting for broadcast')); }, 2000);
 				ws.onmessage = (e) => {
-					resolve(JSON.parse(e.data as string));
+					const parsed = JSON.parse(e.data as string) as { type: string; events: { type: string; id: string }[] };
+					if (parsed.type === 'events') {
+						clearTimeout(timer);
+						resolve(parsed);
+					}
 				};
-				setTimeout(() => reject(new Error('Timed out waiting for broadcast')), 2000);
 			});
 
-			server.broadcast([{ type: 'message', id: 'test-1', timestamp: new Date().toISOString(), agentName: 'worker', content: 'hello' } as import('../../src/shared/types.js').ChatEvent]);
+			server.broadcast([{
+				type: 'message',
+				id: 'test-1',
+				from: 'worker',
+				fromColor: '#3B82F6',
+				text: 'hello',
+				summary: null,
+				timestamp: new Date().toISOString(),
+				isBroadcast: false,
+				isDM: false,
+				dmParticipants: null,
+				isLead: false,
+				replyToId: null,
+			}]);
 
 			const broadcastMsg = await broadcastPromise;
 			expect(broadcastMsg.type).toBe('events');

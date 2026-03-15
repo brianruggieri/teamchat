@@ -17,8 +17,7 @@ import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
 import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
-import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap } from '../shared/replay.js';
-import type { ReplayArtifact } from '../shared/replay.js';
+import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap, ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
 

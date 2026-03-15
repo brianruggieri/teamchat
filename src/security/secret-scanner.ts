@@ -50,13 +50,13 @@ const PATTERNS: PatternDef[] = [
 	{ category: 'env-pattern', pattern: /^[A-Z_]*(KEY|SECRET|TOKEN|PASSWORD|CREDENTIAL)S?\s*[=:]\s*\S+/gm, label: 'Environment variable' },
 
 	// High-entropy base64 blobs (likely secrets or keys)
-	{ category: 'high-entropy', pattern: /(?<![a-zA-Z0-9/:.@_-])[A-Za-z0-9+]{40,}={0,2}(?![a-zA-Z0-9/:.@_-])/g, label: 'High-entropy string' },
+	{ category: 'high-entropy', pattern: /(?<![a-zA-Z0-9/:.@_-])[A-Za-z0-9+/_-]{40,}={0,2}(?![a-zA-Z0-9/:.@_-])/g, label: 'High-entropy string' },
 
 	// Generic
 	{ category: 'generic-secret', pattern: /(api[_-]?key|secret|password|passwd|credentials?)\s*[=:]\s*["']?[^\s"']{6,}/gi, label: 'Generic secret' },
 ];
 
-/** Calculate Shannon entropy in bits per character. */
+/** Calculate Shannon entropy in bits per character. Returns 0 for empty or single-character strings. */
 export function shannonEntropy(s: string): number {
 	const freq = new Map<string, number>();
 	for (const c of s) {
@@ -115,9 +115,15 @@ export function maskSecret(value: string): string {
 	return masked;
 }
 
+// Catch-all categories that should yield to specific pattern matches
+const CATCHALL_CATEGORIES = new Set<SecretCategory>(['high-entropy', 'generic-secret']);
+
 function deduplicateFindings(findings: SecretFinding[]): SecretFinding[] {
-	// Sort by match length ascending (shorter = more specific), then by start position
+	// Sort: specific categories first, then by match length ascending, then by start position
 	findings.sort((a, b) => {
+		const aIsCatchall = CATCHALL_CATEGORIES.has(a.category) ? 1 : 0;
+		const bIsCatchall = CATCHALL_CATEGORIES.has(b.category) ? 1 : 0;
+		if (aIsCatchall !== bIsCatchall) return aIsCatchall - bIsCatchall;
 		const lenA = a.matchEnd - a.matchStart;
 		const lenB = b.matchEnd - b.matchStart;
 		return lenA - lenB || a.matchStart - b.matchStart;

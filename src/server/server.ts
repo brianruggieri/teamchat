@@ -191,7 +191,7 @@ export class TeamChatServer {
 			}
 		}
 
-		throw new Error(`Could not find an available port (tried ${this.port}-${this.port + maxRetries - 1})`);
+		throw new Error(`Could not find an available port (tried ${this.port}-${this.port + maxRetries - 1})`, { cause: lastError });
 	}
 
 	/** Broadcast ChatEvents to all connected WebSocket clients. */

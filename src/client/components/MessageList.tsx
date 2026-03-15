@@ -151,6 +151,9 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 	for (const event of events) {
 		if (event.type === 'message' && (event as ContentMessage).isDM) {
 			const msg = event as ContentMessage;
+			if (!msg.dmParticipants) {
+				console.warn('DM message missing dmParticipants:', msg.id);
+			}
 			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
 			if (!dmsByPair.has(key)) dmsByPair.set(key, []);
 			dmsByPair.get(key)!.push(event);

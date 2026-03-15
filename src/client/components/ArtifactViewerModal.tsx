@@ -136,7 +136,7 @@ export function ArtifactViewerModal({
 						<a
 							href={artifactUrl}
 							target="_blank"
-							rel="noreferrer"
+							rel="noopener noreferrer"
 							className="tc-replay-button is-subtle"
 						>
 							Open in new tab

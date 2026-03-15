@@ -78,7 +78,7 @@
 		// Apply theme from ?theme= query param before first paint
 		(function() {
 			var t = new URLSearchParams(window.location.search).get('theme');
-			if (t) document.documentElement.setAttribute('data-theme', t);
+			if (t && ['claude'].includes(t)) document.documentElement.setAttribute('data-theme', t);
 		})();
 	</script>
 </head>

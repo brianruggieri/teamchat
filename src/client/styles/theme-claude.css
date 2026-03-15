@@ -34,7 +34,11 @@
 	/* Shadows & chrome */
 	--shadow-panel: 0 18px 60px rgba(0, 0, 0, 0.28);
 	--scrollbar-thumb: #352f28;
+	--scrollbar-thumb-hover: #443c34;
 	--scrollbar-track: #13120f;
+
+	/* Badge text — lighter terracotta for replay badges */
+	--replay-badge-text: #e4a080;
 }
 
 /* Body gradient — warm terracotta glow replaces cool indigo */
@@ -155,7 +159,7 @@
 /* Badges and metrics — terracotta tint */
 [data-theme="claude"] .tc-replay-badge {
 	background: rgba(217, 119, 87, 0.14);
-	color: #e4a080;
+	color: var(--replay-badge-text);
 }
 
 /* Marker chips */
@@ -189,7 +193,7 @@
 
 /* Scrollbar hover */
 [data-theme="claude"] *::-webkit-scrollbar-thumb:hover {
-	background: #443c34;
+	background: var(--scrollbar-thumb-hover);
 }
 
 /* Inline code */

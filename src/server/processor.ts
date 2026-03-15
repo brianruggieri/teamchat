@@ -194,7 +194,7 @@ export class EventProcessor {
 		}
 
 		// Members joined — use joinedAt for accurate timestamps
-		// Use previousMembers (cumulative) instead of prevNames (per-diff) to prevent re-emitting
+		// Use previousMembers (tracks current members) instead of prevNames (per-diff) to prevent re-emitting
 		for (const name of currNames) {
 			if (!this.previousMembers.has(name) && !isLeadAgent(name)) {
 				const member = currByName.get(name)!;
@@ -257,6 +257,12 @@ export class EventProcessor {
 				continue;
 			}
 			this.processedMessageKeys.add(msgKey);
+
+			// Prune to prevent unbounded growth — keep the most recent half
+			if (this.processedMessageKeys.size > 10_000) {
+				const keys = Array.from(this.processedMessageKeys);
+				this.processedMessageKeys = new Set(keys.slice(keys.length - 5_000));
+			}
 
 			// Try parsing as system event
 			const sysEvent = tryParseSystemEvent(msg.text);
@@ -506,8 +512,12 @@ export class EventProcessor {
 			if (ackEmoji) {
 				const recentMsg = this.findRecentMessageFrom(inboxOwner, msg.timestamp, 30_000);
 				if (recentMsg) {
+					// Replace the content message with a reaction, but preserve
+					// thread-start markers that were pushed earlier in this call.
+					const preserved = events.filter((e) => e.type === 'thread-marker');
 					events.length = 0;
 					events.push(
+						...preserved,
 						this.makeReaction(recentMsg, ackEmoji, msg.from, msg.color, msg.timestamp, msg.text),
 					);
 				}
@@ -932,7 +942,7 @@ export class EventProcessor {
 	}
 
 	private isInActiveThread(participants: string[]): boolean {
-		const key = participants.sort().join(':');
+		const key = [...participants].sort().join(':');
 		// Check recent events for an active thread with these participants
 		for (let i = this.allEvents.length - 1; i >= 0; i--) {
 			const ev = this.allEvents[i]!;

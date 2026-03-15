@@ -144,6 +144,20 @@ describe('Secret Scanner', () => {
 			const result = scanForSecrets(`token: ${secret}`);
 			expect(result.some(f => f.category === 'high-entropy')).toBe(true);
 		});
+
+		test('detects base64 secrets containing slash characters', () => {
+			// Base64 strings with '/' are valid and common in real secrets
+			const secret = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCY/xQ9z2vL4mNpO3r';
+			const result = scanForSecrets(`secret: ${secret}`);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(true);
+		});
+
+		test('detects base64url secrets containing underscore and hyphen', () => {
+			// base64url variant uses - and _ instead of + and /
+			const secret = 'wJalrXUtnFEMI_K7MDENG-bPxRfiCY_xQ9z2vL4mNpO3r';
+			const result = scanForSecrets(`key: ${secret}`);
+			expect(result.some(f => f.category === 'high-entropy')).toBe(true);
+		});
 	});
 
 	describe('false positives', () => {
