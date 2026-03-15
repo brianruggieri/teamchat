@@ -137,7 +137,7 @@ describe('Replay Server', () => {
 
 			// Set up listener for team-ready before calling activateTeam
 			const teamReadyPromise = new Promise<{ type: string; state: { team: { name: string }; events: unknown[] } }>((resolve, reject) => {
-				const timer = setTimeout(() => reject(new Error('Timed out waiting for team-ready')), 2000);
+				const timer = setTimeout(() => { ws.close(); reject(new Error('Timed out waiting for team-ready')); }, 2000);
 				ws.onmessage = (e) => {
 					const parsed = JSON.parse(e.data as string) as { type: string; state: { team: { name: string }; events: unknown[] } };
 					if (parsed.type === 'team-ready') {
@@ -249,7 +249,7 @@ describe('Replay Server', () => {
 
 			// Now broadcast events — should reach the connected client
 			const broadcastPromise = new Promise<{ type: string; events: { type: string; id: string }[] }>((resolve, reject) => {
-				const timer = setTimeout(() => reject(new Error('Timed out waiting for broadcast')), 2000);
+				const timer = setTimeout(() => { ws.close(); reject(new Error('Timed out waiting for broadcast')); }, 2000);
 				ws.onmessage = (e) => {
 					const parsed = JSON.parse(e.data as string) as { type: string; events: { type: string; id: string }[] };
 					if (parsed.type === 'events') {
