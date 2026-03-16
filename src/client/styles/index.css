@@ -273,7 +273,6 @@ code {
 }
 
 .tc-bottom-sheet-close,
-.tc-expand-button,
 .tc-protocol-expand,
 .tc-sheet-peek {
 	padding: 9px 12px;
@@ -286,7 +285,6 @@ code {
 }
 
 .tc-bottom-sheet-close:hover,
-.tc-expand-button:hover,
 .tc-protocol-expand:hover,
 .tc-sheet-peek:hover {
 	border-color: rgba(91, 109, 247, 0.45);
@@ -1308,10 +1306,22 @@ code {
 	color: #d8e6ff;
 }
 
-.tc-expand-button {
-	margin-top: 8px;
-	padding: 6px 10px;
-	font-size: 0.76rem;
+.tc-expand-toggle {
+	display: inline;
+	padding: 0 4px;
+	margin-left: 4px;
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	cursor: pointer;
+	opacity: 0.6;
+	transition: opacity 0.15s;
+	vertical-align: baseline;
+}
+.tc-expand-toggle:hover {
+	opacity: 1;
+	color: var(--text-secondary);
 }
 
 .tc-reaction-row {
