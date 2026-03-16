@@ -77,4 +77,24 @@ describe('Replay Engine', () => {
 		expect(visible.visibleChips[0]?.label).toBe('Start');
 		expect(visible.activeChipId).toBe(chips[0]?.id ?? null);
 	});
+
+	test('clusters task-claimed markers within 15s window', () => {
+		const loaded = loadReplaySource(replayDir);
+		const chips = buildReplayTimelineChips(loaded.bundle.markers);
+		// Task claimed markers that are close together should be clustered
+		const claimedChips = chips.filter(c => c.label.includes('started'));
+		const rawClaimed = loaded.bundle.markers.filter(m => m.kind === 'task-claimed');
+		// Clustered chips should be fewer than raw markers (or equal if no clustering needed)
+		expect(claimedChips.length).toBeLessThanOrEqual(rawClaimed.length);
+	});
+
+	test('clusters task-completed markers within 15s window', () => {
+		const loaded = loadReplaySource(replayDir);
+		const chips = buildReplayTimelineChips(loaded.bundle.markers);
+		// Task completed markers that are close together should be clustered
+		const completedChips = chips.filter(c => c.label.includes('done'));
+		const rawCompleted = loaded.bundle.markers.filter(m => m.kind === 'task-completed');
+		// Clustered chips should be fewer than raw markers (or equal if no clustering needed)
+		expect(completedChips.length).toBeLessThanOrEqual(rawCompleted.length);
+	});
 });

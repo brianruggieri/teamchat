@@ -272,3 +272,304 @@ describe("Reactions", () => {
 		expect(gotItMsg).toBeDefined();
 	});
 });
+
+describe("DM beat detection — new patterns", () => {
+	let collector: ReturnType<typeof createCollector>;
+	let processor: EventProcessor;
+
+	beforeEach(() => {
+		collector = createCollector();
+		processor = new EventProcessor(collector.emitter);
+		processor.processDelta({ type: "config", previous: null, current: config });
+		collector.events.length = 0;
+	});
+
+	test("detects question pattern in DM", () => {
+		// First message establishes the thread
+		const dm1 = {
+			from: "backend" as const,
+			text: "Let me check the schema",
+			summary: "Checking schema",
+			timestamp: "2026-03-09T10:06:00.000Z",
+			color: "blue",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "frontend",
+			previous: [],
+			current: [dm1],
+		});
+		collector.events.length = 0;
+
+		// Second message triggers question detection
+		const dm2 = {
+			from: "frontend" as const,
+			text: "What columns should be PHI?",
+			summary: "PHI question",
+			timestamp: "2026-03-09T10:06:10.000Z",
+			color: "green",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "backend",
+			previous: [],
+			current: [dm2],
+		});
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const questionReaction = reactions.find(r => r.emoji === "❓");
+		expect(questionReaction).toBeDefined();
+	});
+
+	test("detects code/schema sharing in DM", () => {
+		// First message establishes the thread
+		const dm1 = {
+			from: "frontend" as const,
+			text: "Can you send me the data model?",
+			summary: "Requesting data model",
+			timestamp: "2026-03-09T10:07:00.000Z",
+			color: "green",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "backend",
+			previous: [],
+			current: [dm1],
+		});
+		collector.events.length = 0;
+
+		// Second message triggers sharing detection
+		const dm2 = {
+			from: "backend" as const,
+			text: "Here's the schema with PHI columns marked",
+			summary: "Schema sharing",
+			timestamp: "2026-03-09T10:07:10.000Z",
+			color: "blue",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "frontend",
+			previous: [],
+			current: [dm2],
+		});
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const shareReaction = reactions.find(r => r.emoji === "📎");
+		expect(shareReaction).toBeDefined();
+	});
+
+	test("detects blocker/dependency in DM", () => {
+		// First message establishes the thread
+		const dm1 = {
+			from: "privacy" as const,
+			text: "How's the API endpoint coming along?",
+			summary: "API status check",
+			timestamp: "2026-03-09T10:08:00.000Z",
+			color: "purple",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "frontend",
+			previous: [],
+			current: [dm1],
+		});
+		collector.events.length = 0;
+
+		// Second message triggers blocker detection
+		const dm2 = {
+			from: "frontend" as const,
+			text: "I'm blocked on the API endpoint, waiting on backend",
+			summary: "Blocked",
+			timestamp: "2026-03-09T10:08:10.000Z",
+			color: "green",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "privacy",
+			previous: [],
+			current: [dm2],
+		});
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const blockerReaction = reactions.find(r => r.emoji === "🚧");
+		expect(blockerReaction).toBeDefined();
+	});
+
+	test("detects completion report in DM", () => {
+		// First message establishes the thread
+		const dm1 = {
+			from: "qa" as const,
+			text: "How's the RBAC implementation going?",
+			summary: "RBAC status",
+			timestamp: "2026-03-09T10:09:00.000Z",
+			color: "yellow",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "backend",
+			previous: [],
+			current: [dm1],
+		});
+		collector.events.length = 0;
+
+		// Second message triggers completion detection
+		const dm2 = {
+			from: "backend" as const,
+			text: "All passing, RBAC implementation is done",
+			summary: "Done",
+			timestamp: "2026-03-09T10:09:10.000Z",
+			color: "blue",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "qa",
+			previous: [],
+			current: [dm2],
+		});
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const completionReaction = reactions.find(r => r.emoji === "✅");
+		expect(completionReaction).toBeDefined();
+	});
+});
+
+describe("General chat reaction inference", () => {
+	let collector: ReturnType<typeof createCollector>;
+	let processor: EventProcessor;
+
+	beforeEach(() => {
+		collector = createCollector();
+		processor = new EventProcessor(collector.emitter);
+		processor.processDelta({ type: "config", previous: null, current: config });
+		processor.processDelta({ type: "tasks", previous: null, current: initialTasks });
+		collector.events.length = 0;
+	});
+
+	test("shutdown-approved produces 👋 on shutdown-requested event", () => {
+		// Feed shutdown request
+		const shutdownReq = fixtureEvents.find(e => e.label === "Shutdown request to backend")!;
+		processor.processDelta({
+			type: "inbox",
+			agentName: "backend",
+			previous: [],
+			current: [shutdownReq.message],
+		});
+
+		const shutdownRequestEvents = collector.events.filter(
+			e => e.type === "system" && (e as SystemEvent).subtype === "shutdown-requested"
+		) as SystemEvent[];
+		expect(shutdownRequestEvents).toHaveLength(1);
+		const requestEventId = shutdownRequestEvents[0]!.id;
+
+		// Now feed shutdown approval
+		const shutdownApproval = fixtureEvents.find(e => e.label === "Backend approves shutdown")!;
+		processor.processDelta({
+			type: "inbox",
+			agentName: "team-lead",
+			previous: [],
+			current: [shutdownApproval.message],
+		});
+
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const waveReaction = reactions.find(r => r.emoji === "👋" && r.targetMessageId === requestEventId);
+		expect(waveReaction).toBeDefined();
+	});
+
+	test("broadcast ack: short message after broadcast triggers 👍 on broadcast", async () => {
+		// Feed lead's broadcast
+		const assignment = fixtureEvents.find(
+			(e) => e.label === "Lead assigns work (broadcast)",
+		)!;
+		for (const inbox of assignment.inboxes) {
+			processor.processDelta({
+				type: "inbox",
+				agentName: inbox,
+				previous: [],
+				current: [assignment.message],
+			});
+		}
+
+		// Wait for broadcast hold window to finalize the broadcast
+		await new Promise((resolve) => setTimeout(resolve, 600));
+		collector.events.length = 0;
+
+		// Backend sends a short acknowledgment to the lead within 60s
+		const ackMsg = {
+			from: "backend" as const,
+			text: "Claimed #1. On it.",
+			summary: "Claimed #1",
+			timestamp: "2026-03-09T10:00:48.000Z",
+			color: "blue",
+			read: false as const,
+		};
+		processor.processDelta({
+			type: "inbox",
+			agentName: "team-lead",
+			previous: [],
+			current: [ackMsg],
+		});
+
+		// Wait for hold window
+		await new Promise((resolve) => setTimeout(resolve, 600));
+
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const broadcastAck = reactions.find(r => r.emoji === "👍" && r.fromAgent === "backend");
+		expect(broadcastAck).toBeDefined();
+	});
+
+	test("nudge ack: nudged agent responds within 60s triggers 👍 on nudge event", async () => {
+		// First, make privacy idle
+		const idleNotification = fixtureEvents.find(e => e.label === "Privacy idle after completing #5")!;
+		processor.processDelta({
+			type: "inbox",
+			agentName: "team-lead",
+			previous: [],
+			current: [idleNotification.message],
+		});
+
+		// Lead sends a message to privacy (nudge since privacy is idle)
+		const nudgeMsg = fixtureEvents.find(e => e.label === "Lead to privacy: cross-review")!;
+		for (const inbox of nudgeMsg.inboxes) {
+			processor.processDelta({
+				type: "inbox",
+				agentName: inbox,
+				previous: [],
+				current: [nudgeMsg.message],
+			});
+		}
+
+		// Wait for broadcast hold window
+		await new Promise((resolve) => setTimeout(resolve, 600));
+
+		// Check that a nudge event was emitted
+		const nudgeEvents = collector.events.filter(
+			e => e.type === "system" && (e as SystemEvent).subtype === "nudge"
+		) as SystemEvent[];
+		expect(nudgeEvents.length).toBeGreaterThanOrEqual(1);
+		const privacyNudge = nudgeEvents.find(e => e.agentName === "privacy");
+		expect(privacyNudge).toBeDefined();
+
+		collector.events.length = 0;
+
+		// Privacy responds within 60s
+		const privacyResponse = fixtureEvents.find(e => e.label === "Privacy accepts cross-review")!;
+		processor.processDelta({
+			type: "inbox",
+			agentName: "team-lead",
+			previous: [],
+			current: [privacyResponse.message],
+		});
+
+		// Wait for broadcast hold window
+		await new Promise((resolve) => setTimeout(resolve, 600));
+
+		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
+		const nudgeAck = reactions.find(r => r.emoji === "👍" && r.fromAgent === "privacy");
+		expect(nudgeAck).toBeDefined();
+		expect(nudgeAck!.targetMessageId).toBe(privacyNudge!.id);
+	});
+});

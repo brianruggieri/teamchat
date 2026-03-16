@@ -130,6 +130,12 @@ export const AGENT_COLORS: Record<string, AgentColor> = {
 		border: 'border-pink-500/30',
 		dot: 'bg-pink-500',
 	},
+	gold: {
+		bg: 'bg-yellow-500/20',
+		text: 'text-yellow-300',
+		border: 'border-yellow-500/30',
+		dot: 'bg-yellow-500',
+	},
 };
 
 export function getAgentColor(color: string): AgentColor {
@@ -139,4 +145,21 @@ export function getAgentColor(color: string): AgentColor {
 		border: 'border-gray-500/30',
 		dot: 'bg-gray-500',
 	};
+}
+
+// Raw hex values for SVG rendering (avatar marks)
+export const AGENT_COLOR_VALUES: Record<string, { fill: string; dark: string; light: string }> = {
+	blue:   { fill: '#3b82f6', dark: '#1e4faa', light: '#60a5fa' },
+	green:  { fill: '#22c55e', dark: '#15793a', light: '#4ade80' },
+	purple: { fill: '#a855f7', dark: '#6d28b8', light: '#c084fc' },
+	yellow: { fill: '#eab308', dark: '#a07806', light: '#facc15' },
+	red:    { fill: '#ef4444', dark: '#b32020', light: '#f87171' },
+	orange: { fill: '#f97316', dark: '#b84d0d', light: '#fb923c' },
+	cyan:   { fill: '#06b6d4', dark: '#047a8f', light: '#22d3ee' },
+	pink:   { fill: '#ec4899', dark: '#a8246b', light: '#f472b6' },
+	gold:   { fill: '#d4a017', dark: '#8a6b0f', light: '#e0b83a' },
+};
+
+export function getAgentColorValues(color: string) {
+	return AGENT_COLOR_VALUES[color] ?? { fill: '#6b7280', dark: '#4b5563', light: '#9ca3af' };
 }

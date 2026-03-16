@@ -17,6 +17,7 @@ import { ReplayArtifactPanel } from './components/ReplayArtifactPanel.jsx';
 import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
+import { AvatarMarkProvider } from './components/AvatarMarkContext.js';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap, ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -177,51 +178,53 @@ function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode:
 	useWebSocket(dispatch, bootstrap.wsUrl);
 
 	return (
-		<TimeProvider>
-			<TeamChatScaffold
-				state={state}
-				mode="live"
-				headerStatusText={state.connected ? 'following stream' : 'reconnecting'}
-				topContent={(
-					<ModeBanner
-						mode="live"
-						eyebrow="Live mode"
-						title="Following the active team session"
-						description={
-							state.connected
-								? 'Incoming events stream into the workspace in real time.'
-								: 'Trying to reattach to the live event stream.'
-						}
-						meta={[
-							state.connected ? 'Realtime websocket' : 'Reconnect in progress',
-							`${bootstrap.initialState.team?.members.length ?? 0} agents configured`,
-						]}
-					/>
-				)}
-				emptyTitle="Waiting for messages"
-				emptyDescription="Connect a team or load a replay to populate the conversation."
-				dispatch={dispatch}
-				renderPanels={(onTaskClick, onAgentClick) => [
-					<PresenceRoster
-						key="presence"
-						mode="live"
-						team={state.team}
-						presence={state.presence}
-						threadStatuses={state.threadStatuses}
-						tasks={state.tasks}
-						onAgentClick={onAgentClick}
-					/>,
-					<TaskSidebar key="tasks" tasks={state.tasks} onTaskClick={onTaskClick} />,
-					<SessionStats
-						key="stats"
-						events={state.events}
-						tasks={state.tasks}
-						sessionStart={state.sessionStart}
-						memberCount={state.team?.members.length ?? 0}
-					/>,
-				]}
-			/>
-		</TimeProvider>
+		<AvatarMarkProvider agents={state.team?.members ?? []}>
+			<TimeProvider>
+				<TeamChatScaffold
+					state={state}
+					mode="live"
+					headerStatusText={state.connected ? 'following stream' : 'reconnecting'}
+					topContent={(
+						<ModeBanner
+							mode="live"
+							eyebrow="Live mode"
+							title="Following the active team session"
+							description={
+								state.connected
+									? 'Incoming events stream into the workspace in real time.'
+									: 'Trying to reattach to the live event stream.'
+							}
+							meta={[
+								state.connected ? 'Realtime websocket' : 'Reconnect in progress',
+								`${bootstrap.initialState.team?.members.length ?? 0} agents configured`,
+							]}
+						/>
+					)}
+					emptyTitle="Waiting for messages"
+					emptyDescription="Connect a team or load a replay to populate the conversation."
+					dispatch={dispatch}
+					renderPanels={(onTaskClick, onAgentClick) => [
+						<PresenceRoster
+							key="presence"
+							mode="live"
+							team={state.team}
+							presence={state.presence}
+							threadStatuses={state.threadStatuses}
+							tasks={state.tasks}
+							onAgentClick={onAgentClick}
+						/>,
+						<TaskSidebar key="tasks" tasks={state.tasks} onTaskClick={onTaskClick} />,
+						<SessionStats
+							key="stats"
+							events={state.events}
+							tasks={state.tasks}
+							sessionStart={state.sessionStart}
+							memberCount={state.team?.members.length ?? 0}
+						/>,
+					]}
+				/>
+			</TimeProvider>
+		</AvatarMarkProvider>
 	);
 }
 
@@ -444,53 +447,55 @@ function ReplayWorkspaceLoaded({
 	);
 
 	return (
-		<TimeProvider nowMs={controller.state.virtualNowMs}>
-			<>
-				<TeamChatScaffold
-					state={{ ...controller.derivedState.chatState, activeAgentKey }}
-					mode="replay"
-					headerStatusText={replayStatusText}
-					topContent={replayTopContent}
-					emptyTitle="Replay ready"
-					emptyDescription="Press play, step through the session, or scrub the timeline."
-					dispatch={handleSelectAgent}
-					renderPanels={(onTaskClick, onAgentClick) => [
-						<ReplayArtifactPanel
-							key="artifacts"
-							artifacts={visibleArtifacts}
-							artifactBaseUrl={bootstrap.artifactBaseUrl}
-							selectedArtifactId={selectedArtifactId}
-							onSelectArtifact={setSelectedArtifactId}
-							onExpandArtifact={handleExpandArtifact}
-						/>,
-						<PresenceRoster
-							key="presence"
-							mode="replay"
-							team={controller.derivedState.chatState.team}
-							presence={controller.derivedState.chatState.presence}
-							threadStatuses={controller.derivedState.chatState.threadStatuses}
-							tasks={controller.derivedState.chatState.tasks}
-							onAgentClick={onAgentClick}
-						/>,
-						<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
-						<SessionStats
-							key="stats"
-							events={controller.derivedState.chatState.events}
-							tasks={controller.derivedState.chatState.tasks}
-							sessionStart={controller.derivedState.chatState.sessionStart}
-							memberCount={controller.derivedState.chatState.team?.members.length ?? 0}
-						/>,
-					]}
-				/>
-				{artifactViewerOpen && selectedArtifact && (
-					<ArtifactViewerModal
-						artifact={selectedArtifact}
-						artifactBaseUrl={bootstrap.artifactBaseUrl}
-						onClose={() => setArtifactViewerOpen(false)}
+		<AvatarMarkProvider agents={controller.derivedState.chatState.team?.members ?? []}>
+			<TimeProvider nowMs={controller.state.virtualNowMs}>
+				<>
+					<TeamChatScaffold
+						state={{ ...controller.derivedState.chatState, activeAgentKey }}
+						mode="replay"
+						headerStatusText={replayStatusText}
+						topContent={replayTopContent}
+						emptyTitle="Replay ready"
+						emptyDescription="Press play, step through the session, or scrub the timeline."
+						dispatch={handleSelectAgent}
+						renderPanels={(onTaskClick, onAgentClick) => [
+							<ReplayArtifactPanel
+								key="artifacts"
+								artifacts={visibleArtifacts}
+								artifactBaseUrl={bootstrap.artifactBaseUrl}
+								selectedArtifactId={selectedArtifactId}
+								onSelectArtifact={setSelectedArtifactId}
+								onExpandArtifact={handleExpandArtifact}
+							/>,
+							<PresenceRoster
+								key="presence"
+								mode="replay"
+								team={controller.derivedState.chatState.team}
+								presence={controller.derivedState.chatState.presence}
+								threadStatuses={controller.derivedState.chatState.threadStatuses}
+								tasks={controller.derivedState.chatState.tasks}
+								onAgentClick={onAgentClick}
+							/>,
+							<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
+							<SessionStats
+								key="stats"
+								events={controller.derivedState.chatState.events}
+								tasks={controller.derivedState.chatState.tasks}
+								sessionStart={controller.derivedState.chatState.sessionStart}
+								memberCount={controller.derivedState.chatState.team?.members.length ?? 0}
+							/>,
+						]}
 					/>
-				)}
-			</>
-		</TimeProvider>
+					{artifactViewerOpen && selectedArtifact && (
+						<ArtifactViewerModal
+							artifact={selectedArtifact}
+							artifactBaseUrl={bootstrap.artifactBaseUrl}
+							onClose={() => setArtifactViewerOpen(false)}
+						/>
+					)}
+				</>
+			</TimeProvider>
+		</AvatarMarkProvider>
 	);
 }
 

@@ -42,11 +42,8 @@ export function ChatMessage({
 			>
 				<MessageContent text={displayText} />
 				{isLong && (
-					<button
-						onClick={() => setExpanded(!expanded)}
-						className="tc-expand-button"
-					>
-						{expanded ? 'collapse' : 'expand'}
+					<button onClick={() => setExpanded(!expanded)} className="tc-expand-toggle" title={expanded ? 'Collapse' : 'Expand'}>
+						{expanded ? '▴' : '⋯'}
 					</button>
 				)}
 			</div>

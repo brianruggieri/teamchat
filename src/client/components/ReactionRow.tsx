@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Reaction } from '../types.js';
-import { getAgentColor } from '../types.js';
+import { AgentAvatar } from './AgentAvatar.jsx';
 
 interface ReactionRowProps {
 	reactions: Reaction[];
@@ -43,17 +43,7 @@ export function ReactionRow({
 
 function renderReactionPeople(emoji: string, reactions: Reaction[]) {
 	if (reactions.length === 0) return null;
-
-	const first = reactions[0];
-	const firstColor = getAgentColor(first.fromColor);
-	if (reactions.length === 1) {
-		return <span className={firstColor.text}>{first.fromAgent}</span>;
-	}
-
-	return (
-		<>
-			<span className={firstColor.text}>{first.fromAgent}</span>
-			<span>+{reactions.length - 1}</span>
-		</>
-	);
+	return reactions.slice(0, 3).map((r, i) => (
+		<AgentAvatar key={`${r.fromAgent}-${emoji}-${i}`} name={r.fromAgent} color={r.fromColor} size="xs" />
+	));
 }
