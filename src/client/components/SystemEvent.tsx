@@ -35,8 +35,8 @@ const SUBTYPE_META: Record<string, { icon: string; label: string; tone: string }
 function getCompactText(event: SystemEventType): string {
 	const { subtype, text, agentName, taskId, taskSubject } = event;
 
-	// If no agent avatar will be rendered, keep original text
-	if (!agentName || !event.agentColor) return text;
+	// If no agent name, keep original text (no avatar to provide identity)
+	if (!agentName) return text;
 
 	switch (subtype) {
 		case 'member-joined':
@@ -81,7 +81,7 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 		label: 'system',
 		tone: 'neutral',
 	};
-	const hasAvatar = !!(event.agentName && event.agentColor);
+	const hasAvatar = !!event.agentName;
 	const compactText = getCompactText(event);
 
 	return (
@@ -92,7 +92,7 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 			<div className={`tc-system-card is-${meta.tone}`}>
 				<div className="tc-system-card-body">
 					{hasAvatar && (
-						<AgentAvatar name={event.agentName!} color={event.agentColor!} size="sm" />
+						<AgentAvatar name={event.agentName!} color={event.agentColor ?? 'gray'} size="sm" />
 					)}
 					<div className="tc-system-card-content">
 						<div className="tc-system-header">
