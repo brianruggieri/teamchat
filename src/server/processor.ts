@@ -635,7 +635,7 @@ export class EventProcessor {
 						'nudge',
 						`team-lead nudged ${target}`,
 						target,
-						null,
+						this.getAgentColor(target),
 					);
 					events.push(nudgeEvent);
 					this.recentNudges.set(target, { eventId: nudgeEvent.id, timestamp: pending.timestamp });
@@ -814,7 +814,7 @@ export class EventProcessor {
 							'bottleneck',
 							`${blocker.owner ?? 'Task #' + blockerId} is a bottleneck — ${waiters.join(', ')} waiting`,
 							blocker.owner,
-							null,
+							blocker.owner ? this.getAgentColor(blocker.owner) : null,
 							blockerId,
 							blocker.subject,
 						),
@@ -952,7 +952,7 @@ export class EventProcessor {
 					'idle-surfaced',
 					`${agentName} is idle${parsed.idleReason ? `: ${parsed.idleReason}` : ''}`,
 					agentName,
-					null,
+					this.getAgentColor(agentName),
 				),
 			]);
 		}
