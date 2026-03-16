@@ -82,7 +82,7 @@ export function PresenceRoster({
 					return (
 						<div className="tc-roster-row is-lead">
 							<div className="tc-roster-identity">
-								<AgentAvatar name="team-lead" color="gold" isLead size="sm" />
+								<AgentAvatar name="team-lead" color="gold" isLead size="xs" />
 								<div className="tc-roster-name">team-lead</div>
 							</div>
 							<div className="tc-roster-trailing">
@@ -115,7 +115,7 @@ export function PresenceRoster({
 								style={onAgentClick ? { cursor: 'pointer' } : undefined}
 							>
 								<div className="tc-roster-identity">
-									<AgentAvatar name={member.name} color={member.color} size="sm" />
+									<AgentAvatar name={member.name} color={member.color} size="xs" />
 									<div className={`tc-roster-name ${agentColor.text}`}>
 										{member.name}
 									</div>

@@ -924,8 +924,15 @@ code {
 }
 
 .tc-roster-trailing {
-	flex-shrink: 0;
+	flex-shrink: 1;
+	min-width: 0;
 	gap: 6px;
+}
+
+.tc-roster-trailing > .tc-roster-state {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .tc-roster-state {
@@ -1206,9 +1213,9 @@ code {
 }
 
 .tc-chat-bubble.is-lead {
-	background: linear-gradient(180deg, rgba(91, 109, 247, 0.95), rgba(76, 88, 212, 0.96));
-	border-color: rgba(147, 161, 255, 0.28);
-	color: #f7f9ff;
+	background: linear-gradient(180deg, rgba(91, 109, 247, 0.18), rgba(76, 88, 212, 0.22));
+	border-color: rgba(147, 161, 255, 0.18);
+	color: #e8ecff;
 }
 
 .tc-chat-bubble.is-single {
