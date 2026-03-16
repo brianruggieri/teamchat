@@ -2378,20 +2378,42 @@ code {
 	margin-left: auto;
 	border-radius: 10px 4px 10px 10px;
 }
-/* Identity dot — overlaps the flat corner of each bubble */
+/* Identity pip — rounded square overlapping the flat corner of each bubble */
 .tc-dm-bubble-dot {
 	position: absolute;
-	top: -4px;
-	left: -4px;
-	width: 10px;
-	height: 10px;
-	border-radius: 50%;
+	top: -3px;
+	left: -3px;
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
 	box-shadow: 0 0 0 2px var(--surface-app);
 	z-index: 1;
 }
 .tc-dm-bubble.is-responder .tc-dm-bubble-dot {
 	left: auto;
-	right: -4px;
+	right: -3px;
+}
+/* Capping separator — dotted line with count between first and last bubble */
+.tc-dm-lane-separator {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 0;
+	cursor: pointer;
+}
+.tc-dm-lane-separator:hover .tc-dm-lane-separator-label {
+	color: var(--text-secondary);
+}
+.tc-dm-lane-separator-line {
+	flex: 1;
+	height: 0;
+	border-top: 1px dashed rgba(126, 146, 170, 0.25);
+}
+.tc-dm-lane-separator-label {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+	transition: color 0.15s;
 }
 .tc-dm-lane-expand {
 	align-self: center;

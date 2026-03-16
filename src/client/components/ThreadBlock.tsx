@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { ChatEvent, ContentMessage } from '../../shared/types.js';
 import type { Reaction } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
@@ -147,39 +147,45 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 				{isResolved && <span className="tc-dm-lane-resolution">{'\u2705'}</span>}
 			</div>
 
-			{/* Alternating bubbles */}
-			{visibleMessages.map((msg) => {
+			{/* Alternating bubbles with separator for capped views */}
+			{visibleMessages.map((msg, idx) => {
 				const isResponder = msg.from !== initiator;
 				const msgColorCss = getColorCss(msg.fromColor);
+				const isCapped = !expanded && messages.length > 3;
+				const showSeparatorAfter = isCapped && idx === 0;
+
 				return (
-					<div
-						key={msg.id}
-						className={`tc-dm-bubble ${isResponder ? 'is-responder' : ''}`}
-						style={{
-							backgroundColor: msgColorCss.tint,
-						}}
-					>
-						<span
-							className="tc-dm-bubble-dot"
-							style={{ backgroundColor: msgColorCss.border }}
-						/>
-						<span className="tc-dm-bubble-text">
-							{distillSummary(msg.text, msg.summary)}
-						</span>
-					</div>
+					<React.Fragment key={msg.id}>
+						<div
+							className={`tc-dm-bubble ${isResponder ? 'is-responder' : ''}`}
+							style={{
+								backgroundColor: msgColorCss.tint,
+							}}
+						>
+							<span
+								className="tc-dm-bubble-dot"
+								style={{ backgroundColor: msgColorCss.border }}
+							/>
+							<span className="tc-dm-bubble-text">
+								{distillSummary(msg.text, msg.summary)}
+							</span>
+						</div>
+						{showSeparatorAfter && (
+							<div
+								className="tc-dm-lane-separator"
+								onClick={() => setExpanded(true)}
+								role="button"
+								tabIndex={0}
+								onKeyDown={(e) => e.key === 'Enter' && setExpanded(true)}
+							>
+								<div className="tc-dm-lane-separator-line" />
+								<span className="tc-dm-lane-separator-label">{hiddenCount} more</span>
+								<div className="tc-dm-lane-separator-line" />
+							</div>
+						)}
+					</React.Fragment>
 				);
 			})}
-
-			{/* Expand/collapse controls */}
-			{!expanded && messages.length > 3 && (
-				<button
-					type="button"
-					className="tc-dm-lane-expand"
-					onClick={() => setExpanded(true)}
-				>
-					{hiddenCount} more messages
-				</button>
-			)}
 
 			{expanded && messages.length > 20 && !showAll && (
 				<button
