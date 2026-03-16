@@ -130,6 +130,12 @@ export const AGENT_COLORS: Record<string, AgentColor> = {
 		border: 'border-pink-500/30',
 		dot: 'bg-pink-500',
 	},
+	gold: {
+		bg: 'bg-yellow-500/20',
+		text: 'text-yellow-300',
+		border: 'border-yellow-500/30',
+		dot: 'bg-yellow-500',
+	},
 };
 
 export function getAgentColor(color: string): AgentColor {

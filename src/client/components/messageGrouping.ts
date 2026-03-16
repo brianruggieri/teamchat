@@ -46,13 +46,14 @@ export type MessageLaneItem =
 	| SystemGroupItem
 	| SetupCardItem;
 
-export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
+export function buildMessageLaneItems(events: ChatEvent[], sessionStartOverride?: number): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];
 
-	// Determine session start for setup phase detection
-	const sessionStartMs = events.length > 0
-		? new Date(events[0]!.timestamp).getTime()
-		: NaN;
+	// Determine session start for setup phase detection.
+	// When called on a slice of events, the caller can provide the true session start
+	// to avoid misdetecting setup phase in later event groups.
+	const sessionStartMs = sessionStartOverride
+		?? (events.length > 0 ? new Date(events[0]!.timestamp).getTime() : NaN);
 	const SETUP_WINDOW_MS = 60_000;
 	let setupCard: SetupCardItem | null = null;
 

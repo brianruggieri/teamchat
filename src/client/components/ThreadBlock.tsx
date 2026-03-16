@@ -9,7 +9,7 @@ import { SetupCard } from './SetupCard.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { buildMessageLaneItems } from './messageGrouping.js';
-import { distillSummary } from '../../server/processor.js';
+import { distillSummary } from '../../shared/distill.js';
 
 interface ThreadBlockProps {
 	threadKey: string;
