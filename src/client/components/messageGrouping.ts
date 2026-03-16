@@ -50,9 +50,9 @@ export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];
 
 	// Determine session start for setup phase detection
-	const sessionStart = events.length > 0
+	const sessionStartMs = events.length > 0
 		? new Date(events[0]!.timestamp).getTime()
-		: 0;
+		: NaN;
 	const SETUP_WINDOW_MS = 60_000;
 	let setupCard: SetupCardItem | null = null;
 
@@ -66,12 +66,12 @@ export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 			continue;
 		}
 
-		// Setup phase grouping: task-created/task-claimed within first 60s
+		// Setup phase grouping: team-created, task-created/claimed, member-joined within first 60s
 		if (
 			event.type === 'system'
 			&& isSetupPhaseEvent(event)
-			&& sessionStart > 0
-			&& (new Date(event.timestamp).getTime() - sessionStart) < SETUP_WINDOW_MS
+			&& !Number.isNaN(sessionStartMs)
+			&& (new Date(event.timestamp).getTime() - sessionStartMs) < SETUP_WINDOW_MS
 		) {
 			if (!setupCard) {
 				setupCard = { kind: 'setup-card', events: [] };
@@ -159,7 +159,10 @@ function isCollapsibleSystemEvent(
 }
 
 function isSetupPhaseEvent(event: SystemEvent): boolean {
-	return event.subtype === 'task-created' || event.subtype === 'task-claimed';
+	return event.subtype === 'team-created'
+		|| event.subtype === 'task-created'
+		|| event.subtype === 'task-claimed'
+		|| event.subtype === 'member-joined';
 }
 
 export function isPlanApproval(message: ContentMessage): boolean {
