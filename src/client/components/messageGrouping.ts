@@ -29,7 +29,12 @@ export interface SystemRowItem {
 
 export interface SystemGroupItem {
 	kind: 'system-group';
-	subtype: 'member-joined' | 'task-created';
+	subtype: 'member-joined' | 'task-created' | 'task-claimed';
+	events: SystemEvent[];
+}
+
+export interface SetupCardItem {
+	kind: 'setup-card';
 	events: SystemEvent[];
 }
 
@@ -38,10 +43,18 @@ export type MessageLaneItem =
 	| PlanCardItem
 	| PermissionCardItem
 	| SystemRowItem
-	| SystemGroupItem;
+	| SystemGroupItem
+	| SetupCardItem;
 
 export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];
+
+	// Determine session start for setup phase detection
+	const sessionStart = events.length > 0
+		? new Date(events[0]!.timestamp).getTime()
+		: 0;
+	const SETUP_WINDOW_MS = 60_000;
+	let setupCard: SetupCardItem | null = null;
 
 	for (const event of events) {
 		if (
@@ -50,6 +63,21 @@ export function buildMessageLaneItems(events: ChatEvent[]): MessageLaneItem[] {
 			|| event.type === 'reaction'
 			|| event.type === 'thread-marker'
 		) {
+			continue;
+		}
+
+		// Setup phase grouping: task-created/task-claimed within first 60s
+		if (
+			event.type === 'system'
+			&& isSetupPhaseEvent(event)
+			&& sessionStart > 0
+			&& (new Date(event.timestamp).getTime() - sessionStart) < SETUP_WINDOW_MS
+		) {
+			if (!setupCard) {
+				setupCard = { kind: 'setup-card', events: [] };
+				items.push(setupCard);
+			}
+			setupCard.events.push(event);
 			continue;
 		}
 
@@ -126,8 +154,12 @@ function canGroupMessages(a: ContentMessage, b: ContentMessage): boolean {
 
 function isCollapsibleSystemEvent(
 	event: SystemEvent
-): event is SystemEvent & { subtype: 'member-joined' | 'task-created' } {
-	return event.subtype === 'member-joined' || event.subtype === 'task-created';
+): event is SystemEvent & { subtype: 'member-joined' | 'task-created' | 'task-claimed' } {
+	return event.subtype === 'member-joined' || event.subtype === 'task-created' || event.subtype === 'task-claimed';
+}
+
+function isSetupPhaseEvent(event: SystemEvent): boolean {
+	return event.subtype === 'task-created' || event.subtype === 'task-claimed';
 }
 
 export function isPlanApproval(message: ContentMessage): boolean {

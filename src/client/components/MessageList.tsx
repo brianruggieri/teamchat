@@ -8,6 +8,7 @@ import { ThreadBlock } from './ThreadBlock.jsx';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
 import { SystemEventGroup } from './SystemEventGroup.jsx';
+import { SetupCard } from './SetupCard.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { buildMessageLaneItems, type MessageLaneItem } from './messageGrouping.js';
@@ -109,12 +110,25 @@ export function MessageList({ events, reactions }: MessageListProps) {
 								);
 							}
 
-							return (
-								<SystemEventComponent
-									key={laneItem.event.id}
-									event={laneItem.event}
-								/>
-							);
+							if (laneItem.kind === 'setup-card') {
+								return (
+									<SetupCard
+										key={`setup-${laneItem.events[0]?.id ?? 'card'}`}
+										events={laneItem.events}
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'system') {
+								return (
+									<SystemEventComponent
+										key={laneItem.event.id}
+										event={laneItem.event}
+									/>
+								);
+							}
+
+							return null;
 						})}
 					</React.Fragment>
 				);

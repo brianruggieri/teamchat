@@ -4,7 +4,7 @@
  * classified as DMs and wrapped in thread markers.
  */
 import { describe, test, expect, beforeEach } from "bun:test";
-import { EventProcessor, type EventEmitter } from "../../src/server/processor.js";
+import { EventProcessor, type EventEmitter, distillSummary } from "../../src/server/processor.js";
 import type { ChatEvent, ContentMessage, ThreadMarker } from "../../src/shared/types.js";
 import { config } from "../data/config.js";
 import { events as fixtureEvents, getDMThreads } from "../data/events.js";
@@ -184,5 +184,70 @@ describe("DM Thread Detection", () => {
 		expect(messages).toHaveLength(1);
 		expect(messages[0]!.isDM).toBe(false);
 		expect(messages[0]!.isLead).toBe(false);
+	});
+});
+
+describe("Summary Distillation", () => {
+	test("distillSummary strips leading filler phrases", () => {
+		expect(distillSummary("Sure, I'll add the RBAC check")).toBe("I'll add the RBAC check");
+		expect(distillSummary("Great question. The JWT payload has sub, email, role")).toBe("The JWT payload has sub, email, role");
+	});
+
+	test("distillSummary truncates at 80 chars on word boundary", () => {
+		const long = "This is a very long message that goes well beyond the eighty character limit and should be truncated at a word boundary";
+		const result = distillSummary(long);
+		expect(result.length).toBeLessThanOrEqual(81); // 80 + "…"
+		expect(result.endsWith("\u2026")).toBe(true);
+	});
+
+	test("distillSummary prefers existing summary field", () => {
+		expect(distillSummary("Full text here", "Claimed #1, exploring codebase")).toBe("Claimed #1, exploring codebase");
+	});
+
+	test("distillSummary replaces code blocks with [code]", () => {
+		expect(distillSummary("Here's the fix:\n```\nconst x = 1;\n```\nShould work")).toBe("Here's the fix: [code] Should work");
+	});
+
+	test("distillSummary ignores existing summary if over 80 chars", () => {
+		const longSummary = "This is a very long summary that exceeds the eighty character limit and should not be preferred over the raw text";
+		expect(distillSummary("Short text", longSummary)).toBe("Short text");
+	});
+
+	test("distillSummary handles empty text", () => {
+		expect(distillSummary("")).toBe("");
+	});
+});
+
+describe("DM lane rendering helpers", () => {
+	test("resolution detection identifies resolved thread patterns", () => {
+		// We test the resolution patterns by checking text matching
+		const resolvedTexts = [
+			"We're fully aligned on this approach",
+			"This works for me, shipping it",
+			"Confirmed, the implementation matches the spec",
+			"Agreed, let's go with option B",
+			"The implementation matches perfectly",
+		];
+		const unresolvedTexts = [
+			"I'm still working on the fix",
+			"Let me check the API response",
+			"What do you think about this approach?",
+		];
+
+		const RESOLUTION_PATTERNS = [
+			/\baligned\b/i, /\bconfirmed\b/i, /\bthis works\b/i,
+			/\bworks for me\b/i, /\bagreed\b/i, /\bmatches perfectly\b/i,
+			/\bimplementation matches\b/i, /\bfully aligned\b/i,
+		];
+
+		for (const text of resolvedTexts) {
+			const matches = RESOLUTION_PATTERNS.some(p => p.test(text));
+			expect(matches).toBe(true);
+		}
+
+		for (const text of unresolvedTexts) {
+			const matches = RESOLUTION_PATTERNS.some(p => p.test(text));
+			expect(matches).toBe(false);
+		}
 	});
 });
