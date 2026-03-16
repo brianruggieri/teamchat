@@ -111,18 +111,6 @@ export function buildTimelineDots(markers: ReplayMarker[], durationMs: number, t
 		}
 	}
 
-	// Step 3: enforce minimum gap between final dots to prevent overlap
-	const MIN_DOT_GAP_PX = 22;
-	let lastPx = -Infinity;
-	for (const dot of dots) {
-		let px = (dot.positionPct / 100) * trackWidthPx;
-		if (px - lastPx < MIN_DOT_GAP_PX) {
-			px = lastPx + MIN_DOT_GAP_PX;
-			dot.positionPct = Math.min((px / trackWidthPx) * 100, 100);
-		}
-		lastPx = px;
-	}
-
 	return dots;
 }
 
