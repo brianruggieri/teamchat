@@ -40,6 +40,27 @@ const ACK_PHRASES: Record<string, string> = {
 
 /** Conversational beat patterns — structural dialogue markers derived from real content. */
 const BEAT_PATTERNS: { type: BeatType; emoji: string; patterns: RegExp[] }[] = [
+	// New patterns: most specific first, before existing patterns
+	{
+		type: 'completion',
+		emoji: '✅',
+		patterns: [/\bdone\b/i, /\bcomplete\b/i, /\bfinished\b/i, /all\s+passing/i, /\bimplemented\b/i],
+	},
+	{
+		type: 'blocker',
+		emoji: '🚧',
+		patterns: [/blocked\s+on/i, /waiting\s+on/i, /need\s+.*before/i, /can't\s+start\s+until/i],
+	},
+	{
+		type: 'sharing',
+		emoji: '📎',
+		patterns: [/```/, /\bschema\b/i, /interface\s+\w/i, /type\s+\w.*=/i],
+	},
+	{
+		type: 'question',
+		emoji: '❓',
+		patterns: [/\?$/],
+	},
 	// Check "resolution" BEFORE plain "agreement" (ordering matters)
 	{
 		type: 'resolution',
@@ -103,6 +124,11 @@ export class EventProcessor {
 	private broadcastHoldMs = 500;
 	private idleSurfaceMs = 30_000;
 	private taskClaimWindowMs = 120_000;
+
+	// Reaction inference tracking
+	private recentShutdownRequests: Map<string, string> = new Map(); // agent name → event ID
+	private recentNudges: Map<string, { eventId: string; timestamp: string }> = new Map(); // agent name → nudge info
+	private recentBroadcasts: { eventId: string; timestamp: string; from: string }[] = [];
 
 	constructor(emitter: EventEmitter, compactMode = false) {
 		this.emitter = emitter;
@@ -285,21 +311,22 @@ export class EventProcessor {
 				this.handleIdleNotification(msg.from, msg.timestamp, parsed);
 				break;
 
-			case 'shutdown_request':
-				this.emit([
-					this.makeSystemEvent(
-						'shutdown-requested',
-						`team-lead asked ${inboxOwner} to leave`,
-						inboxOwner,
-						msg.color,
-					),
-				]);
+			case 'shutdown_request': {
+				const shutdownReqEvent = this.makeSystemEvent(
+					'shutdown-requested',
+					`team-lead asked ${inboxOwner} to leave`,
+					inboxOwner,
+					msg.color,
+				);
+				this.recentShutdownRequests.set(inboxOwner, shutdownReqEvent.id);
+				this.emit([shutdownReqEvent]);
 				break;
+			}
 
-			case 'shutdown_approved':
+			case 'shutdown_approved': {
 				this.presence.set(msg.from, 'offline');
 				this.shutdownApproved.add(msg.from);
-				this.emit([
+				const approvalEvents: ChatEvent[] = [
 					this.makeSystemEvent(
 						'shutdown-approved',
 						`${msg.from} has left the chat`,
@@ -307,8 +334,18 @@ export class EventProcessor {
 						msg.color,
 					),
 					this.makePresenceChange(msg.from, 'offline', msg.timestamp),
-				]);
+				];
+				// Emit 👋 reaction on the original shutdown-requested event
+				const requestEventId = this.recentShutdownRequests.get(msg.from);
+				if (requestEventId) {
+					approvalEvents.push(
+						this.makeReaction(requestEventId, '👋', msg.from, msg.color, msg.timestamp, 'shutdown compliance'),
+					);
+					this.recentShutdownRequests.delete(msg.from);
+				}
+				this.emit(approvalEvents);
 				break;
+			}
 
 			case 'shutdown_rejected':
 				this.emit([
@@ -524,6 +561,12 @@ export class EventProcessor {
 			}
 		}
 
+		// Nudge ack: if this agent was recently nudged, emit 👍 on the nudge event
+		const nudgeAck = this.checkNudgeAck(msg.from, msg.timestamp);
+		if (nudgeAck) {
+			events.push(nudgeAck);
+		}
+
 		this.emit(events);
 	}
 
@@ -588,14 +631,23 @@ export class EventProcessor {
 				const isIdle = this.presence.get(target) === 'idle';
 				const isAssignment = pending.text.includes('"type":"task_assignment"');
 				if (isIdle && !isAssignment && !isLeadAgent(target)) {
-					events.push(
-						this.makeSystemEvent(
-							'nudge',
-							`team-lead nudged ${target}`,
-							target,
-							null,
-						),
+					const nudgeEvent = this.makeSystemEvent(
+						'nudge',
+						`team-lead nudged ${target}`,
+						target,
+						null,
 					);
+					events.push(nudgeEvent);
+					this.recentNudges.set(target, { eventId: nudgeEvent.id, timestamp: pending.timestamp });
+				}
+			}
+
+			// Track broadcast for ack detection
+			if (isBroadcast) {
+				this.recentBroadcasts.push({ eventId: msg.id, timestamp: msg.timestamp, from: msg.from });
+				// Keep only last 20 broadcasts
+				if (this.recentBroadcasts.length > 20) {
+					this.recentBroadcasts.shift();
 				}
 			}
 		}
@@ -615,6 +667,22 @@ export class EventProcessor {
 						);
 					}
 				}
+			}
+		}
+
+		// Nudge ack: if this agent was recently nudged, emit 👍 on the nudge event
+		if (senderIsTeammate) {
+			const nudgeAck = this.checkNudgeAck(pending.from, pending.timestamp);
+			if (nudgeAck) {
+				events.push(nudgeAck);
+			}
+		}
+
+		// Broadcast ack: short message from non-lead agent within 60s of a broadcast
+		if (senderIsTeammate && !isBroadcast) {
+			const broadcastAck = this.checkBroadcastAck(pending.from, pending.text, pending.timestamp);
+			if (broadcastAck) {
+				events.push(broadcastAck);
 			}
 		}
 
@@ -1045,6 +1113,49 @@ export class EventProcessor {
 		}
 
 		return null;
+	}
+
+	// === Reaction inference helpers ===
+
+	/** Check if an agent message should trigger a nudge ack reaction (👍 on the nudge event). */
+	private checkNudgeAck(agentName: string, timestamp: string): ReactionEvent | null {
+		const nudge = this.recentNudges.get(agentName);
+		if (!nudge) return null;
+		if (!isWithinWindow(nudge.timestamp, timestamp, 60_000)) {
+			this.recentNudges.delete(agentName);
+			return null;
+		}
+		this.recentNudges.delete(agentName);
+		const agentColor = this.getAgentColor(agentName);
+		return this.makeReaction(nudge.eventId, '👍', agentName, agentColor, timestamp, 'nudge response');
+	}
+
+	/** Check if a short message from a non-lead agent should trigger a broadcast ack (👍 on the broadcast). */
+	private checkBroadcastAck(agentName: string, text: string, timestamp: string): ReactionEvent | null {
+		if (isLeadAgent(agentName)) return null;
+		if (text.length >= 50) return null;
+		// Find the most recent broadcast from a different agent within 60s
+		for (let i = this.recentBroadcasts.length - 1; i >= 0; i--) {
+			const bc = this.recentBroadcasts[i]!;
+			if (bc.from === agentName) continue;
+			if (isWithinWindow(bc.timestamp, timestamp, 60_000)) {
+				const agentColor = this.getAgentColor(agentName);
+				return this.makeReaction(bc.eventId, '👍', agentName, agentColor, timestamp, 'broadcast ack');
+			}
+		}
+		return null;
+	}
+
+	/** Get agent color from presence or default to empty. */
+	private getAgentColor(agentName: string): string {
+		// Look up from recent events
+		for (let i = this.allEvents.length - 1; i >= 0; i--) {
+			const ev = this.allEvents[i]!;
+			if (ev.type === 'message' && (ev as ContentMessage).from === agentName) {
+				return (ev as ContentMessage).fromColor;
+			}
+		}
+		return '';
 	}
 
 	// === Event creation helpers ===

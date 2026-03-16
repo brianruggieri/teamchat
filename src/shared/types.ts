@@ -150,7 +150,11 @@ export type BeatType =
 	| 'agreement'
 	| 'counter-proposal'
 	| 'acknowledgement'
-	| 'resolution';
+	| 'resolution'
+	| 'question'
+	| 'sharing'
+	| 'blocker'
+	| 'completion';
 
 export interface ThreadStatus {
 	threadKey: string; // sorted participant pair, e.g. "auth:gateway"
