@@ -1,6 +1,7 @@
 import React from 'react';
 import type { TeamState, ThreadStatus, TaskInfo } from '../types.js';
 import { getAgentColor } from '../types.js';
+import { AgentAvatar } from './AgentAvatar.jsx';
 
 interface PresenceRosterProps {
 	mode?: 'live' | 'replay';
@@ -81,7 +82,7 @@ export function PresenceRoster({
 					return (
 						<div className="tc-roster-row is-lead">
 							<div className="tc-roster-identity">
-								<span className="tc-roster-dot is-lead" />
+								<AgentAvatar name="team-lead" color="gold" isLead size="sm" />
 								<div className="tc-roster-name">team-lead</div>
 							</div>
 							<div className="tc-roster-trailing">
@@ -114,7 +115,7 @@ export function PresenceRoster({
 								style={onAgentClick ? { cursor: 'pointer' } : undefined}
 							>
 								<div className="tc-roster-identity">
-									<span className={`tc-roster-dot ${agentColor.dot}`} />
+									<AgentAvatar name={member.name} color={member.color} size="sm" />
 									<div className={`tc-roster-name ${agentColor.text}`}>
 										{member.name}
 									</div>

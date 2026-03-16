@@ -9,6 +9,8 @@ export interface ReplayTimelineChip {
 }
 
 const TASK_CREATED_CLUSTER_WINDOW_MS = 15_000;
+const TASK_CLAIMED_CLUSTER_WINDOW_MS = 15_000;
+const TASK_COMPLETED_CLUSTER_WINDOW_MS = 15_000;
 
 export function buildReplayTimelineChips(markers: ReplayMarker[]): ReplayTimelineChip[] {
 	const chips: ReplayTimelineChip[] = [];
@@ -33,6 +35,48 @@ export function buildReplayTimelineChips(markers: ReplayMarker[]): ReplayTimelin
 			}
 
 			chips.push(cluster.length === 1 ? buildTaskCreatedChip(marker) : buildTaskCreatedClusterChip(cluster));
+			index = nextIndex - 1;
+			continue;
+		}
+
+		if (marker.kind === 'task-claimed') {
+			const cluster = [marker];
+			let nextIndex = index + 1;
+
+			while (nextIndex < markers.length) {
+				const candidate = markers[nextIndex]!;
+				if (candidate.kind !== 'task-claimed') {
+					break;
+				}
+				if (candidate.atMs - cluster[0]!.atMs > TASK_CLAIMED_CLUSTER_WINDOW_MS) {
+					break;
+				}
+				cluster.push(candidate);
+				nextIndex += 1;
+			}
+
+			chips.push(cluster.length === 1 ? buildTaskClaimedChip(marker) : buildTaskClaimedClusterChip(cluster));
+			index = nextIndex - 1;
+			continue;
+		}
+
+		if (marker.kind === 'task-completed') {
+			const cluster = [marker];
+			let nextIndex = index + 1;
+
+			while (nextIndex < markers.length) {
+				const candidate = markers[nextIndex]!;
+				if (candidate.kind !== 'task-completed') {
+					break;
+				}
+				if (candidate.atMs - cluster[0]!.atMs > TASK_COMPLETED_CLUSTER_WINDOW_MS) {
+					break;
+				}
+				cluster.push(candidate);
+				nextIndex += 1;
+			}
+
+			chips.push(cluster.length === 1 ? buildTaskCompletedChip(marker) : buildTaskCompletedClusterChip(cluster));
 			index = nextIndex - 1;
 			continue;
 		}
@@ -101,14 +145,52 @@ function buildTaskCreatedClusterChip(cluster: ReplayMarker[]): ReplayTimelineChi
 	};
 }
 
+function buildTaskClaimedChip(marker: ReplayMarker): ReplayTimelineChip {
+	return {
+		id: marker.id,
+		atMs: marker.atMs,
+		label: marker.taskId ? `#${marker.taskId} started` : 'Task started',
+		detailLabel: marker.label,
+		marker,
+	};
+}
+
+function buildTaskClaimedClusterChip(cluster: ReplayMarker[]): ReplayTimelineChip {
+	const firstMarker = cluster[0]!;
+	return {
+		id: `cluster-claimed-${firstMarker.id}`,
+		atMs: firstMarker.atMs,
+		label: `${cluster.length} tasks started`,
+		detailLabel: `${cluster.length} tasks claimed`,
+		marker: firstMarker,
+	};
+}
+
+function buildTaskCompletedChip(marker: ReplayMarker): ReplayTimelineChip {
+	return {
+		id: marker.id,
+		atMs: marker.atMs,
+		label: marker.taskId ? `#${marker.taskId} done` : 'Task done',
+		detailLabel: marker.label,
+		marker,
+	};
+}
+
+function buildTaskCompletedClusterChip(cluster: ReplayMarker[]): ReplayTimelineChip {
+	const firstMarker = cluster[0]!;
+	return {
+		id: `cluster-completed-${firstMarker.id}`,
+		atMs: firstMarker.atMs,
+		label: `${cluster.length} tasks done`,
+		detailLabel: `${cluster.length} tasks completed`,
+		marker: firstMarker,
+	};
+}
+
 function getShortMarkerLabel(marker: ReplayMarker): string | null {
 	switch (marker.kind) {
 		case 'session-start':
 			return 'Start';
-		case 'task-claimed':
-			return marker.taskId ? `#${marker.taskId} started` : 'Task started';
-		case 'task-completed':
-			return marker.taskId ? `#${marker.taskId} done` : 'Task done';
 		case 'task-unblocked':
 			return marker.taskId ? `#${marker.taskId} ready` : 'Task ready';
 		case 'thread-start':
