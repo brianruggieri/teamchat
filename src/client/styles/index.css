@@ -469,7 +469,7 @@ code {
 .tc-right-rail {
 	display: none;
 	min-height: 0;
-	overflow-y: auto;
+	overflow: hidden;
 	width: 312px;
 	flex-shrink: 0;
 	border-left: 1px solid var(--border-subtle);
@@ -479,30 +479,34 @@ code {
 
 .tc-rail-frame {
 	display: flex;
-	min-height: 100%;
+	height: 100%;
 	flex-direction: column;
 	gap: var(--space-8);
 	padding: 12px;
+	overflow: hidden;
 }
 
-/* Pin the last panel (session stats) to the bottom of the rail */
+/* First two sections (Artifacts, Team) — pinned top, no shrink */
+.tc-rail-frame > .tc-rail-section:nth-child(1),
+.tc-rail-frame > .tc-rail-section:nth-child(2) {
+	flex-shrink: 0;
+}
+
+/* Third section (Tasks) — scrollable middle */
+.tc-rail-frame > .tc-rail-section:nth-child(3) {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 2px;
+}
+
+/* Last section (Session Stats) — pinned bottom, no shrink */
 .tc-rail-frame > .tc-rail-section:last-child {
-	margin-top: auto;
-	position: sticky;
-	bottom: 0;
-	z-index: 2;
-	padding-bottom: 4px;
-	background: rgba(7, 14, 22, 0.95);
-	backdrop-filter: blur(8px);
+	flex-shrink: 0;
 }
 
 .tc-rail-section {
 	min-height: 0;
-}
-
-.tc-rail-section.is-middle {
-	overflow-y: auto;
-	padding-right: 2px;
 }
 
 .tc-workbench-stack {
