@@ -37,34 +37,69 @@ function getMarkerContent(marker: ReplayMarker): {
 	}
 }
 
-/**
- * Enforce minimum pixel gap between markers, scaling the gap down
- * when there are too many markers for the available track width.
- */
-export function enforceMinGap(markers: ReplayMarker[], durationMs: number, trackWidthPx = 600): Map<string, number> {
-	// Scale min gap down when marker density is high to avoid overflow
-	const idealGap = 20;
-	const maxTotalPx = trackWidthPx * 0.95; // leave 5% breathing room
-	const neededPx = markers.length * idealGap;
-	const MIN_GAP_PX = neededPx > maxTotalPx
-		? Math.max(4, maxTotalPx / markers.length)
-		: idealGap;
+/* --- Visual clustering types and helpers --- */
 
-	const positions = new Map<string, number>();
-	let lastPx = -Infinity;
+export interface VisualCluster {
+	id: string;
+	markers: ReplayMarker[];
+	atMs: number;
+	positionPct: number;
+}
+
+const KIND_PRIORITY: Record<string, number> = {
+	'all-tasks-completed': 10,
+	'task-completed': 8,
+	'thread-start': 7,
+	'task-claimed': 6,
+	'task-unblocked': 5,
+	'permission': 4,
+	'plan': 3,
+	'task-created': 2,
+	'artifact': 2,
+	'session-start': 1,
+};
+
+export function pickRepresentative(markers: ReplayMarker[]): ReplayMarker {
+	return markers.reduce((best, m) =>
+		(KIND_PRIORITY[m.kind] ?? 0) > (KIND_PRIORITY[best.kind] ?? 0) ? m : best
+	);
+}
+
+/**
+ * Cluster markers that are too close together in pixel-space into
+ * a single visual dot with a count badge.
+ */
+export function clusterMarkers(markers: ReplayMarker[], durationMs: number, trackWidthPx = 600): VisualCluster[] {
+	const MIN_GAP_PX = 28;
+	const clusters: VisualCluster[] = [];
+
 	for (const marker of markers) {
-		let pct = durationMs > 0 ? (marker.atMs / durationMs) * 100 : 0;
-		let px = (pct / 100) * trackWidthPx;
-		if (px - lastPx < MIN_GAP_PX) {
-			px = lastPx + MIN_GAP_PX;
-			pct = (px / trackWidthPx) * 100;
+		const px = durationMs > 0 ? (marker.atMs / durationMs) * trackWidthPx : 0;
+		const lastCluster = clusters[clusters.length - 1];
+		const lastPx = lastCluster
+			? (lastCluster.atMs / durationMs) * trackWidthPx
+			: -Infinity;
+
+		if (lastCluster && px - lastPx < MIN_GAP_PX) {
+			lastCluster.markers.push(marker);
+			lastCluster.atMs =
+				lastCluster.markers.reduce((sum, m) => sum + m.atMs, 0) /
+				lastCluster.markers.length;
+		} else {
+			clusters.push({
+				id: `cluster-${marker.id}`,
+				markers: [marker],
+				atMs: marker.atMs,
+				positionPct: durationMs > 0 ? (marker.atMs / durationMs) * 100 : 0,
+			});
 		}
-		// Clamp to 100% to prevent overflow
-		pct = Math.min(pct, 100);
-		positions.set(marker.id, pct);
-		lastPx = px;
 	}
-	return positions;
+
+	for (const cluster of clusters) {
+		cluster.positionPct = durationMs > 0 ? (cluster.atMs / durationMs) * 100 : 0;
+	}
+
+	return clusters;
 }
 
 export function ReplayTimeline({
@@ -79,7 +114,7 @@ export function ReplayTimeline({
 		() => getVisibleReplayTimelineChips(chips, elapsedMs),
 		[chips, elapsedMs],
 	);
-	const markerPositions = useMemo(() => enforceMinGap(markers, durationMs), [markers, durationMs]);
+	const clusters = useMemo(() => clusterMarkers(markers, durationMs), [markers, durationMs]);
 
 	return (
 		<section className="tc-replay-timeline">
@@ -94,26 +129,43 @@ export function ReplayTimeline({
 					aria-label="Replay scrubber"
 				/>
 				<div className="tc-replay-marker-track" aria-hidden="true">
-					{markers.map((marker) => {
-						const mc = getMarkerContent(marker);
+					{clusters.map((cluster) => {
+						const rep = cluster.markers.length === 1
+							? cluster.markers[0]!
+							: pickRepresentative(cluster.markers);
+						const mc = getMarkerContent(rep);
 						const isAgent = mc.type === 'agent';
+						const isCluster = cluster.markers.length > 1;
 						const classes = [
 							'tc-replay-marker',
 							isAgent ? 'is-agent' : '',
 							mc.isFinale ? 'is-all-tasks-completed' : '',
+							isCluster ? 'is-cluster' : '',
 						].filter(Boolean).join(' ');
+
+						const title = isCluster
+							? `${cluster.markers.length} events near ${formatMs(cluster.atMs)}`
+							: `${rep.label} · ${formatMs(rep.atMs)}`;
+						const ariaLabel = isCluster
+							? `${cluster.markers.length} events at ${formatMs(cluster.atMs)}`
+							: `${rep.label} at ${formatMs(rep.atMs)}`;
 
 						return (
 							<button
-								key={marker.id}
+								key={cluster.id}
 								type="button"
 								className={classes}
-								style={{ left: `${markerPositions.get(marker.id) ?? 0}%` }}
-								onClick={() => onMarkerJump(marker)}
-								title={`${marker.label} · ${formatMs(marker.atMs)}`}
-								aria-label={`${marker.label} at ${formatMs(marker.atMs)}`}
+								style={{ left: `${cluster.positionPct}%` }}
+								onClick={() => onMarkerJump(rep)}
+								title={title}
+								aria-label={ariaLabel}
 							>
 								{mc.content}
+								{isCluster && (
+									<span className="tc-marker-count">
+										{cluster.markers.length}
+									</span>
+								)}
 							</button>
 						);
 					})}
