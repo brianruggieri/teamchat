@@ -37,8 +37,19 @@ function getMarkerContent(marker: ReplayMarker): {
 	}
 }
 
-export function enforceMinGap(markers: ReplayMarker[], durationMs: number, trackWidthPx = 800): Map<string, number> {
-	const MIN_GAP_PX = 24;
+/**
+ * Enforce minimum pixel gap between markers, scaling the gap down
+ * when there are too many markers for the available track width.
+ */
+export function enforceMinGap(markers: ReplayMarker[], durationMs: number, trackWidthPx = 600): Map<string, number> {
+	// Scale min gap down when marker density is high to avoid overflow
+	const idealGap = 20;
+	const maxTotalPx = trackWidthPx * 0.95; // leave 5% breathing room
+	const neededPx = markers.length * idealGap;
+	const MIN_GAP_PX = neededPx > maxTotalPx
+		? Math.max(4, maxTotalPx / markers.length)
+		: idealGap;
+
 	const positions = new Map<string, number>();
 	let lastPx = -Infinity;
 	for (const marker of markers) {
@@ -48,6 +59,8 @@ export function enforceMinGap(markers: ReplayMarker[], durationMs: number, track
 			px = lastPx + MIN_GAP_PX;
 			pct = (px / trackWidthPx) * 100;
 		}
+		// Clamp to 100% to prevent overflow
+		pct = Math.min(pct, 100);
 		positions.set(marker.id, pct);
 		lastPx = px;
 	}
