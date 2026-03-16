@@ -27,6 +27,53 @@ const SUBTYPE_META: Record<string, { icon: string; label: string; tone: string }
 	'session-summary': { icon: '📊', label: 'summary', tone: 'celebration' },
 };
 
+/**
+ * Returns compact event text that omits the agent name when an avatar is present.
+ * The avatar already identifies who — so the text focuses on what happened.
+ * For task events with a chip in the header, we show the task subject instead.
+ */
+function getCompactText(event: SystemEventType): string {
+	const { subtype, text, agentName, taskId, taskSubject } = event;
+
+	// If no agent avatar will be rendered, keep original text
+	if (!agentName || !event.agentColor) return text;
+
+	switch (subtype) {
+		case 'member-joined':
+			return 'joined the chat';
+		case 'member-left':
+			return 'left the chat';
+		case 'task-claimed':
+			// Header shows "✋ claimed #N" — text shows the task subject
+			if (taskSubject) return taskSubject;
+			return taskId ? `claimed #${taskId}` : text;
+		case 'task-completed':
+			// Header shows "✅ complete #N" — text shows the task subject
+			if (taskSubject) return taskSubject;
+			return taskId ? `completed #${taskId}` : text;
+		case 'task-failed':
+			if (taskSubject) return taskSubject;
+			return taskId ? `failed #${taskId}` : text;
+		case 'idle-surfaced':
+			return 'idle: available';
+		case 'nudge': {
+			// "team-lead nudged testing" → for the nudged agent: "nudged by team-lead"
+			const match = text.match(/^(\S+)\s+nudged/);
+			return match ? `nudged by ${match[1]}` : text;
+		}
+		case 'bottleneck': {
+			// "schema is a bottleneck — tester, gateway waiting" → "bottleneck — tester, gateway waiting"
+			return text.replace(new RegExp(`^${agentName}\\s+is\\s+a\\s+`, 'i'), '');
+		}
+		case 'shutdown-requested':
+			return 'asked to leave';
+		case 'shutdown-approved':
+			return 'left the chat';
+		default:
+			return text;
+	}
+}
+
 export function SystemEventComponent({ event }: SystemEventProps) {
 	const { formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const meta = SUBTYPE_META[event.subtype] ?? {
@@ -34,6 +81,8 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 		label: 'system',
 		tone: 'neutral',
 	};
+	const hasAvatar = !!(event.agentName && event.agentColor);
+	const compactText = getCompactText(event);
 
 	return (
 		<div
@@ -42,8 +91,8 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 		>
 			<div className={`tc-system-card is-${meta.tone}`}>
 				<div className="tc-system-card-body">
-					{event.agentName && event.agentColor && (
-						<AgentAvatar name={event.agentName} color={event.agentColor} size="sm" />
+					{hasAvatar && (
+						<AgentAvatar name={event.agentName!} color={event.agentColor!} size="sm" />
 					)}
 					<div className="tc-system-card-content">
 						<div className="tc-system-header">
@@ -53,9 +102,9 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 								<span className="tc-system-chip">#{event.taskId}</span>
 							)}
 						</div>
-						<div className="tc-system-text">{event.text}</div>
+						<div className="tc-system-text">{compactText}</div>
 						<div className="tc-system-meta">
-							{event.taskSubject ?? (!event.agentColor ? event.agentName : null) ?? 'system'}
+							{!hasAvatar && (event.taskSubject ?? event.agentName ?? 'system')}
 							<span
 								className="tc-system-time"
 								title={formatISOTooltip(event.timestamp)}
