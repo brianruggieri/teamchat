@@ -1,6 +1,7 @@
 import React from 'react';
 import type { SystemEvent as SystemEventType } from '../types.js';
 import { useRelativeTime } from '../hooks/useRelativeTime.js';
+import { AgentAvatar } from './AgentAvatar.jsx';
 
 interface SystemEventProps {
 	event: SystemEventType;
@@ -40,22 +41,29 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 			data-task-id={event.taskId ?? undefined}
 		>
 			<div className={`tc-system-card is-${meta.tone}`}>
-				<div className="tc-system-header">
-					<span className="tc-system-icon">{meta.icon}</span>
-					<span className="tc-system-label">{meta.label}</span>
-					{event.taskId && (
-						<span className="tc-system-chip">#{event.taskId}</span>
+				<div className="tc-system-card-body">
+					{event.agentName && event.agentColor && (
+						<AgentAvatar name={event.agentName} color={event.agentColor} size="sm" />
 					)}
-				</div>
-				<div className="tc-system-text">{event.text}</div>
-				<div className="tc-system-meta">
-					{event.taskSubject ?? event.agentName ?? 'system'}
-					<span
-						className="tc-system-time"
-						title={formatISOTooltip(event.timestamp)}
-					>
-						{formatAbsoluteTime(event.timestamp)}
-					</span>
+					<div className="tc-system-card-content">
+						<div className="tc-system-header">
+							<span className="tc-system-icon">{meta.icon}</span>
+							<span className="tc-system-label">{meta.label}</span>
+							{event.taskId && (
+								<span className="tc-system-chip">#{event.taskId}</span>
+							)}
+						</div>
+						<div className="tc-system-text">{event.text}</div>
+						<div className="tc-system-meta">
+							{event.taskSubject ?? event.agentName ?? 'system'}
+							<span
+								className="tc-system-time"
+								title={formatISOTooltip(event.timestamp)}
+							>
+								{formatAbsoluteTime(event.timestamp)}
+							</span>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
