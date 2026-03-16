@@ -3,7 +3,7 @@ import type { SystemEvent } from '../types.js';
 import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
 interface SystemEventGroupProps {
-	subtype: 'member-joined' | 'task-created';
+	subtype: 'member-joined' | 'task-created' | 'task-claimed';
 	events: SystemEvent[];
 }
 
@@ -40,8 +40,10 @@ export function SystemEventGroup({
 
 	const title = subtype === 'member-joined'
 		? `${events.length} ${events.length === 1 ? 'member joined' : 'members joined'}`
-		: `${events.length} ${events.length === 1 ? 'task created' : 'tasks created'}`;
-	const icon = subtype === 'member-joined' ? '🟢' : '📋';
+		: subtype === 'task-claimed'
+			? `${events.length} ${events.length === 1 ? 'task claimed' : 'tasks claimed'}`
+			: `${events.length} ${events.length === 1 ? 'task created' : 'tasks created'}`;
+	const icon = subtype === 'member-joined' ? '🟢' : subtype === 'task-claimed' ? '✋' : '📋';
 
 	return (
 		<section className="tc-system-group">

@@ -2229,6 +2229,119 @@ code {
 	}
 }
 
+/* === DM Conversation Lanes === */
+.tc-dm-lane {
+	margin-left: 28px;
+	padding: 10px 12px 10px 14px;
+	border-left: 2px solid;
+	border-radius: 0 10px 10px 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.tc-dm-lane-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+.tc-dm-lane-avatar-pair {
+	position: relative;
+	width: 40px;
+	height: 28px;
+	flex-shrink: 0;
+}
+.tc-dm-lane-avatar-pair .tc-avatar {
+	position: absolute;
+	border: 2px solid var(--surface-app);
+}
+.tc-dm-lane-avatar-pair .tc-avatar:first-child {
+	left: 0;
+	z-index: 2;
+}
+.tc-dm-lane-avatar-pair .tc-avatar:last-child {
+	left: 14px;
+	z-index: 1;
+}
+.tc-dm-lane-names {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+.tc-dm-lane-count {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+.tc-dm-lane-resolution {
+	font-size: 0.9rem;
+}
+.tc-dm-bubble {
+	max-width: 80%;
+	padding: 5px 10px;
+	border-radius: 4px 10px 10px 10px;
+	font-size: 0.78rem;
+	color: var(--text-primary);
+	line-height: 1.4;
+}
+.tc-dm-bubble.is-responder {
+	margin-left: auto;
+	border-radius: 10px 4px 10px 10px;
+}
+.tc-dm-lane-expand {
+	align-self: center;
+	background: none;
+	border: 1px solid var(--border-subtle);
+	border-radius: 8px;
+	padding: 3px 12px;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.tc-dm-lane-expand:hover {
+	border-color: var(--border-strong);
+	color: var(--text-secondary);
+}
+/* Single DM badge (1-message, no lane) */
+.tc-dm-badge {
+	display: inline-flex;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.06);
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	margin-left: 6px;
+}
+
+/* === Setup Card === */
+.tc-setup-card { padding: 0; }
+.tc-setup-card-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 10px 12px;
+	background: none;
+	border: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+	font-size: 0.82rem;
+	text-align: left;
+}
+.tc-setup-card-toggle:hover { color: var(--text-primary); }
+.tc-setup-card-icon { font-size: 1rem; }
+.tc-setup-card-chevron { margin-left: auto; font-size: 0.7rem; }
+.tc-setup-card-detail {
+	padding: 4px 12px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+.tc-setup-card-item {
+	font-size: 0.76rem;
+	color: var(--text-muted);
+	padding: 2px 0;
+}
+
 @keyframes spin {
 	to {
 		transform: rotate(360deg);
