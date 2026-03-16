@@ -55,7 +55,7 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 						</div>
 						<div className="tc-system-text">{event.text}</div>
 						<div className="tc-system-meta">
-							{event.taskSubject ?? event.agentName ?? 'system'}
+							{event.taskSubject ?? (!event.agentColor ? event.agentName : null) ?? 'system'}
 							<span
 								className="tc-system-time"
 								title={formatISOTooltip(event.timestamp)}

@@ -2326,28 +2326,33 @@ code {
 	gap: 8px;
 	margin-bottom: 4px;
 }
-.tc-dm-lane-avatar-pair {
+/* Reusable overlapping avatar pair — used in DM lane headers, timeline, etc. */
+.tc-avatar-pair {
 	position: relative;
 	width: 42px;
 	height: 28px;
 	flex-shrink: 0;
 }
-.tc-dm-lane-avatar-pair .tc-avatar {
+.tc-avatar-pair .tc-avatar {
 	position: absolute;
 	top: 50%;
 	transform: translateY(-50%);
-	border: 2px solid transparent;
-	outline: 2px solid var(--surface-app);
-	border-radius: 8px;
 }
-.tc-dm-lane-avatar-pair .tc-avatar:first-child {
+.tc-avatar-pair .tc-avatar:first-child {
 	left: 0;
 	z-index: 2;
 }
-.tc-dm-lane-avatar-pair .tc-avatar:last-child {
-	left: 16px;
+.tc-avatar-pair .tc-avatar:last-child {
+	left: 15px;
 	z-index: 1;
 }
+/* Knockout ring: box-shadow on the core creates a clean gap between overlapping avatars */
+.tc-avatar-pair .tc-avatar:first-child .tc-avatar-core {
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 3px 0 0 0 var(--surface-app, #071019);
+}
+/* Legacy alias */
+.tc-dm-lane-avatar-pair { /* @deprecated: use .tc-avatar-pair */ }
+
 .tc-dm-lane-names {
 	font-size: 0.8rem;
 	font-weight: 600;
@@ -2361,6 +2366,7 @@ code {
 	font-size: 0.9rem;
 }
 .tc-dm-bubble {
+	position: relative;
 	max-width: 80%;
 	padding: 5px 10px;
 	border-radius: 4px 10px 10px 10px;
@@ -2371,6 +2377,21 @@ code {
 .tc-dm-bubble.is-responder {
 	margin-left: auto;
 	border-radius: 10px 4px 10px 10px;
+}
+/* Identity dot — overlaps the flat corner of each bubble */
+.tc-dm-bubble-dot {
+	position: absolute;
+	top: -4px;
+	left: -4px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 2px var(--surface-app);
+	z-index: 1;
+}
+.tc-dm-bubble.is-responder .tc-dm-bubble-dot {
+	left: auto;
+	right: -4px;
 }
 .tc-dm-lane-expand {
 	align-self: center;

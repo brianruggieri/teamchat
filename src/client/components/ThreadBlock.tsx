@@ -138,7 +138,7 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 		>
 			{/* Lane header */}
 			<div className="tc-dm-lane-header">
-				<div className="tc-dm-lane-avatar-pair">
+				<div className="tc-avatar-pair">
 					<AgentAvatar name={initiator} color={initiatorColor} size="sm" />
 					<AgentAvatar name={responder} color={responderColor} size="sm" />
 				</div>
@@ -159,6 +159,10 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 							backgroundColor: msgColorCss.tint,
 						}}
 					>
+						<span
+							className="tc-dm-bubble-dot"
+							style={{ backgroundColor: msgColorCss.border }}
+						/>
 						<span className="tc-dm-bubble-text">
 							{distillSummary(msg.text, msg.summary)}
 						</span>
