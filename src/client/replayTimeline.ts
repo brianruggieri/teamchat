@@ -120,7 +120,7 @@ function getShortMarkerLabel(marker: ReplayMarker): string | null {
 		case 'artifact':
 			return marker.label.length > 28 ? 'Artifact ready' : marker.label;
 		case 'all-tasks-completed':
-			return 'All done';
+			return '🎉 All done';
 		default:
 			return null;
 	}

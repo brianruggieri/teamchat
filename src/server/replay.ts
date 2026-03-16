@@ -366,9 +366,16 @@ function buildManifest({
 
 	const startedAt = manifest?.startedAt ?? metadata?.startedAt ?? entries[0]!.event.timestamp;
 	const endedAt = manifest?.endedAt ?? metadata?.endedAt ?? entries[entries.length - 1]!.event.timestamp;
-	const durationMs = manifest?.durationMs
-		?? metadata?.durationMs
-		?? Math.max(0, new Date(endedAt).getTime() - new Date(startedAt).getTime());
+	// Always compute duration from actual event span — metadata durationMs can
+	// reflect wall-clock process uptime which overshoots when there's trailing idle.
+	const eventSpanMs = entries.length > 0
+		? entries[entries.length - 1]!.atMs
+		: 0;
+	const durationMs = eventSpanMs > 0
+		? eventSpanMs
+		: manifest?.durationMs
+			?? metadata?.durationMs
+			?? Math.max(0, new Date(endedAt).getTime() - new Date(startedAt).getTime());
 
 	return {
 		version: 1,
