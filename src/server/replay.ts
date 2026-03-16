@@ -195,6 +195,32 @@ function buildReplaySource({
 	});
 	const markers = buildMarkers(normalizedEntries, artifacts);
 
+	// Enrich system events that have agentName but null agentColor
+	// by looking up the color from the team members list.
+	const colorByAgent = new Map<string, string>();
+	for (const m of members) {
+		if (m.color) colorByAgent.set(m.name, m.color);
+	}
+	// Also collect colors from message events for agents not in config
+	for (const entry of normalizedEntries) {
+		const ev = entry.event;
+		if (ev.type === 'message' && 'fromColor' in ev && 'from' in ev) {
+			const msg = ev as { from: string; fromColor: string };
+			if (msg.from && msg.fromColor && !colorByAgent.has(msg.from)) {
+				colorByAgent.set(msg.from, msg.fromColor);
+			}
+		}
+	}
+	for (const entry of normalizedEntries) {
+		const ev = entry.event;
+		if (ev.type === 'system' && 'agentName' in ev) {
+			const sys = ev as { agentName: string | null; agentColor: string | null };
+			if (sys.agentName && !sys.agentColor) {
+				sys.agentColor = colorByAgent.get(sys.agentName) ?? null;
+			}
+		}
+	}
+
 	return {
 		bundle: {
 			manifest: computedManifest,
