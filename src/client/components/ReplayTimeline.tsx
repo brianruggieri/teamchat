@@ -39,67 +39,91 @@ function getMarkerContent(marker: ReplayMarker): {
 
 /* --- Visual clustering types and helpers --- */
 
-export interface VisualCluster {
+/** A rendered dot on the timeline — one per unique kind within a proximity group. */
+export interface TimelineDot {
 	id: string;
+	/** The representative marker for this dot (first of this kind in the group). */
+	marker: ReplayMarker;
+	/** All markers of this kind in the group. */
 	markers: ReplayMarker[];
+	/** Average time of markers in this sub-group (for positioning). */
 	atMs: number;
 	positionPct: number;
 }
 
-const KIND_PRIORITY: Record<string, number> = {
-	'all-tasks-completed': 10,
-	'task-completed': 8,
-	'thread-start': 7,
-	'task-claimed': 6,
-	'task-unblocked': 5,
-	'permission': 4,
-	'plan': 3,
-	'task-created': 2,
-	'artifact': 2,
-	'session-start': 1,
-};
-
-export function pickRepresentative(markers: ReplayMarker[]): ReplayMarker {
-	return markers.reduce((best, m) =>
-		(KIND_PRIORITY[m.kind] ?? 0) > (KIND_PRIORITY[best.kind] ?? 0) ? m : best
-	);
-}
-
 /**
- * Cluster markers that are too close together in pixel-space into
- * a single visual dot with a count badge.
+ * Build timeline dots by:
+ * 1. Grouping markers that are too close together in pixel-space.
+ * 2. Within each group, emitting one dot per unique event kind,
+ *    positioned at that sub-group's average time.
+ *
+ * This keeps density manageable while showing the composition of
+ * what happened (📋 + S + 💬 instead of a single icon with "33").
  */
-export function clusterMarkers(markers: ReplayMarker[], durationMs: number, trackWidthPx = 600): VisualCluster[] {
+export function buildTimelineDots(markers: ReplayMarker[], durationMs: number, trackWidthPx = 600): TimelineDot[] {
 	const MIN_GAP_PX = 28;
-	const clusters: VisualCluster[] = [];
+
+	// Step 1: group markers by proximity
+	const groups: ReplayMarker[][] = [];
+	let currentGroup: ReplayMarker[] = [];
 
 	for (const marker of markers) {
 		const px = durationMs > 0 ? (marker.atMs / durationMs) * trackWidthPx : 0;
-		const lastCluster = clusters[clusters.length - 1];
-		const lastPx = lastCluster
-			? (lastCluster.atMs / durationMs) * trackWidthPx
-			: -Infinity;
 
-		if (lastCluster && px - lastPx < MIN_GAP_PX) {
-			lastCluster.markers.push(marker);
-			lastCluster.atMs =
-				lastCluster.markers.reduce((sum, m) => sum + m.atMs, 0) /
-				lastCluster.markers.length;
+		if (currentGroup.length === 0) {
+			currentGroup.push(marker);
+			continue;
+		}
+
+		// Compare against the first marker in the group (anchor) to keep the group window bounded
+		const anchorPx = durationMs > 0 ? (currentGroup[0]!.atMs / durationMs) * trackWidthPx : 0;
+		if (px - anchorPx < MIN_GAP_PX * 3) {
+			currentGroup.push(marker);
 		} else {
-			clusters.push({
-				id: `cluster-${marker.id}`,
-				markers: [marker],
-				atMs: marker.atMs,
-				positionPct: durationMs > 0 ? (marker.atMs / durationMs) * 100 : 0,
+			groups.push(currentGroup);
+			currentGroup = [marker];
+		}
+	}
+	if (currentGroup.length > 0) groups.push(currentGroup);
+
+	// Step 2: within each group, emit one dot per unique kind
+	const dots: TimelineDot[] = [];
+
+	for (const group of groups) {
+		// Collect markers by kind — use a display kind that merges task-claimed agents into one
+		const byKind = new Map<string, ReplayMarker[]>();
+		for (const m of group) {
+			const key = m.kind;
+			if (!byKind.has(key)) byKind.set(key, []);
+			byKind.get(key)!.push(m);
+		}
+
+		for (const [kind, kindMarkers] of byKind) {
+			const avgMs = kindMarkers.reduce((sum, m) => sum + m.atMs, 0) / kindMarkers.length;
+			const pct = durationMs > 0 ? Math.min((avgMs / durationMs) * 100, 100) : 0;
+			dots.push({
+				id: `dot-${kind}-${kindMarkers[0]!.id}`,
+				marker: kindMarkers[0]!,
+				markers: kindMarkers,
+				atMs: avgMs,
+				positionPct: pct,
 			});
 		}
 	}
 
-	for (const cluster of clusters) {
-		cluster.positionPct = durationMs > 0 ? (cluster.atMs / durationMs) * 100 : 0;
+	// Step 3: enforce minimum gap between final dots to prevent overlap
+	const MIN_DOT_GAP_PX = 22;
+	let lastPx = -Infinity;
+	for (const dot of dots) {
+		let px = (dot.positionPct / 100) * trackWidthPx;
+		if (px - lastPx < MIN_DOT_GAP_PX) {
+			px = lastPx + MIN_DOT_GAP_PX;
+			dot.positionPct = Math.min((px / trackWidthPx) * 100, 100);
+		}
+		lastPx = px;
 	}
 
-	return clusters;
+	return dots;
 }
 
 export function ReplayTimeline({
@@ -114,7 +138,7 @@ export function ReplayTimeline({
 		() => getVisibleReplayTimelineChips(chips, elapsedMs),
 		[chips, elapsedMs],
 	);
-	const clusters = useMemo(() => clusterMarkers(markers, durationMs), [markers, durationMs]);
+	const dots = useMemo(() => buildTimelineDots(markers, durationMs), [markers, durationMs]);
 
 	return (
 		<section className="tc-replay-timeline">
@@ -129,42 +153,34 @@ export function ReplayTimeline({
 					aria-label="Replay scrubber"
 				/>
 				<div className="tc-replay-marker-track" aria-hidden="true">
-					{clusters.map((cluster) => {
-						const rep = cluster.markers.length === 1
-							? cluster.markers[0]!
-							: pickRepresentative(cluster.markers);
-						const mc = getMarkerContent(rep);
+					{dots.map((dot) => {
+						const mc = getMarkerContent(dot.marker);
 						const isAgent = mc.type === 'agent';
-						const isCluster = cluster.markers.length > 1;
+						const count = dot.markers.length;
 						const classes = [
 							'tc-replay-marker',
 							isAgent ? 'is-agent' : '',
 							mc.isFinale ? 'is-all-tasks-completed' : '',
-							isCluster ? 'is-cluster' : '',
+							count > 1 ? 'is-cluster' : '',
 						].filter(Boolean).join(' ');
 
-						const title = isCluster
-							? `${cluster.markers.length} events near ${formatMs(cluster.atMs)}`
-							: `${rep.label} · ${formatMs(rep.atMs)}`;
-						const ariaLabel = isCluster
-							? `${cluster.markers.length} events at ${formatMs(cluster.atMs)}`
-							: `${rep.label} at ${formatMs(rep.atMs)}`;
+						const kindLabel = count > 1
+							? `${count} ${dot.marker.kind.replace(/-/g, ' ')} events · ${formatMs(dot.atMs)}`
+							: `${dot.marker.label} · ${formatMs(dot.marker.atMs)}`;
 
 						return (
 							<button
-								key={cluster.id}
+								key={dot.id}
 								type="button"
 								className={classes}
-								style={{ left: `${cluster.positionPct}%` }}
-								onClick={() => onMarkerJump(rep)}
-								title={title}
-								aria-label={ariaLabel}
+								style={{ left: `${dot.positionPct}%` }}
+								onClick={() => onMarkerJump(dot.marker)}
+								title={kindLabel}
+								aria-label={kindLabel}
 							>
 								{mc.content}
-								{isCluster && (
-									<span className="tc-marker-count">
-										{cluster.markers.length}
-									</span>
+								{count > 1 && (
+									<span className="tc-marker-count">{count}</span>
 								)}
 							</button>
 						);
