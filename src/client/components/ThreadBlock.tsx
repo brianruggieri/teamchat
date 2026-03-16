@@ -10,6 +10,8 @@ import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { buildMessageLaneItems } from './messageGrouping.js';
 import { distillSummary } from '../../shared/distill.js';
+import { useAvatarMark } from './AvatarMarkContext.js';
+import { renderAvatarMark } from '../avatar-marks.js';
 
 interface ThreadBlockProps {
 	threadKey: string;
@@ -47,6 +49,21 @@ function isThreadResolved(messages: ContentMessage[]): boolean {
 	if (messages.length === 0) return false;
 	const lastText = messages[messages.length - 1]!.text;
 	return RESOLUTION_PATTERNS.some(p => p.test(lastText));
+}
+
+function DmBubblePip({ name, color }: { name: string; color: string }) {
+	const identity = useAvatarMark(name);
+	if (identity) {
+		return (
+			<span
+				className="tc-dm-bubble-dot"
+				dangerouslySetInnerHTML={{
+					__html: renderAvatarMark(name, color, 10, identity),
+				}}
+			/>
+		);
+	}
+	return <span className="tc-dm-bubble-dot" style={{ backgroundColor: 'var(--text-muted)' }} />;
 }
 
 export function ThreadBlock({ threadKey, participants, events, reactions, topic }: ThreadBlockProps) {
@@ -162,10 +179,7 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 								backgroundColor: msgColorCss.tint,
 							}}
 						>
-							<span
-								className="tc-dm-bubble-dot"
-								style={{ backgroundColor: msgColorCss.border }}
-							/>
+							<DmBubblePip name={msg.from} color={msg.fromColor} />
 							<span className="tc-dm-bubble-text">
 								{distillSummary(msg.text, msg.summary)}
 							</span>
