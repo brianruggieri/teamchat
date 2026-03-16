@@ -150,12 +150,14 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 	const dmPairInserted = new Set<string>();
 	let flatBuffer: ChatEvent[] = [];
 
+	const sessionStartMs = events.length > 0 ? new Date(events[0]!.timestamp).getTime() : undefined;
+
 	const pushFlat = () => {
 		if (flatBuffer.length > 0) {
 			items.push({
 				kind: 'flat-events',
 				events: flatBuffer,
-				laneItems: buildMessageLaneItems(flatBuffer),
+				laneItems: buildMessageLaneItems(flatBuffer, sessionStartMs),
 			});
 			flatBuffer = [];
 		}

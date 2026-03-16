@@ -24,6 +24,7 @@ function getMarkerContent(marker: ReplayMarker): {
 		case 'task-created': return { type: 'emoji', content: '📋' };
 		case 'task-completed': return { type: 'emoji', content: '✅' };
 		case 'task-claimed': {
+			// Shows first agent's letter; count badge indicates total agents
 			const agentName = marker.label.split(' ')[0] ?? '';
 			return { type: 'agent', content: agentName.charAt(0).toUpperCase() };
 		}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { AvatarMark, AgentEntry } from '../avatar-marks.js';
 import { resolveMarks } from '../avatar-marks.js';
 
@@ -9,7 +9,7 @@ export function AvatarMarkProvider({
 	children,
 }: {
 	agents: AgentEntry[];
-	children: React.ReactNode;
+	children: ReactNode;
 }) {
 	// Stabilize on serialized roster key to avoid re-resolving on every render
 	const rosterKey = agents.map(a => `${a.name}:${a.color}`).join(',');

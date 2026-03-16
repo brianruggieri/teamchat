@@ -44,6 +44,6 @@ export function ReactionRow({
 function renderReactionPeople(emoji: string, reactions: Reaction[]) {
 	if (reactions.length === 0) return null;
 	return reactions.slice(0, 3).map((r, i) => (
-		<AgentAvatar key={`${r.fromAgent}-${emoji}`} name={r.fromAgent} color={r.fromColor} size="xs" />
+		<AgentAvatar key={`${r.fromAgent}-${emoji}-${i}`} name={r.fromAgent} color={r.fromColor} size="xs" />
 	));
 }

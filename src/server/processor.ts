@@ -347,7 +347,7 @@ export class EventProcessor {
 				break;
 			}
 
-			case 'shutdown_rejected':
+			case 'shutdown_rejected': {
 				this.emit([
 					this.makeSystemEvent(
 						'shutdown-rejected',
@@ -356,7 +356,9 @@ export class EventProcessor {
 						msg.color,
 					),
 				]);
+				this.recentShutdownRequests.delete(msg.from);
 				break;
+			}
 
 			case 'task_completed': {
 				const taskId = parsed.taskId ?? parsed.completedTaskId ?? null;
@@ -1146,16 +1148,23 @@ export class EventProcessor {
 		return null;
 	}
 
-	/** Get agent color from presence or default to empty. */
+	/** Get agent color from recent events or default to 'blue'. */
 	private getAgentColor(agentName: string): string {
-		// Look up from recent events
+		// Look up from recent message events
 		for (let i = this.allEvents.length - 1; i >= 0; i--) {
 			const ev = this.allEvents[i]!;
 			if (ev.type === 'message' && (ev as ContentMessage).from === agentName) {
 				return (ev as ContentMessage).fromColor;
 			}
 		}
-		return '';
+		// Look up from member-joined system events (which have agentColor set)
+		for (let i = this.allEvents.length - 1; i >= 0; i--) {
+			const ev = this.allEvents[i]!;
+			if (ev.type === 'system' && (ev as SystemEvent).agentName === agentName && (ev as SystemEvent).agentColor) {
+				return (ev as SystemEvent).agentColor!;
+			}
+		}
+		return 'blue'; // safe default
 	}
 
 	// === Event creation helpers ===

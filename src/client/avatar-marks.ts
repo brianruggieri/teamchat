@@ -172,11 +172,19 @@ export function resolveMarks(agents: AgentEntry[]): Map<string, AvatarMark> {
 		const h3 = hashName3(agent.name);
 
 		let qi = h1 % QUAD_PATTERNS.length;
-		while (usedQuads.has(qi)) qi = (qi + 1) % QUAD_PATTERNS.length;
+		let qAttempts = 0;
+		while (usedQuads.has(qi) && qAttempts < QUAD_PATTERNS.length) {
+			qi = (qi + 1) % QUAD_PATTERNS.length;
+			qAttempts++;
+		}
 		usedQuads.add(qi);
 
 		let ai = h2 % ACCENTS.length;
-		while (usedAccents.has(ai)) ai = (ai + 1) % ACCENTS.length;
+		let aAttempts = 0;
+		while (usedAccents.has(ai) && aAttempts < ACCENTS.length) {
+			ai = (ai + 1) % ACCENTS.length;
+			aAttempts++;
+		}
 		usedAccents.add(ai);
 
 		map.set(agent.name, {
@@ -239,7 +247,9 @@ export function resolveMarks(agents: AgentEntry[]): Map<string, AvatarMark> {
 
 // ──────────── SVG Renderer ────────────
 
-let svgUid = 0;
+function escapeHtml(s: string): string {
+	return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 export function renderAvatarMark(
 	name: string,
@@ -248,11 +258,11 @@ export function renderAvatarMark(
 	identity: AvatarMark,
 ): string {
 	const c = getAgentColorValues(color);
-	const id = `id${svgUid++}`;
+	const id = `m${hashName(name)}${size}`;
 	const { quadBits, accentIdx, edgeIdx, cornerIdx, gradAngle } = identity;
 
 	const borderR = size <= 10 ? size * 0.2 : size <= 16 ? size * 0.22 : size * 0.3;
-	const letter = name.charAt(0).toUpperCase();
+	const letter = escapeHtml(name.charAt(0).toUpperCase());
 	const showText = size >= 14;
 	const fontSize = size <= 16 ? size * 0.52 : size * 0.44;
 	const clipId = `cl${id}`;

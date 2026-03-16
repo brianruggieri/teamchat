@@ -31,6 +31,7 @@ const AGENT_COLOR_CSS: Record<string, { border: string; tint: string }> = {
 	orange: { border: 'rgb(249, 115, 22)', tint: 'rgba(249, 115, 22, 0.04)' },
 	cyan: { border: 'rgb(6, 182, 212)', tint: 'rgba(6, 182, 212, 0.04)' },
 	pink: { border: 'rgb(236, 72, 153)', tint: 'rgba(236, 72, 153, 0.04)' },
+	gold: { border: 'rgb(234, 179, 8)', tint: 'rgba(234, 179, 8, 0.04)' },
 };
 
 const DEFAULT_COLOR_CSS = { border: 'rgb(107, 114, 128)', tint: 'rgba(255, 255, 255, 0.04)' };
