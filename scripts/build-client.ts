@@ -37,11 +37,15 @@ const srcClient = path.resolve(import.meta.dirname ?? '.', '..', 'src', 'client'
 // Copy index.html
 fs.copyFileSync(path.join(srcClient, 'index.html'), path.join(outDir, 'index.html'));
 
-// Copy styles
+// Copy all CSS files from styles/
 const stylesDir = path.join(outDir, 'styles');
 fs.mkdirSync(stylesDir, { recursive: true });
-fs.copyFileSync(path.join(srcClient, 'styles', 'index.css'), path.join(stylesDir, 'index.css'));
-fs.copyFileSync(path.join(srcClient, 'styles', 'theme-claude.css'), path.join(stylesDir, 'theme-claude.css'));
+const srcStylesDir = path.join(srcClient, 'styles');
+for (const file of fs.readdirSync(srcStylesDir)) {
+	if (file.endsWith('.css')) {
+		fs.copyFileSync(path.join(srcStylesDir, file), path.join(stylesDir, file));
+	}
+}
 
 console.log(`Client built to ${outDir}`);
 for (const artifact of result.outputs) {
