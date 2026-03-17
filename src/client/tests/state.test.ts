@@ -2,7 +2,7 @@
  * Unit tests for the client state reducer (src/client/state.ts).
  * Covers all 6 exported functions with >80% branch coverage.
  */
-import { describe, test, expect, beforeEach } from 'bun:test';
+import { describe, test, expect } from 'bun:test';
 import type {
 	ContentMessage,
 	SystemEvent,
@@ -42,7 +42,7 @@ function makeMessage(overrides?: Partial<ContentMessage>): ContentMessage {
 		text: 'Hello team',
 		summary: null,
 		timestamp: '2024-01-01T00:00:00Z',
-		isBroadcast: true,
+		isBroadcast: false,
 		isDM: false,
 		dmParticipants: null,
 		isLead: false,
@@ -198,26 +198,9 @@ function makeThreadStatus(overrides?: Partial<ThreadStatus>): ThreadStatus {
 
 // ─── Test isolation ───────────────────────────────────────────────────────────
 //
-// createBaseChatState() does a shallow spread of INITIAL_STATE, so the returned
-// state shares the same array/object references (events, tasks, presence, etc.).
-// hydrateChatState() calls createBaseChatState() internally, then mutates the
-// result via applyChatEventInPlace — which pushes into INITIAL_STATE.events.
-// We reset INITIAL_STATE's mutable fields before each test to prevent cross-test
-// contamination.
-
-beforeEach(() => {
-	(INITIAL_STATE as ChatState).events = [];
-	(INITIAL_STATE as ChatState).tasks = [];
-	(INITIAL_STATE as ChatState).presence = {};
-	(INITIAL_STATE as ChatState).reactions = {};
-	(INITIAL_STATE as ChatState).threadStatuses = {};
-	(INITIAL_STATE as ChatState).planCards = {};
-	(INITIAL_STATE as ChatState).permissionCards = {};
-	(INITIAL_STATE as ChatState).team = null;
-	(INITIAL_STATE as ChatState).sessionStart = null;
-	(INITIAL_STATE as ChatState).connected = false;
-	(INITIAL_STATE as ChatState).activeAgentKey = null;
-});
+// createBaseChatState() always produces fresh mutable containers (events, tasks,
+// presence, etc.) so there is no shared reference to INITIAL_STATE. No beforeEach
+// reset is needed.
 
 // ─── createBaseChatState ──────────────────────────────────────────────────────
 
