@@ -18,6 +18,7 @@ import { ArtifactViewerModal } from './components/ArtifactViewerModal.jsx';
 import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
 import { AvatarMarkProvider } from './components/AvatarMarkContext.js';
+import { ThreadSummary } from './components/ThreadSummary.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap, ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -212,6 +213,14 @@ function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode:
 							threadStatuses={state.threadStatuses}
 							tasks={state.tasks}
 							onAgentClick={onAgentClick}
+						/>,
+						<ThreadSummary
+							key="threads"
+							threadStatuses={state.threadStatuses}
+							onThreadClick={(threadKey) => {
+								const el = document.querySelector(`[data-thread-key="${threadKey}"]`);
+								el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+							}}
 						/>,
 						<TaskSidebar key="tasks" tasks={state.tasks} onTaskClick={onTaskClick} />,
 						<SessionStats
@@ -475,6 +484,14 @@ function ReplayWorkspaceLoaded({
 								threadStatuses={controller.derivedState.chatState.threadStatuses}
 								tasks={controller.derivedState.chatState.tasks}
 								onAgentClick={onAgentClick}
+							/>,
+							<ThreadSummary
+								key="threads"
+								threadStatuses={controller.derivedState.chatState.threadStatuses}
+								onThreadClick={(threadKey) => {
+									const el = document.querySelector(`[data-thread-key="${threadKey}"]`);
+									el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+								}}
 							/>,
 							<TaskSidebar key="tasks" tasks={controller.derivedState.chatState.tasks} onTaskClick={onTaskClick} />,
 							<SessionStats

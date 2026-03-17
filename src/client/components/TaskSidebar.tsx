@@ -97,6 +97,15 @@ export function TaskSidebar({ tasks, onTaskClick }: TaskSidebarProps) {
 					style={{ width: `${pct}%` }}
 				/>
 			</div>
+			{totalTasks > 0 && (
+				<div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+					<div style={{ flex: 1, height: 4, background: '#1e293b', borderRadius: 2, overflow: 'hidden' }}>
+						<div style={{ width: `${(completedTasks / totalTasks) * 100}%`, height: '100%',
+							background: 'linear-gradient(90deg, #22c55e, #3b82f6)', borderRadius: 2 }} />
+					</div>
+					<span style={{ fontSize: '0.66rem', color: '#475569' }}>{completedTasks}/{totalTasks}</span>
+				</div>
+			)}
 			<div className="tc-task-list">
 				{tasks.length === 0 ? (
 					<div className="tc-sidecard-empty">No correlated tasks yet.</div>

@@ -80,21 +80,6 @@ export function AgentProfile({
 				</div>
 			)}
 
-			<div className="tc-agent-section">
-				<div className="tc-agent-section-title">Stats</div>
-				<div className="tc-agent-stats-strip">
-					<div className="tc-stat-chip">
-						<span className="tc-stat-label">threads</span>
-						<span className="tc-stat-value">{agentThreads.length}</span>
-					</div>
-					<div className="tc-stat-chip">
-						<span className="tc-stat-label">tasks</span>
-						<span className="tc-stat-value">
-							{agentTasks.filter((t) => t.status === 'completed').length}/{agentTasks.length}
-						</span>
-					</div>
-				</div>
-			</div>
 		</section>
 	);
 }
