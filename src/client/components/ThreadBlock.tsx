@@ -182,7 +182,7 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 						>
 							<DmBubblePip name={msg.from} color={msg.fromColor} />
 							<span className="tc-dm-bubble-text">
-								{distillSummary(msg.text, msg.summary)}
+								{distillSummary(msg.text, msg.summary, 140)}
 							</span>
 						</div>
 						{showSeparatorAfter && (

@@ -229,7 +229,7 @@
 	min-height: 100%;
 	width: min(100%, var(--thread-max-width));
 	flex-direction: column;
-	gap: 14px;
+	gap: 10px;
 	margin-inline: auto;
 }
 
