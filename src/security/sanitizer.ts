@@ -18,10 +18,6 @@ export interface SanitizationReport {
 
 const PSEUDONYMS = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel'];
 
-function deepClone<T>(value: T): T {
-	return JSON.parse(JSON.stringify(value));
-}
-
 // --- Individual transform functions ---
 
 /**
@@ -29,7 +25,7 @@ function deepClone<T>(value: T): T {
  * a count of how many messages were redacted.
  */
 export function redactSecrets(bundle: ReplayBundle): { bundle: ReplayBundle; count: number } {
-	const cloned = deepClone(bundle);
+	const cloned = structuredClone(bundle);
 	let count = 0;
 
 	for (const entry of cloned.entries) {
@@ -58,7 +54,7 @@ export function anonymizeAgentNames(bundle: ReplayBundle): {
 	count: number;
 	pseudonymMap: Record<string, string>;
 } {
-	const cloned = deepClone(bundle);
+	const cloned = structuredClone(bundle);
 	const nameMap: Record<string, string> = {};
 
 	// Build map: lead first, then rest in member order
@@ -146,7 +142,7 @@ export function anonymizeAgentNames(bundle: ReplayBundle): {
  * Replace absolute paths in message text and task descriptions with ./project/ stubs.
  */
 export function stripPaths(bundle: ReplayBundle): { bundle: ReplayBundle; count: number } {
-	const cloned = deepClone(bundle);
+	const cloned = structuredClone(bundle);
 	let count = 0;
 
 	const pathRegexes = [
@@ -200,7 +196,7 @@ export function stripPaths(bundle: ReplayBundle): { bundle: ReplayBundle; count:
  * epoch (1970-01-01T00:00:00.000Z).
  */
 export function cleanMetadata(bundle: ReplayBundle): ReplayBundle {
-	const cloned = deepClone(bundle);
+	const cloned = structuredClone(bundle);
 
 	// Replace team name
 	cloned.team.name = 'demo-team';
@@ -255,7 +251,7 @@ export function cleanMetadata(bundle: ReplayBundle): ReplayBundle {
  * with null.
  */
 export function stripContent(bundle: ReplayBundle): ReplayBundle {
-	const cloned = deepClone(bundle);
+	const cloned = structuredClone(bundle);
 
 	let taskIdx = 1;
 	const taskSubjectMap: Record<string, string> = {};

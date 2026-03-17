@@ -2380,9 +2380,6 @@ code {
 .tc-avatar-pair .tc-avatar:first-child .tc-avatar-core {
 	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 3px 0 0 0 var(--surface-app, #071019);
 }
-/* Legacy alias */
-.tc-dm-lane-avatar-pair { /* @deprecated: use .tc-avatar-pair */ }
-
 .tc-dm-lane-names {
 	font-size: 0.8rem;
 	font-weight: 600;

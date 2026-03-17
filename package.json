@@ -17,6 +17,8 @@
 	],
 	"scripts": {
 		"dev": "bun run bin/teamchat.ts --team test-team --port 4567",
+		"dev:demo": "bun run bin/teamchat.ts --replay --demo --port 4567",
+		"dev:replay": "bun run bin/teamchat.ts --replay fixtures/replays/teamchat-build-session/session.jsonl --port 4567",
 		"build": "bun run scripts/build-client.ts",
 		"typecheck": "bun x tsc --noEmit",
 		"test": "bun test",
@@ -33,7 +35,7 @@
 		"url": "https://github.com/brianruggieri/teamchat/issues"
 	},
 	"devDependencies": {
-		"@types/bun": "latest",
+		"@types/bun": "^1.2.0",
 		"@types/react": "^19.0.0",
 		"@types/react-dom": "^19.0.0",
 		"react": "^19.0.0",

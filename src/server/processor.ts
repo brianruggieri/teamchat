@@ -21,6 +21,30 @@ import {
 } from '../shared/parse.js';
 import type { WatcherDelta } from './watcher.js';
 
+/** Shallow field-level comparison for RawTaskData (avoids JSON.stringify). */
+function taskChanged(prev: RawTaskData, curr: RawTaskData): boolean {
+	if (prev.id !== curr.id) return true;
+	if (prev.subject !== curr.subject) return true;
+	if (prev.description !== curr.description) return true;
+	if (prev.status !== curr.status) return true;
+	if (prev.owner !== curr.owner) return true;
+	if (prev.activeForm !== curr.activeForm) return true;
+	if (prev.created !== curr.created) return true;
+	if (prev.updated !== curr.updated) return true;
+
+	// blockedBy: both null, or same length with identical elements
+	const a = prev.blockedBy;
+	const b = curr.blockedBy;
+	if (a === null && b === null) return false;
+	if (a === null || b === null) return true;
+	if (a.length !== b.length) return true;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return true;
+	}
+
+	return false;
+}
+
 /** Acknowledgment phrases for compact mode (Tier 2 reactions). */
 const ACK_PHRASES: Record<string, string> = {
 	'got it': '👍',
@@ -130,9 +154,13 @@ export class EventProcessor {
 	private recentNudges: Map<string, { eventId: string; timestamp: string }> = new Map(); // agent name → nudge info
 	private recentBroadcasts: { eventId: string; timestamp: string; from: string }[] = [];
 
+	// Color lookup cache — populated on first observation of each agent's color
+	private agentColorCache: Map<string, string> = new Map();
+
 	constructor(emitter: EventEmitter, compactMode = false) {
 		this.emitter = emitter;
 		this.compactMode = compactMode;
+		this.agentColorCache = new Map();
 	}
 
 	/** Process a delta from the file watcher. */
@@ -226,6 +254,10 @@ export class EventProcessor {
 				const member = currByName.get(name)!;
 				this.presence.set(name, 'working');
 				this.previousMembers.add(name);
+				// Cache the color as soon as we know it from config
+				if (member.color) {
+					this.agentColorCache.set(name, member.color);
+				}
 				const joinedTs = member.joinedAt
 					? new Date(member.joinedAt).toISOString()
 					: undefined;
@@ -598,6 +630,11 @@ export class EventProcessor {
 			}
 		}
 
+		// Update color cache from the pending broadcast before building the message
+		if (pending.fromColor) {
+			this.agentColorCache.set(pending.from, pending.fromColor);
+		}
+
 		const msg: ContentMessage = {
 			type: 'message',
 			id: generateEventId(),
@@ -775,7 +812,7 @@ export class EventProcessor {
 			}
 
 			// Emit task update for any change
-			if (JSON.stringify(prev) !== JSON.stringify(curr)) {
+			if (taskChanged(prev, curr)) {
 				events.push(this.makeTaskUpdate(curr));
 			}
 		}
@@ -981,6 +1018,11 @@ export class EventProcessor {
 		// Clear idle state when agent sends a content message
 		this.clearIdleState(msg.from, msg.timestamp);
 
+		// Update color cache on every message so we always have the latest color
+		if (msg.color) {
+			this.agentColorCache.set(msg.from, msg.color);
+		}
+
 		const contentMsg: ContentMessage = {
 			type: 'message',
 			id: generateEventId(),
@@ -1148,9 +1190,15 @@ export class EventProcessor {
 		return null;
 	}
 
-	/** Get agent color from recent events or default to 'blue'. */
+	/** Get agent color from cache, recent events, or default to 'blue'. */
 	private getAgentColor(agentName: string): string {
-		// Look up from recent message events
+		// Fast path: O(1) cache lookup
+		const cached = this.agentColorCache.get(agentName);
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		// Fallback: reverse scan over allEvents (handles edge cases where cache was missed)
 		for (let i = this.allEvents.length - 1; i >= 0; i--) {
 			const ev = this.allEvents[i]!;
 			if (ev.type === 'message' && (ev as ContentMessage).from === agentName) {
