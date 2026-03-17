@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TeamState, ThreadStatus, TaskInfo } from '../types.js';
-import { getAgentColor } from '../types.js';
+import { getAgentColor, getAgentColorValues } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
 
 interface PresenceRosterProps {
@@ -106,6 +106,18 @@ export function PresenceRoster({
 						const smartStatus = useSmartStatus
 							? getSmartStatus(member.name, status, threadStatuses!, tasks!)
 							: { label: STATUS_LABELS[status] ?? status, tone: status };
+
+						const agentTasks = (tasks ?? []).filter((t) => t.owner === member.name);
+						const completed = agentTasks.filter((t) => t.status === 'completed').length;
+						const total = agentTasks.length;
+						const pct = total > 0 ? (completed / total) * 100 : 0;
+						const fillColor = getAgentColorValues(member.color).fill;
+
+						const statusDotColor =
+							status === 'working' ? '#8ef2b4' :
+							status === 'idle' ? '#ffd38b' :
+							'#ffb0b0';
+
 						return (
 							<div
 								key={member.name}
@@ -121,14 +133,35 @@ export function PresenceRoster({
 									</div>
 								</div>
 								<div className="tc-roster-trailing">
-									{member.model && (
-										<span className="tc-roster-badge is-model" title={member.model}>
-											{formatModel(member.model)}
-										</span>
+									{total > 0 && (
+										<>
+											<div style={{
+												width: 32, height: 4,
+												background: '#1e293b',
+												borderRadius: 2,
+												overflow: 'hidden',
+												flexShrink: 0,
+											}}>
+												<div style={{
+													width: `${pct}%`,
+													height: '100%',
+													background: fillColor,
+													borderRadius: 2,
+												}} />
+											</div>
+											<span style={{ fontSize: '0.62rem', color: '#475569', flexShrink: 0 }}>
+												{completed}/{total}
+											</span>
+										</>
 									)}
-									<span className={`tc-roster-state is-${smartStatus.tone}`}>
-										{smartStatus.label}
-									</span>
+									<span style={{
+										width: 6,
+										height: 6,
+										borderRadius: '50%',
+										background: statusDotColor,
+										flexShrink: 0,
+										display: 'inline-block',
+									}} />
 								</div>
 							</div>
 						);

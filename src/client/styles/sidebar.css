@@ -80,7 +80,7 @@
 .tc-roster-list {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 3px;
 }
 
 .tc-task-card {
@@ -189,10 +189,8 @@
 }
 
 .tc-roster-row {
-	padding: 7px 8px;
-	border: 1px solid var(--border-subtle);
+	padding: 5px 6px;
 	border-radius: var(--radius-10);
-	background: rgba(10, 18, 28, 0.74);
 	transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
 }
 

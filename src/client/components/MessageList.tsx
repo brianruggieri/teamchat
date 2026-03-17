@@ -3,6 +3,9 @@ import type {
 	ChatEvent,
 	ContentMessage,
 	Reaction,
+	TaskInfo,
+	TeamState,
+	ThreadStatus,
 } from '../types.js';
 import { ThreadBlock } from './ThreadBlock.jsx';
 import { MessageStack } from './MessageStack.jsx';
@@ -11,11 +14,16 @@ import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { SetupCard } from './SetupCard.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
+import { SessionSummaryCard } from './SessionSummaryCard.jsx';
 import { buildMessageLaneItems, type MessageLaneItem } from './messageGrouping.js';
 
 interface MessageListProps {
 	events: ChatEvent[];
 	reactions: Record<string, Reaction[]>;
+	tasks: TaskInfo[];
+	team: TeamState | null;
+	threadStatuses: Record<string, ThreadStatus>;
+	sessionStart: string | null;
 }
 
 interface AccumulatedThread {
@@ -34,7 +42,7 @@ interface FlatEventsGroup {
 
 type RenderItem = AccumulatedThread | FlatEventsGroup;
 
-export function MessageList({ events, reactions }: MessageListProps) {
+export function MessageList({ events, reactions, tasks, team, threadStatuses, sessionStart }: MessageListProps) {
 	const items = useMemo(() => groupEvents(events), [events]);
 
 	return (
@@ -120,10 +128,25 @@ export function MessageList({ events, reactions }: MessageListProps) {
 							}
 
 							if (laneItem.kind === 'system') {
+								if (laneItem.event.subtype === 'session-summary') {
+									return (
+										<SessionSummaryCard
+											key={laneItem.event.id}
+											event={laneItem.event}
+											teamSize={team?.members.length ?? 0}
+											tasksCompleted={tasks.filter(t => t.status === 'completed').length}
+											tasksTotal={tasks.length}
+											threadsResolved={Object.values(threadStatuses).filter(t => t.status === 'resolved').length}
+											threadsTotal={Object.values(threadStatuses).length}
+											sessionStart={sessionStart}
+										/>
+									);
+								}
 								return (
 									<SystemEventComponent
 										key={laneItem.event.id}
 										event={laneItem.event}
+										inline
 									/>
 								);
 							}

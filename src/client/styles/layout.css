@@ -229,7 +229,7 @@
 	min-height: 100%;
 	width: min(100%, var(--thread-max-width));
 	flex-direction: column;
-	gap: 14px;
+	gap: 10px;
 	margin-inline: auto;
 }
 
@@ -259,14 +259,15 @@
 	overflow: hidden;
 }
 
-/* First two sections (Artifacts, Team) — pinned top, no shrink */
+/* First three sections (Artifacts, Team, Threads) — pinned top, no shrink */
 .tc-rail-frame > .tc-rail-section:nth-child(1),
-.tc-rail-frame > .tc-rail-section:nth-child(2) {
+.tc-rail-frame > .tc-rail-section:nth-child(2),
+.tc-rail-frame > .tc-rail-section:nth-child(3) {
 	flex-shrink: 0;
 }
 
-/* Third section (Tasks) — scrollable middle */
-.tc-rail-frame > .tc-rail-section:nth-child(3) {
+/* Fourth section (Tasks) — scrollable middle */
+.tc-rail-frame > .tc-rail-section:nth-child(4) {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;

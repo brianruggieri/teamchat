@@ -5,6 +5,7 @@ import { AgentAvatar } from './AgentAvatar.jsx';
 
 interface SystemEventProps {
 	event: SystemEventType;
+	inline?: boolean;
 }
 
 const SUBTYPE_META: Record<string, { icon: string; label: string; tone: string }> = {
@@ -74,7 +75,7 @@ function getCompactText(event: SystemEventType): string {
 	}
 }
 
-export function SystemEventComponent({ event }: SystemEventProps) {
+export function SystemEventComponent({ event, inline }: SystemEventProps) {
 	const { formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const meta = SUBTYPE_META[event.subtype] ?? {
 		icon: '.',
@@ -83,6 +84,21 @@ export function SystemEventComponent({ event }: SystemEventProps) {
 	};
 	const hasAvatar = !!event.agentName;
 	const compactText = getCompactText(event);
+
+	if (inline) {
+		return (
+			<div className="tc-system-inline">
+				<span className="tc-system-icon">{meta.icon}</span>
+				{event.agentName && (
+					<span className="tc-system-agent" style={{ color: event.agentColor ?? undefined }}>
+						{event.agentName}
+					</span>
+				)}
+				<span>{compactText}</span>
+				<span className="tc-system-time">{formatAbsoluteTime(event.timestamp)}</span>
+			</div>
+		);
+	}
 
 	return (
 		<div
