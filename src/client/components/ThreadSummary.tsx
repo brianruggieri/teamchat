@@ -32,7 +32,7 @@ export function ThreadSummary({ threadStatuses, onThreadClick }: ThreadSummaryPr
 							alignItems: 'center',
 							gap: 6,
 							padding: '4px 6px',
-							background: 'var(--surface-card)',
+							background: 'var(--surface-elevated)',
 							borderRadius: 6,
 							border: 'none',
 							borderLeft: `2px solid ${thread.status === 'resolved' ? '#8ef2b4' : '#ffd38b'}`,
