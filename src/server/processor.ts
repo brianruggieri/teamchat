@@ -21,6 +21,30 @@ import {
 } from '../shared/parse.js';
 import type { WatcherDelta } from './watcher.js';
 
+/** Shallow field-level comparison for RawTaskData (avoids JSON.stringify). */
+function taskChanged(prev: RawTaskData, curr: RawTaskData): boolean {
+	if (prev.id !== curr.id) return true;
+	if (prev.subject !== curr.subject) return true;
+	if (prev.description !== curr.description) return true;
+	if (prev.status !== curr.status) return true;
+	if (prev.owner !== curr.owner) return true;
+	if (prev.activeForm !== curr.activeForm) return true;
+	if (prev.created !== curr.created) return true;
+	if (prev.updated !== curr.updated) return true;
+
+	// blockedBy: both null, or same length with identical elements
+	const a = prev.blockedBy;
+	const b = curr.blockedBy;
+	if (a === null && b === null) return false;
+	if (a === null || b === null) return true;
+	if (a.length !== b.length) return true;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return true;
+	}
+
+	return false;
+}
+
 /** Acknowledgment phrases for compact mode (Tier 2 reactions). */
 const ACK_PHRASES: Record<string, string> = {
 	'got it': '👍',
@@ -775,7 +799,7 @@ export class EventProcessor {
 			}
 
 			// Emit task update for any change
-			if (JSON.stringify(prev) !== JSON.stringify(curr)) {
+			if (taskChanged(prev, curr)) {
 				events.push(this.makeTaskUpdate(curr));
 			}
 		}

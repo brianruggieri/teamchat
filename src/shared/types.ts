@@ -9,17 +9,7 @@ export interface RawInboxMessage {
 }
 
 // === Raw Task Data (from ~/.claude/tasks/{name}/*.json) ===
-export interface RawTaskData {
-	id: string;
-	subject: string;
-	description: string | null;
-	status: 'pending' | 'in_progress' | 'completed' | 'failed';
-	owner: string | null;
-	blockedBy: string[] | null;
-	activeForm: string | null;
-	created: string;
-	updated: string;
-}
+export type RawTaskData = TaskInfo;
 
 // === Agent & Team ===
 export interface AgentInfo {
