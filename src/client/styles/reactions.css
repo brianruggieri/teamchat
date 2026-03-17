@@ -1,0 +1,33 @@
+.tc-reaction-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.tc-reaction-row.is-end {
+	justify-content: flex-end;
+}
+
+.tc-reaction-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 4px 8px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 999px;
+	background: rgba(14, 23, 34, 0.78);
+	color: var(--text-secondary);
+	font-size: 0.7rem;
+}
+
+.tc-reaction-count {
+	color: var(--text-primary);
+	font-weight: 700;
+}
+
+.tc-reaction-pill .tc-avatar {
+	margin-right: -4px;
+}
+.tc-reaction-pill .tc-avatar:last-child {
+	margin-right: 4px;
+}

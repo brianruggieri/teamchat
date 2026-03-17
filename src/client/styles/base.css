@@ -1,0 +1,89 @@
+:root {
+	--surface-app: #071019;
+	--surface-panel: #0d1722;
+	--surface-elevated: #13202f;
+	--surface-background: #03060b;
+	--text-primary: #f3f7fb;
+	--text-secondary: #b3c0cf;
+	--text-muted: #7f90a6;
+	--border-subtle: rgba(126, 146, 170, 0.16);
+	--border-strong: rgba(126, 146, 170, 0.3);
+	--accent-lead: #5b6df7;
+	--accent-lead-soft: rgba(91, 109, 247, 0.18);
+	--radius-10: 10px;
+	--radius-14: 14px;
+	--radius-20: 20px;
+	--space-4: 4px;
+	--space-8: 8px;
+	--space-12: 12px;
+	--space-16: 16px;
+	--space-24: 24px;
+	--space-32: 32px;
+	--shadow-panel: 0 18px 60px rgba(0, 0, 0, 0.22);
+	--scrollbar-thumb: #223244;
+	--scrollbar-thumb-hover: #2c4157;
+	--scrollbar-track: #09131d;
+	--replay-badge-text: #8fa4c8;
+	--thread-max-width: 960px;
+	--thread-card-max-width: 56rem;
+	--message-max-width: 46rem;
+}
+
+* {
+	box-sizing: border-box;
+	scrollbar-width: thin;
+	scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+	background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+	background: var(--scrollbar-thumb);
+	border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+	background: var(--scrollbar-thumb-hover);
+}
+
+html,
+body,
+#root {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	overflow: hidden;
+	background:
+		radial-gradient(circle at top, rgba(91, 109, 247, 0.18), transparent 38%),
+		linear-gradient(180deg, #071019 0%, #03060b 100%);
+	color: var(--text-primary);
+	font-family: "IBM Plex Sans", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+	font: inherit;
+}
+
+button {
+	appearance: none;
+	border: 0;
+	background: none;
+	cursor: pointer;
+}
+
+pre,
+code {
+	font-family: "IBM Plex Mono", "SFMono-Regular", "SF Mono", Menlo, monospace;
+}

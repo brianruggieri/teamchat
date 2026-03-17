@@ -1,0 +1,133 @@
+/* === DM Conversation Lanes === */
+.tc-dm-lane {
+	margin-left: 28px;
+	padding: 10px 12px 10px 14px;
+	border-left: 2px solid;
+	border-radius: 0 10px 10px 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.tc-dm-lane-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 4px;
+}
+/* Reusable overlapping avatar pair — used in DM lane headers, timeline, etc. */
+.tc-avatar-pair {
+	position: relative;
+	width: 42px;
+	height: 28px;
+	flex-shrink: 0;
+}
+.tc-avatar-pair .tc-avatar {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+}
+.tc-avatar-pair .tc-avatar:first-child {
+	left: 0;
+	z-index: 2;
+}
+.tc-avatar-pair .tc-avatar:last-child {
+	left: 15px;
+	z-index: 1;
+}
+/* Knockout ring: box-shadow on the core creates a clean gap between overlapping avatars */
+.tc-avatar-pair .tc-avatar:first-child .tc-avatar-core {
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 3px 0 0 0 var(--surface-app, #071019);
+}
+.tc-dm-lane-names {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+.tc-dm-lane-count {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+.tc-dm-lane-resolution {
+	font-size: 0.9rem;
+}
+.tc-dm-bubble {
+	position: relative;
+	max-width: 80%;
+	padding: 5px 10px;
+	border-radius: 4px 10px 10px 10px;
+	font-size: 0.78rem;
+	color: var(--text-primary);
+	line-height: 1.4;
+}
+.tc-dm-bubble.is-responder {
+	margin-left: auto;
+	border-radius: 10px 4px 10px 10px;
+}
+/* Identity pip — rounded square overlapping the flat corner of each bubble */
+.tc-dm-bubble-dot {
+	position: absolute;
+	top: -4px;
+	left: -4px;
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	overflow: hidden;
+	box-shadow: 0 0 0 2px var(--surface-app);
+	z-index: 1;
+}
+
+.tc-dm-bubble-dot svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+.tc-dm-bubble.is-responder .tc-dm-bubble-dot {
+	left: auto;
+	right: -4px;
+}
+/* Capping separator — dotted line with count between first and last bubble */
+.tc-dm-lane-separator {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 2px 0;
+	cursor: pointer;
+}
+.tc-dm-lane-separator:hover .tc-dm-lane-separator-label {
+	color: var(--text-secondary);
+}
+.tc-dm-lane-separator-line {
+	flex: 1;
+	height: 0;
+	border-top: 1px dashed rgba(126, 146, 170, 0.25);
+}
+.tc-dm-lane-separator-label {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+	transition: color 0.15s;
+}
+.tc-dm-lane-expand {
+	align-self: center;
+	background: none;
+	border: 1px solid var(--border-subtle);
+	border-radius: 8px;
+	padding: 3px 12px;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+.tc-dm-lane-expand:hover {
+	border-color: var(--border-strong);
+	color: var(--text-secondary);
+}
+/* Single DM badge (1-message, no lane) */
+.tc-dm-badge {
+	display: inline-flex;
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: rgba(255, 255, 255, 0.06);
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	margin-left: 6px;
+}
