@@ -1,0 +1,134 @@
+.tc-top-content {
+	padding: 12px 20px;
+	border-bottom: 1px solid var(--border-subtle);
+	background: rgba(9, 16, 24, 0.74);
+}
+
+.tc-top-content.is-live {
+	border-bottom-color: rgba(42, 208, 108, 0.12);
+	background: linear-gradient(180deg, rgba(8, 19, 16, 0.92), rgba(9, 16, 24, 0.74));
+}
+
+.tc-top-content.is-replay {
+	border-bottom-color: rgba(255, 189, 74, 0.16);
+	background: linear-gradient(180deg, rgba(29, 21, 8, 0.92), rgba(9, 16, 24, 0.74));
+}
+
+.tc-mode-banner {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px 18px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 18px;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.tc-mode-banner.is-live {
+	border-color: rgba(42, 208, 108, 0.22);
+	background:
+		linear-gradient(180deg, rgba(10, 31, 22, 0.94), rgba(10, 24, 22, 0.82)),
+		radial-gradient(circle at top right, rgba(42, 208, 108, 0.16), transparent 34%);
+}
+
+.tc-mode-banner.is-replay {
+	border-color: rgba(255, 189, 74, 0.28);
+	background:
+		linear-gradient(180deg, rgba(44, 29, 8, 0.94), rgba(25, 20, 12, 0.84)),
+		radial-gradient(circle at top right, rgba(255, 189, 74, 0.18), transparent 38%);
+}
+
+/* Demo mode banner — warm amber, visually distinct from the standard replay banner */
+.tc-mode-banner.is-demo {
+	border-color: rgba(251, 146, 60, 0.38);
+	background:
+		linear-gradient(180deg, rgba(50, 22, 4, 0.96), rgba(28, 14, 4, 0.88)),
+		radial-gradient(circle at top right, rgba(251, 146, 60, 0.22), transparent 40%);
+}
+
+.tc-mode-banner-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	flex-wrap: wrap;
+}
+
+.tc-mode-banner-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-width: 52rem;
+}
+
+.tc-mode-banner-eyebrow {
+	font-size: 0.7rem;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+}
+
+.tc-mode-banner.is-live .tc-mode-banner-eyebrow {
+	color: #8ef2b4;
+}
+
+.tc-mode-banner.is-replay .tc-mode-banner-eyebrow {
+	color: #ffd38b;
+}
+
+.tc-mode-banner.is-demo .tc-mode-banner-eyebrow {
+	color: #fdba74;
+}
+
+.tc-mode-banner-title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 700;
+}
+
+.tc-mode-banner-description {
+	margin: 0;
+	color: var(--text-secondary);
+	font-size: 0.84rem;
+	line-height: 1.55;
+}
+
+.tc-mode-banner-meta {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.tc-mode-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 6px 10px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 999px;
+	background: rgba(9, 16, 24, 0.52);
+	color: var(--text-primary);
+	font-size: 0.72rem;
+	font-weight: 600;
+}
+
+.tc-mode-banner.is-live .tc-mode-chip {
+	border-color: rgba(42, 208, 108, 0.18);
+	background: rgba(8, 23, 18, 0.62);
+}
+
+.tc-mode-banner.is-replay .tc-mode-chip {
+	border-color: rgba(255, 189, 74, 0.2);
+	background: rgba(33, 24, 10, 0.62);
+}
+
+.tc-mode-banner.is-demo .tc-mode-chip {
+	border-color: rgba(251, 146, 60, 0.26);
+	background: rgba(40, 16, 4, 0.68);
+}
+
+.tc-mode-banner-body {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}

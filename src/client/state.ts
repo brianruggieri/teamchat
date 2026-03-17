@@ -41,6 +41,13 @@ export function cloneChatState(state: ChatState): ChatState {
 export function createBaseChatState(overrides: Partial<ChatState> = {}): ChatState {
 	return {
 		...INITIAL_STATE,
+		events: [],
+		tasks: [],
+		presence: {},
+		reactions: {},
+		planCards: {},
+		permissionCards: {},
+		threadStatuses: {},
 		...overrides,
 	};
 }

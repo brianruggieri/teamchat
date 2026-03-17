@@ -1,0 +1,29 @@
+/* === Setup Card === */
+.tc-setup-card { padding: 0; }
+.tc-setup-card-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 10px 12px;
+	background: none;
+	border: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+	font-size: 0.82rem;
+	text-align: left;
+}
+.tc-setup-card-toggle:hover { color: var(--text-primary); }
+.tc-setup-card-icon { font-size: 1rem; }
+.tc-setup-card-chevron { margin-left: auto; font-size: 0.7rem; }
+.tc-setup-card-detail {
+	padding: 4px 12px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+.tc-setup-card-item {
+	font-size: 0.76rem;
+	color: var(--text-muted);
+	padding: 2px 0;
+}
