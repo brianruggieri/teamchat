@@ -84,8 +84,9 @@ describe('Replay Engine', () => {
 		// Task claimed markers that are close together should be clustered
 		const claimedChips = chips.filter(c => c.label.includes('started'));
 		const rawClaimed = loaded.bundle.markers.filter(m => m.kind === 'task-claimed');
-		// Clustered chips should be fewer than raw markers (or equal if no clustering needed)
-		expect(claimedChips.length).toBeLessThanOrEqual(rawClaimed.length);
+		// Ensure there are multiple raw events to cluster, then assert actual clustering occurred
+		expect(rawClaimed.length).toBeGreaterThan(1);
+		expect(claimedChips.length).toBeLessThan(rawClaimed.length);
 	});
 
 	test('clusters task-completed markers within 15s window', () => {
@@ -94,7 +95,8 @@ describe('Replay Engine', () => {
 		// Task completed markers that are close together should be clustered
 		const completedChips = chips.filter(c => c.label.includes('done'));
 		const rawCompleted = loaded.bundle.markers.filter(m => m.kind === 'task-completed');
-		// Clustered chips should be fewer than raw markers (or equal if no clustering needed)
-		expect(completedChips.length).toBeLessThanOrEqual(rawCompleted.length);
+		// Ensure there are multiple raw events to cluster, then assert actual clustering occurred
+		expect(rawCompleted.length).toBeGreaterThan(1);
+		expect(completedChips.length).toBeLessThan(rawCompleted.length);
 	});
 });

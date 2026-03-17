@@ -18,7 +18,7 @@ export function SetupCard({ events }: SetupCardProps) {
 
 	return (
 		<div className="tc-system-card is-accent tc-setup-card">
-			<button type="button" className="tc-setup-card-toggle" onClick={() => setExpanded(!expanded)}>
+			<button type="button" className="tc-setup-card-toggle" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
 				<span className="tc-setup-card-icon">📋</span>
 				<span className="tc-setup-card-label">
 					{parts.length > 0 ? parts.join(', ') : 'Session setup'}

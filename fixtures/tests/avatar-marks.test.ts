@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { hashName, hashName2, hashName3, resolveMarks, renderAvatarMark, pairScore } from '../../src/client/avatar-marks';
+import { hashName, hashName2, hashName3, resolveMarks, renderAvatarMark, pairScore } from '../../src/client/avatar-marks.js';
 
 describe('identity hash functions', () => {
 	test('hashName is deterministic', () => {

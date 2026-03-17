@@ -154,9 +154,13 @@ export class EventProcessor {
 	private recentNudges: Map<string, { eventId: string; timestamp: string }> = new Map(); // agent name → nudge info
 	private recentBroadcasts: { eventId: string; timestamp: string; from: string }[] = [];
 
+	// Color lookup cache — populated on first observation of each agent's color
+	private agentColorCache: Map<string, string> = new Map();
+
 	constructor(emitter: EventEmitter, compactMode = false) {
 		this.emitter = emitter;
 		this.compactMode = compactMode;
+		this.agentColorCache = new Map();
 	}
 
 	/** Process a delta from the file watcher. */
@@ -250,6 +254,10 @@ export class EventProcessor {
 				const member = currByName.get(name)!;
 				this.presence.set(name, 'working');
 				this.previousMembers.add(name);
+				// Cache the color as soon as we know it from config
+				if (member.color) {
+					this.agentColorCache.set(name, member.color);
+				}
 				const joinedTs = member.joinedAt
 					? new Date(member.joinedAt).toISOString()
 					: undefined;
@@ -620,6 +628,11 @@ export class EventProcessor {
 				this.emitDM(inboxOwner, rawMsg);
 				return;
 			}
+		}
+
+		// Update color cache from the pending broadcast before building the message
+		if (pending.fromColor) {
+			this.agentColorCache.set(pending.from, pending.fromColor);
 		}
 
 		const msg: ContentMessage = {
@@ -1005,6 +1018,11 @@ export class EventProcessor {
 		// Clear idle state when agent sends a content message
 		this.clearIdleState(msg.from, msg.timestamp);
 
+		// Update color cache on every message so we always have the latest color
+		if (msg.color) {
+			this.agentColorCache.set(msg.from, msg.color);
+		}
+
 		const contentMsg: ContentMessage = {
 			type: 'message',
 			id: generateEventId(),
@@ -1172,9 +1190,15 @@ export class EventProcessor {
 		return null;
 	}
 
-	/** Get agent color from recent events or default to 'blue'. */
+	/** Get agent color from cache, recent events, or default to 'blue'. */
 	private getAgentColor(agentName: string): string {
-		// Look up from recent message events
+		// Fast path: O(1) cache lookup
+		const cached = this.agentColorCache.get(agentName);
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		// Fallback: reverse scan over allEvents (handles edge cases where cache was missed)
 		for (let i = this.allEvents.length - 1; i >= 0; i--) {
 			const ev = this.allEvents[i]!;
 			if (ev.type === 'message' && (ev as ContentMessage).from === agentName) {

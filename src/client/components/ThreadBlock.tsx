@@ -186,17 +186,23 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 							</span>
 						</div>
 						{showSeparatorAfter && (
-							<div
+							<button
+								type="button"
 								className="tc-dm-lane-separator"
 								onClick={() => setExpanded(true)}
-								role="button"
-								tabIndex={0}
-								onKeyDown={(e) => e.key === 'Enter' && setExpanded(true)}
+								aria-label="Show all thread messages"
+								aria-expanded={expanded}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										setExpanded(true);
+									}
+								}}
 							>
 								<div className="tc-dm-lane-separator-line" />
 								<span className="tc-dm-lane-separator-label">{hiddenCount} more</span>
 								<div className="tc-dm-lane-separator-line" />
-							</div>
+							</button>
 						)}
 					</React.Fragment>
 				);
