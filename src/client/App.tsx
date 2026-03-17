@@ -672,6 +672,10 @@ function TeamChatScaffold({
 							<MessageList
 								events={state.events}
 								reactions={state.reactions}
+								tasks={state.tasks}
+								team={state.team}
+								threadStatuses={state.threadStatuses}
+								sessionStart={state.sessionStart}
 							/>
 						</div>
 					</div>

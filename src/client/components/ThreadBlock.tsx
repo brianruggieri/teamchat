@@ -147,7 +147,7 @@ function ThreadLane({ threadKey, participants, events, messages, reactions, topi
 
 	return (
 		<div
-			className="tc-dm-lane"
+			className={`tc-dm-lane${isResolved ? ' is-resolved' : ''}`}
 			data-thread-key={threadKey}
 			style={{
 				borderLeftColor: initiatorColorCss.border,
