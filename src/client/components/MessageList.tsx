@@ -124,6 +124,7 @@ export function MessageList({ events, reactions }: MessageListProps) {
 									<SystemEventComponent
 										key={laneItem.event.id}
 										event={laneItem.event}
+										inline
 									/>
 								);
 							}

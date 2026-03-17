@@ -61,11 +61,11 @@ export function ChatMessage({
 				>
 					{timeDisplay}
 				</span>
+				<ReactionRow
+					reactions={reactions}
+					align={message.isLead ? 'end' : 'start'}
+				/>
 			</div>
-			<ReactionRow
-				reactions={reactions}
-				align={message.isLead ? 'end' : 'start'}
-			/>
 		</article>
 	);
 }

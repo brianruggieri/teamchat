@@ -250,6 +250,7 @@
 .tc-chat-meta {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
 	gap: var(--space-8);
 	padding-inline: 2px;
 }

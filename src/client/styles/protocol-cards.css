@@ -166,3 +166,15 @@
 .tc-system-text {
 	line-height: 1.5;
 }
+
+.tc-system-inline {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 0;
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+}
+.tc-system-inline .tc-system-icon { font-size: 0.85rem; flex-shrink: 0; }
+.tc-system-inline .tc-system-agent { font-weight: 500; }
+.tc-system-inline .tc-system-time { color: var(--text-muted); font-size: 0.72rem; margin-left: auto; }
