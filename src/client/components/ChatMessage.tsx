@@ -43,7 +43,7 @@ export function ChatMessage({
 				<MessageContent text={displayText} />
 				{isLong && (
 					<button type="button" onClick={() => setExpanded(!expanded)} className="tc-expand-toggle" title={expanded ? 'Collapse' : 'Expand'} aria-label={expanded ? 'Collapse message' : 'Expand message'} aria-expanded={expanded}>
-						{expanded ? '▴' : '⋯'}
+						{expanded ? '▴ less' : '⋯ more'}
 					</button>
 				)}
 			</div>
