@@ -10,14 +10,14 @@ interface SystemEventProps {
 
 const SUBTYPE_META: Record<string, { icon: string; label: string; tone: string }> = {
 	'member-joined': { icon: '👋', label: 'joined', tone: 'positive' },
-	'member-left': { icon: '←', label: 'left', tone: 'neutral' },
+	'member-left': { icon: '👋', label: 'left', tone: 'neutral' },
 	'task-created': { icon: '📋', label: 'task', tone: 'neutral' },
 	'task-claimed': { icon: '✋', label: 'claimed', tone: 'accent' },
 	'task-completed': { icon: '✅', label: 'complete', tone: 'positive' },
 	'task-failed': { icon: '❌', label: 'failed', tone: 'danger' },
 	'task-unblocked': { icon: '🔓', label: 'unblocked', tone: 'accent' },
 	'all-tasks-completed': { icon: '🎉', label: 'milestone', tone: 'celebration' },
-	'shutdown-requested': { icon: '⏹', label: 'shutdown', tone: 'warning' },
+	'shutdown-requested': { icon: '🛑', label: 'shutdown', tone: 'warning' },
 	'shutdown-approved': { icon: '👋', label: 'goodbye', tone: 'neutral' },
 	'shutdown-rejected': { icon: '🚫', label: 'rejected', tone: 'danger' },
 	'team-created': { icon: '🚀', label: 'launched', tone: 'accent' },
