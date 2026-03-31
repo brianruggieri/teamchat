@@ -24,7 +24,7 @@ bun run dev:demo               # Replay bundled demo session on port 4567
 bun run dev:replay             # Replay build session fixture on port 4567
 bun run build                  # Bundle client to dist/client/
 bun run typecheck              # tsc --noEmit
-bun test                       # Run all tests (555 tests across 26 files)
+bun test                       # Run all tests (559 tests across 27 files)
 bun run fixture:generate       # Regenerate test fixtures
 ```
 
@@ -99,7 +99,7 @@ The `ChatEvent` union type in `src/shared/types.ts` is the core contract:
 
 ## Planning & Specs
 
-Planning docs live in `.claude/` (local, gitignored — not committed to the repo):
+Planning docs live in `.claude/` (some specs are committed; local plans are gitignored):
 
 **Active plans (have remaining work):**
 - `plan-v2-kickoff.md` — master plan: Waves 1–2 complete, Waves 3–4 pending

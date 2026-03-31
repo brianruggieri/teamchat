@@ -32,7 +32,7 @@ Planning docs live in `.claude/` (local, gitignored). Key references:
 - Run: `bun test`
 - All tests use fixture data — don't depend on real Claude Code installations
 - When adding new features, add tests for the new event processing logic
-- Current: 555 tests across 26 files covering processor, DMs, idle suppression, broadcasts, reactions, task cascades, avatar marks, conversation beats, replay engine, state reducer, message grouping, export, sanitization, and secret scanning
+- Current: 559 tests across 27 files covering processor, DMs, idle suppression, broadcasts, reactions, task cascades, task prompt collapse, avatar marks, conversation beats, replay engine, state reducer, message grouping, export, sanitization, and secret scanning
 
 ## Key Design Principles
 
