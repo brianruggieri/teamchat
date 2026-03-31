@@ -10,3 +10,16 @@ fixtures/output/
 .env
 .env.*
 package-lock.json
+
+# Claude Code agent docs (local plans, specs, settings)
+.claude/
+
+# Tool caches
+.superpowers/
+.playwright-mcp/
+
+# Screenshots (QA artifacts, not source)
+*.png
+
+# Showcase projects (independent codebases, not part of teamchat source)
+showcase/*/

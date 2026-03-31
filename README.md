@@ -31,6 +31,12 @@ teamchat --watch ~/.claude/teams
 
 Or run without arguments — teamchat defaults to watching `~/.claude/teams/` if it exists.
 
+Start in lobby mode — waits for the first new team to be created:
+
+```bash
+teamchat --auto
+```
+
 ### Auto-Launch Hook
 
 Run once to configure teamchat to start automatically whenever a Claude Code Agent Team is created:
@@ -39,7 +45,7 @@ Run once to configure teamchat to start automatically whenever a Claude Code Age
 teamchat setup
 ```
 
-This writes a `PostToolUse` hook to `~/.claude/settings.json` that launches teamchat in the background when a `Teammate` tool is invoked.
+This writes a `PostToolUse` hook to `~/.claude/settings.json` that launches teamchat in the background when a `TeamCreate` tool is invoked.
 
 ## Features
 
@@ -61,12 +67,15 @@ teamchat is entirely local. It makes no network calls and collects no telemetry.
 
 | Command / Flag | Description |
 |---|---|
-| `teamchat --team <name>` | Watch a specific running team |
-| `teamchat --watch <dir>` | Auto-detect teams in a directory |
-| `teamchat --replay <file-or-dir>` | Replay a JSONL journal or bundle directory |
+| `teamchat --team, -t <name>` | Watch a specific running team |
+| `teamchat --watch, -w <dir>` | Auto-detect teams in a directory |
+| `teamchat --auto` | Wait for a new team to be created (lobby mode) |
+| `teamchat --replay, -r <file-or-dir>` | Replay a JSONL journal or bundle directory |
 | `teamchat --replay --demo` | Replay the bundled demo session |
 | `teamchat export <path>` | Export a session to a `.teamchat-replay` bundle |
 | `teamchat export --latest` | Export the most recent session |
+| `teamchat export --sanitize` | Anonymize agent names and redact detected secrets |
+| `teamchat export --strip-content` | Strip all message content (requires `--sanitize`) |
 | `teamchat scan <file.jsonl>` | Scan a session file for secrets |
 | `teamchat setup` | Install the auto-launch hook into `~/.claude/settings.json` |
 | `--port, -p <port>` | Server port (default: `3456`) |
