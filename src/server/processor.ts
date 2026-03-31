@@ -501,14 +501,15 @@ export class EventProcessor {
 		if (isLeadAgent(msg.from) && ownerIsTeammate) {
 			const match = msg.text.match(EventProcessor.TASK_PROMPT_PATTERN);
 			if (match) {
-				const [, agentName, , taskNum] = match;
+				const [, , , taskNum] = match;
 				const sysEvent = this.makeSystemEvent(
 					'task-assigned',
-					`team-lead assigned Task #${taskNum} to ${agentName}`,
-					agentName!,
-					this.getAgentColor(agentName!),
+					`team-lead assigned Task #${taskNum} to ${inboxOwner}`,
+					inboxOwner,
+					this.getAgentColor(inboxOwner),
+					taskNum,
 				);
-				this.clearIdleState(msg.from, msg.timestamp);
+				this.clearIdleState(inboxOwner, msg.timestamp);
 				this.emit([sysEvent]);
 				return;
 			}
