@@ -489,9 +489,30 @@ export class EventProcessor {
 		}
 	}
 
+	/** Detect task-assignment system prompts (lead dispatching work to agents). */
+	private static readonly TASK_PROMPT_PATTERN =
+		/^You are the (\S+) agent on team "([^"]+)"\.\s+Your job is Task #(\d+)\./;
+
 	private processContentMessage(inboxOwner: string, msg: RawInboxMessage): void {
 		const senderIsTeammate = !isLeadAgent(msg.from);
 		const ownerIsTeammate = !isLeadAgent(inboxOwner);
+
+		// Collapse lead→agent task-assignment system prompts into a system event
+		if (isLeadAgent(msg.from) && ownerIsTeammate) {
+			const match = msg.text.match(EventProcessor.TASK_PROMPT_PATTERN);
+			if (match) {
+				const [, agentName, , taskNum] = match;
+				const sysEvent = this.makeSystemEvent(
+					'task-assigned',
+					`team-lead assigned Task #${taskNum} to ${agentName}`,
+					agentName!,
+					this.getAgentColor(agentName!),
+				);
+				this.clearIdleState(msg.from, msg.timestamp);
+				this.emit([sysEvent]);
+				return;
+			}
+		}
 
 		// Teammate→teammate: always a DM — emit immediately, no hold window needed.
 		// Each inbox gets its own DM event. This preserves synchronous emission
@@ -542,6 +563,22 @@ export class EventProcessor {
 
 		const contentMsg = this.buildContentMessage(msg, false, true, participants);
 		events.push(contentMsg);
+
+		// Nudge detection: lead → single idle agent (non-assignment DM)
+		if (isLeadAgent(msg.from)) {
+			const isIdle = this.presence.get(inboxOwner) === 'idle';
+			const isAssignment = msg.text.includes('"type":"task_assignment"');
+			if (isIdle && !isAssignment) {
+				const nudgeEvent = this.makeSystemEvent(
+					'nudge',
+					`team-lead nudged ${inboxOwner}`,
+					inboxOwner,
+					this.getAgentColor(inboxOwner),
+				);
+				events.push(nudgeEvent);
+				this.recentNudges.set(inboxOwner, { eventId: nudgeEvent.id, timestamp: msg.timestamp });
+			}
+		}
 
 		// Track thread status
 		const existing = this.threadStatuses.get(threadKey);
@@ -612,11 +649,11 @@ export class EventProcessor {
 		const isBroadcast = pending.inboxes.size >= 3;
 		const senderIsTeammate = !isLeadAgent(pending.from);
 
-		// DM: teammate→teammate message that appeared in only one inbox
-		if (senderIsTeammate && pending.inboxes.size === 1) {
+		// DM: any message that appeared in only one inbox (teammate→teammate or lead→teammate)
+		if (pending.inboxes.size === 1) {
 			const inboxOwner = [...pending.inboxes][0]!;
 			if (!isLeadAgent(inboxOwner)) {
-				// It's a true DM — emit via the DM path
+				// It's a DM to a single teammate — emit via the DM path
 				const rawMsg: RawInboxMessage = {
 					from: pending.from,
 					text: pending.text,

@@ -142,7 +142,7 @@ describe("DM Thread Detection", () => {
 		expect(messages[0]!.text).toContain("RBAC");
 	});
 
-	test("lead→teammate messages are NOT classified as DMs", async () => {
+	test("lead→teammate messages ARE classified as DMs", async () => {
 		const leadMsg = fixtureEvents.find(
 			(e) => e.label === "Lead answers privacy encryption question",
 		)!;
@@ -160,7 +160,7 @@ describe("DM Thread Detection", () => {
 			(e) => e.type === "message",
 		) as ContentMessage[];
 		expect(messages).toHaveLength(1);
-		expect(messages[0]!.isDM).toBe(false);
+		expect(messages[0]!.isDM).toBe(true);
 		expect(messages[0]!.isLead).toBe(true);
 	});
 

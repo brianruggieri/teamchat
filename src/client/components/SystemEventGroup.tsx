@@ -9,8 +9,20 @@ interface SystemEventGroupProps {
 
 export function SystemEventGroup({
 	subtype,
-	events,
+	events: rawEvents,
 }: SystemEventGroupProps) {
+	// Deduplicate events that share the same agent/task (e.g. from double-fired watchers)
+	const events = useMemo(() => {
+		const seen = new Set<string>();
+		return rawEvents.filter((e) => {
+			const key = subtype === 'member-joined'
+				? e.agentName ?? e.id
+				: e.taskId ?? e.id;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
+	}, [rawEvents, subtype]);
 	const [collapsed, setCollapsed] = useState(true);
 	const { formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const detailId = useMemo(
@@ -26,15 +38,19 @@ export function SystemEventGroup({
 	);
 	const preview = useMemo(() => {
 		if (subtype === 'member-joined') {
-			const members = events
-				.map((event) => event.agentName)
-				.filter((name): name is string => Boolean(name));
+			const members = [...new Set(
+				events
+					.map((event) => event.agentName)
+					.filter((name): name is string => Boolean(name)),
+			)];
 			return members.slice(0, 3).join(', ');
 		}
 
-		const subjects = events
-			.map((event) => event.taskSubject ?? event.taskId)
-			.filter((value): value is string => Boolean(value));
+		const subjects = [...new Set(
+			events
+				.map((event) => event.taskSubject ?? event.taskId)
+				.filter((value): value is string => Boolean(value)),
+		)];
 		return subjects.slice(0, 2).join(' · ');
 	}, [events, subtype]);
 
