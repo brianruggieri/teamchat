@@ -1,0 +1,5 @@
+[
+	{"from":"team-lead","text":"Please build the login page with email/password fields.","summary":"Build login page","timestamp":"2026-03-31T17:55:10.000Z","color":"indigo","read":true},
+	{"from":"agent-b","text":"Hey, what auth library are you using? I need to match the token format.","summary":null,"timestamp":"2026-03-31T17:56:30.000Z","color":"cyan","read":true},
+	{"from":"agent-b","text":"Never mind, I see you're using JWT. I'll match that.","summary":null,"timestamp":"2026-03-31T17:57:00.000Z","color":"cyan","read":true}
+]

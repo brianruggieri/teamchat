@@ -1,0 +1,17 @@
+{
+	"version": 1,
+	"team": "test-team",
+	"sessionId": "test-session-001",
+	"projectPath": "/tmp/test-project",
+	"durationMs": 300000,
+	"agents": [
+		{ "name": "team-lead", "agentId": "lead-001", "agentType": "lead", "color": "indigo" },
+		{ "name": "agent-a", "agentId": "agent-test-001", "agentType": "general-purpose", "color": "purple" },
+		{ "name": "agent-b", "agentId": "agent-test-002", "agentType": "general-purpose", "color": "cyan" }
+	],
+	"taskCount": 2,
+	"eventCount": 18,
+	"capturedAt": "2026-03-31T18:00:00.000Z",
+	"startedAt": "2026-03-31T17:55:00.000Z",
+	"endedAt": "2026-03-31T18:00:00.000Z"
+}
