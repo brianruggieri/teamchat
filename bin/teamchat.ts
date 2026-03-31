@@ -25,7 +25,7 @@ interface CliArgs {
 	demo: boolean;
 	auto: boolean;
 	// Export subcommand
-	subcommand: 'export' | 'scan' | null;
+	subcommand: 'export' | 'scan' | 'capture' | 'report' | null;
 	subcommandArg: string | null;
 	// Export flags
 	latest: boolean;
@@ -127,6 +127,18 @@ function parseArgs(argv: string[]): CliArgs {
 					args.subcommandArg = argv[++i] ?? null;
 				}
 				break;
+			case 'capture':
+				args.subcommand = 'capture';
+				if (argv[i + 1] && !argv[i + 1]!.startsWith('-')) {
+					args.subcommandArg = argv[++i] ?? null;
+				}
+				break;
+			case 'report':
+				args.subcommand = 'report';
+				if (argv[i + 1] && !argv[i + 1]!.startsWith('-')) {
+					args.subcommandArg = argv[++i] ?? null;
+				}
+				break;
 		}
 	}
 
@@ -146,6 +158,8 @@ USAGE:
   teamchat export <path>           Export session to .teamchat-replay bundle
   teamchat export --latest         Export most recent session
   teamchat scan <file.jsonl>       Scan a session for secrets
+  teamchat capture <session-id>    Bundle a session for comparison reports
+  teamchat report <bundle>         Generate an HTML comparison report
   teamchat setup                   Configure auto-launch hook
 
 OPTIONS:
@@ -631,6 +645,23 @@ if (args.subcommand === 'export') {
 		process.exit(1);
 	}
 	runScan(args.subcommandArg);
+} else if (args.subcommand === 'report') {
+	if (!args.subcommandArg) {
+		console.error('Usage: teamchat report <capture-bundle-path>');
+		process.exit(1);
+	}
+	const { generateReport } = await import('../src/compare/report-generator');
+	const html = generateReport(args.subcommandArg);
+	const outputPath = args.subcommandArg.replace(/\/?$/, '') + '-report.html';
+	await Bun.write(outputPath, html);
+	console.log(`Report written to ${outputPath}`);
+} else if (args.subcommand === 'capture') {
+	if (!args.subcommandArg) {
+		console.error('Usage: teamchat capture <session-id>');
+		process.exit(1);
+	}
+	const { runCapture } = await import('../src/capture/cli');
+	await runCapture(args.subcommandArg);
 } else if (args.replay) {
 	const replayPath = args.demo
 		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/demo/session.teamchat-replay')
