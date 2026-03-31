@@ -9,27 +9,30 @@ Instructions for AI agents working on this project.
 3. Run `bun test` and `bun run typecheck` to confirm a clean baseline
 4. After making changes, always run `bun test` and `bun run typecheck` before claiming completion
 
-## v1 Spec
+## Specs & Plans
 
-The current product spec is `.claude/teamchat-v1-spec.md` (local, not committed to the repo). This is the source of truth for what ships in v1.0.
+Planning docs live in `.claude/` (local, gitignored). Key references:
+- `plan-v2-kickoff.md` — master plan with work items and wave structure
+- `teamchat-spec-v02.md` — original product spec (protocol ground truth)
+- `teamchat-build-handoff.md` — architecture decisions and rationale
 
 ## Code Style
 
 - **TypeScript strict mode** — no `any` abuse, no `@ts-ignore`
 - **Tabs** for indentation
 - **Bun-native APIs** preferred (Bun.serve, Bun.file, Bun.build)
-- **No external runtime dependencies** beyond React and Tailwind (chokidar is optional fallback)
+- **No external runtime dependencies** beyond React and Tailwind (chokidar is an optional fallback for file watching)
 - **Event-sourced architecture** — all state is built from immutable `ChatEvent` streams
 - **Reducer pattern** in client — state changes go through `useChatReducer`
 
 ## Testing
 
-- Tests live alongside source in `src/` or in `fixtures/`
+- Tests live alongside source in `src/` and in `fixtures/tests/`
 - Test files: `*.test.ts`
 - Run: `bun test`
 - All tests use fixture data — don't depend on real Claude Code installations
 - When adding new features, add tests for the new event processing logic
-- Current: 47 tests across 6 files (processor, DMs, idle, broadcasts, reactions, task cascades)
+- Current: 555 tests across 26 files covering processor, DMs, idle suppression, broadcasts, reactions, task cascades, avatar marks, conversation beats, replay engine, state reducer, message grouping, export, sanitization, and secret scanning
 
 ## Key Design Principles
 

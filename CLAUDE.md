@@ -4,7 +4,7 @@
 
 A group chat visualizer for Claude Code Agent Teams. Renders multi-agent coordination as a Slack/iMessage-style group chat with DM threads, reactions, task tracking, idle suppression, and session replay.
 
-**Current status**: Pre-v1 — core features complete, preparing for npm publish + Show HN launch.
+**Current status**: v1.0.0 — core features complete, preparing for public launch.
 
 ## Tech Stack
 
@@ -19,10 +19,12 @@ A group chat visualizer for Claude Code Agent Teams. Renders multi-agent coordin
 
 ```bash
 bun install                    # Install dependencies
-bun run dev                    # Dev server on port 4567 with test fixtures
+bun run dev                    # Live-watch mode (team "test-team" on port 4567)
+bun run dev:demo               # Replay bundled demo session on port 4567
+bun run dev:replay             # Replay build session fixture on port 4567
 bun run build                  # Bundle client to dist/client/
 bun run typecheck              # tsc --noEmit
-bun test                       # Run all tests
+bun test                       # Run all tests (555 tests across 26 files)
 bun run fixture:generate       # Regenerate test fixtures
 ```
 
@@ -39,16 +41,31 @@ src/
     replay.ts                  # Replay bundle loading (server-side)
   client/
     App.tsx                    # Main React SPA
-    components/                # 17+ components (messages, tasks, reactions, cards)
-    hooks/                     # useWebSocket, useChatReducer, useAutoScroll, useRelativeTime
-    styles/index.css           # Dark theme, animations, semantic CSS variables
+    components/                # 26 components (messages, tasks, reactions, threads, cards)
+    components/tests/          # Client component tests (messageGrouping)
+    hooks/                     # useWebSocket, useChatReducer, useAutoScroll, useRelativeTime, useReplayController
+    styles/                    # 18 CSS files: index.css entry + 17 per-section modules
+    tests/                     # Client state tests (state.test.ts)
+    artifacts.ts               # Artifact loading and display
+    avatar-marks.ts            # Generative avatar mark system (hash-based)
+    replay.ts                  # Client-side replay engine
+    replayTimeline.ts          # Timeline marker computation
+    state.ts                   # Chat state reducer (drives the entire UI)
     types.ts                   # Client-side types, agent color mappings
   shared/
     types.ts                   # ChatEvent type definitions (server↔client contract)
     parse.ts                   # System event parsing utilities
     replay.ts                  # ReplayBundle, ReplayManifest, ReplayEntry types
+    distill.ts                 # Text distillation/summarization utility
+  security/
+    sanitizer.ts               # Agent anonymization and content redaction
+    secret-scanner.ts          # Pattern-based secret detection
+  export/
+    cli.ts                     # Export subcommand handler
+    exporter.ts                # Session → .teamchat-replay bundle exporter
 fixtures/
   replays/                     # Bundled demo session for --replay --demo
+  tests/                       # Server-side test suites
 scripts/
   build-client.ts              # Bun bundler configuration
 ```
@@ -80,20 +97,25 @@ The `ChatEvent` union type in `src/shared/types.ts` is the core contract:
 - **Theming**: Semantic `--tc-*` CSS tokens for theming. Don't add new hardcoded color values.
 - **Tests**: All tests use fixture data in `fixtures/`. Run `bun test` after any change.
 
-## Current Branches
-
-- `main` — stable, all tests passing
-- `codex/timed-replay-system` — timed replay UI controls (needs merge to main for v1)
-- `codex/theme-extension-spec` — theme system spec (v2, not for v1)
-
 ## Planning & Specs
 
 Planning docs live in `.claude/` (local, gitignored — not committed to the repo):
-- `teamchat-v1-spec.md` — v1 product spec (the launch plan)
-- `teamchat-spec-v02.md` — original product spec (detailed design reference)
+
+**Active plans (have remaining work):**
+- `plan-v2-kickoff.md` — master plan: Waves 1–2 complete, Waves 3–4 pending
+- `v1-showcase-and-launch-plan.md` — launch tasks 10–15 (showcase sessions, demo GIF, launch post)
+- `v1-event-enrichment-plan.md` — P1 done, P2–5 remaining (advanced reactions, post-mortem)
+- `ui-polish-and-postmortem-plan.md` — sidebar layout, celebrations, post-mortem pipeline
+- `2025-03-15-chat-ux-improvements-plan.md` — timeline lead glow and overlap handling
+
+**Active reference (useful context):**
+- `teamchat-spec-v02.md` — original product spec (protocol ground truth)
 - `teamchat-build-handoff.md` — architecture decisions and rationale
 - `market-research-and-plan.md` — competitive analysis, GTM strategy
-- `teamchat-session-transcript.md` — simulated session for testing reference
+- `pulse-spec.md` — spec for the pulse showcase session (Wave 3)
+- `frontend-redesign-spec.md` — Playwright-driven UI audit (918 lines of findings)
+
+**Archived (completed work):** in `.claude/archive/`
 
 ## What NOT to Do
 
