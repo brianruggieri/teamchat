@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseSessionLog, parseSubagentLog } from '../../src/compare/parser';
+import { parseSessionLog, parseSubagentLog } from '../../src/compare/parser.js';
 import { join } from 'path';
 
 const FIXTURE_DIR = join(import.meta.dir, '../captures/test-session');

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
-import { finalizeCaptureBundle } from '../../src/capture/finalizer';
-import { getCapturePaths } from '../../src/capture/types';
+import { finalizeCaptureBundle } from '../../src/capture/finalizer.js';
+import { getCapturePaths } from '../../src/capture/types.js';
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 

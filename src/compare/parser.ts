@@ -1,5 +1,5 @@
 import { readFileSync } from 'fs';
-import type { TerminalEntry } from './types';
+import type { TerminalEntry } from './types.js';
 
 interface SessionJsonlEntry {
 	type: string;
@@ -32,9 +32,11 @@ function parseJsonlFile(filePath: string): SessionJsonlEntry[] {
 
 function extractEntries(entries: SessionJsonlEntry[], agentName: string): TerminalEntry[] {
 	const result: TerminalEntry[] = [];
+	let lastTimestamp: string | null = null;
 
 	for (const entry of entries) {
-		const timestamp = entry.timestamp ?? new Date().toISOString();
+		const timestamp: string = entry.timestamp ?? lastTimestamp ?? '1970-01-01T00:00:00.000Z';
+		lastTimestamp = timestamp;
 
 		if (entry.type === 'user' && entry.message) {
 			const content = typeof entry.message.content === 'string'
@@ -50,7 +52,11 @@ function extractEntries(entries: SessionJsonlEntry[], agentName: string): Termin
 
 		if (entry.type === 'assistant' && entry.message) {
 			const blocks = entry.message.content;
-			if (Array.isArray(blocks)) {
+			if (typeof blocks === 'string') {
+				if (blocks) {
+					result.push({ timestamp, agent: agentName, type: 'assistant-text', content: blocks });
+				}
+			} else if (Array.isArray(blocks)) {
 				for (const block of blocks) {
 					if (block.type === 'thinking' && block.thinking) {
 						result.push({ timestamp, agent: agentName, type: 'thinking', content: block.thinking });

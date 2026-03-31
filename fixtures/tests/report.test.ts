@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
-import { renderReport } from '../../src/compare/report-template';
-import type { Scorecard } from '../../src/compare/types';
+import { renderReport } from '../../src/compare/report-template.js';
+import type { Scorecard } from '../../src/compare/types.js';
 
 function makeTestScorecard(): Scorecard {
 	return {

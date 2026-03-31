@@ -1,5 +1,5 @@
-import type { ParsedSession, Scorecard, ScorecardMetrics, KeyMoment } from './types';
-import type { ChatEvent } from '../shared/types';
+import type { ParsedSession, Scorecard, ScorecardMetrics, KeyMoment } from './types.js';
+import type { ChatEvent } from '../shared/types.js';
 
 function countByType(events: ChatEvent[], type: string): number {
 	return events.filter(e => e.type === type).length;
@@ -196,7 +196,7 @@ export function detectKeyMoments(session: ParsedSession): KeyMoment[] {
 
 	// Detect bottlenecks
 	const bottlenecks = teamchat.events.filter(
-		(e): e is import('../shared/types').SystemEvent => e.type === 'system' && e.subtype === 'bottleneck'
+		(e): e is import('../shared/types.js').SystemEvent => e.type === 'system' && e.subtype === 'bottleneck'
 	);
 	for (const bn of bottlenecks) {
 		moments.push({

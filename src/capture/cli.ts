@@ -1,9 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { finalizeCaptureBundle } from './finalizer';
+import * as os from 'os';
+import { finalizeCaptureBundle } from './finalizer.js';
 
 export async function runCapture(sessionId: string): Promise<void> {
-	const homeDir = process.env.HOME ?? '~';
+	const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? os.homedir();
 	const projectsDir = `${homeDir}/.claude/projects`;
 
 	if (!existsSync(projectsDir)) {
@@ -48,8 +49,8 @@ export async function runCapture(sessionId: string): Promise<void> {
 
 	const subagentDir = join(projectPath, sessionId, 'subagents');
 	const teamsDir = `${homeDir}/.claude/teams`;
-	const inboxDir = existsSync(join(teamsDir, sessionId, 'inboxes'))
-		? join(teamsDir, sessionId, 'inboxes')
+	const inboxDir = existsSync(join(teamsDir, teamName, 'inboxes'))
+		? join(teamsDir, teamName, 'inboxes')
 		: null;
 
 	// Check for teamchat journal
@@ -57,6 +58,10 @@ export async function runCapture(sessionId: string): Promise<void> {
 	const journalPath = existsSync(join(journalDir, `${teamName}.jsonl`))
 		? join(journalDir, `${teamName}.jsonl`)
 		: null;
+
+	// Check for tasks directory
+	const tasksTeamDir = join(homeDir, '.claude', 'tasks', teamName);
+	const tasksSourceDir = existsSync(tasksTeamDir) ? tasksTeamDir : null;
 
 	const outputDir = `${homeDir}/.teamchat/captures`;
 
@@ -68,7 +73,7 @@ export async function runCapture(sessionId: string): Promise<void> {
 		subagentDir: existsSync(subagentDir) ? subagentDir : null,
 		inboxSnapshotsDir: inboxDir,
 		journalPath,
-		tasksDir: null,
+		tasksDir: tasksSourceDir,
 		outputDir,
 	});
 

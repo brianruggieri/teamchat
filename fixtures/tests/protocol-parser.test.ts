@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseInboxes } from '../../src/compare/protocol-parser';
+import { parseInboxes } from '../../src/compare/protocol-parser.js';
 import { join } from 'path';
 
 const INBOX_DIR = join(import.meta.dir, '../captures/test-session/inboxes');
@@ -21,8 +21,8 @@ describe('parseInboxes', () => {
 	test('detects DMs (message to single recipient, not broadcast)', () => {
 		const timeline = parseInboxes(INBOX_DIR);
 		const dms = timeline.messages.filter(m => m.isDM);
-		// agent-b → agent-a: 2 DMs about auth library
-		expect(dms.length).toBe(2);
+		// agent-b → agent-a: 2 DMs about auth library + team-lead → agent-b: 1 private message
+		expect(dms.length).toBe(3);
 	});
 
 	test('messages are chronologically ordered', () => {
@@ -36,7 +36,11 @@ describe('parseInboxes', () => {
 	test('sets correct from/to fields', () => {
 		const timeline = parseInboxes(INBOX_DIR);
 		const dms = timeline.messages.filter(m => m.isDM);
-		expect(dms[0].from).toBe('agent-b');
-		expect(dms[0].to).toBe('agent-a');
+		// First DM chronologically is team-lead → agent-b (private, non-broadcast)
+		expect(dms[0].from).toBe('team-lead');
+		expect(dms[0].to).toBe('agent-b');
+		// Then agent-b → agent-a DMs
+		expect(dms[1].from).toBe('agent-b');
+		expect(dms[1].to).toBe('agent-a');
 	});
 });

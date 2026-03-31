@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { CaptureManifest } from './types';
+import type { CaptureManifest } from './types.js';
 
 export interface FinalizeOptions {
 	sessionId: string;
@@ -30,6 +30,7 @@ function extractTimestamp(entry: Record<string, unknown>): string | null {
 function getTimestampRange(filePath: string): { start: string; end: string } {
 	if (!existsSync(filePath)) return { start: new Date().toISOString(), end: new Date().toISOString() };
 	const lines = readFileSync(filePath, 'utf-8').split('\n').filter(l => l.trim());
+	if (lines.length === 0) return { start: new Date().toISOString(), end: new Date().toISOString() };
 
 	// Scan forward for first valid timestamp
 	let start: string | null = null;
@@ -74,7 +75,7 @@ export async function finalizeCaptureBundle(opts: FinalizeOptions): Promise<stri
 			copyFileSync(join(opts.subagentDir, file), join(bundlePath, 'subagents', file));
 			if (file.endsWith('.meta.json')) {
 				const meta = JSON.parse(readFileSync(join(opts.subagentDir, file), 'utf-8'));
-				const agentId = file.replace('.meta.json', '').replace('agent-', '');
+				const agentId = file.replace('.meta.json', '');
 				agents.push({
 					name: agentId,
 					agentId,

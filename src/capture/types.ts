@@ -1,5 +1,5 @@
 // src/capture/types.ts
-import type { AgentInfo } from '../shared/types';
+import type { AgentInfo } from '../shared/types.js';
 
 export interface CaptureManifest {
 	version: 1;

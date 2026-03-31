@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, copyFileSync, readdirSync } from 'fs';
 import { join } from 'path';
+import * as os from 'os';
 
 export class CaptureCollector {
 	private snapshotDir: string;
@@ -9,7 +10,7 @@ export class CaptureCollector {
 	private _sourceTaskDir: string | null;
 
 	constructor(sessionId: string, inboxSourceDir: string, taskSourceDir: string | null) {
-		const homeDir = process.env.HOME ?? '~';
+		const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? os.homedir();
 		this.snapshotDir = join(homeDir, '.teamchat', 'captures', sessionId);
 		this.inboxesDir = join(this.snapshotDir, 'inboxes');
 		this.tasksDir = join(this.snapshotDir, 'tasks');

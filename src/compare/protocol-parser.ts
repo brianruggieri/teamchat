@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'fs';
 import { join, basename } from 'path';
-import type { ProtocolMessage, ProtocolTimeline } from './types';
-import type { RawInboxMessage } from '../shared/types';
+import type { ProtocolMessage, ProtocolTimeline } from './types.js';
+import type { RawInboxMessage } from '../shared/types.js';
 
 interface InboxEntry extends RawInboxMessage {
 	_recipient: string;
@@ -51,7 +51,7 @@ export function parseInboxes(inboxDir: string): ProtocolTimeline {
 	const messages: ProtocolMessage[] = allEntries.map(entry => {
 		const key = `${contentHash(entry.text)}:${entry.from}`;
 		const isBroadcast = broadcastHashes.has(key);
-		const isDM = !isBroadcast && entry.from !== 'team-lead';
+		const isDM = !isBroadcast;
 		return {
 			timestamp: entry.timestamp,
 			from: entry.from,

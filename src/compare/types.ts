@@ -1,5 +1,5 @@
 // src/compare/types.ts
-import type { ChatEvent } from '../shared/types';
+import type { ChatEvent } from '../shared/types.js';
 
 export interface TerminalEntry {
 	timestamp: string;
@@ -33,7 +33,7 @@ export interface TeamchatTimeline {
 }
 
 export interface ParsedSession {
-	manifest: import('../capture/types').CaptureManifest;
+	manifest: import('../capture/types.js').CaptureManifest;
 	terminal: TerminalTimeline;
 	protocol: ProtocolTimeline;
 	teamchat: TeamchatTimeline;

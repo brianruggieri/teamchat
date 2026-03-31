@@ -1,12 +1,12 @@
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import { getCapturePaths, type CaptureManifest } from '../capture/types';
-import { parseSessionLog } from './parser';
-import { parseInboxes } from './protocol-parser';
-import { computeScorecard } from './scorecard';
-import { renderReport } from './report-template';
-import type { ParsedSession, TerminalTimeline, TeamchatTimeline } from './types';
-import type { ChatEvent, JournalEntry } from '../shared/types';
+import { getCapturePaths, type CaptureManifest } from '../capture/types.js';
+import { parseSessionLog } from './parser.js';
+import { parseInboxes } from './protocol-parser.js';
+import { computeScorecard } from './scorecard.js';
+import { renderReport } from './report-template.js';
+import type { ParsedSession, TerminalTimeline, TeamchatTimeline } from './types.js';
+import type { ChatEvent, JournalEntry } from '../shared/types.js';
 
 function buildTerminalTimeline(paths: ReturnType<typeof getCapturePaths>, manifest: CaptureManifest): TerminalTimeline {
 	const lead = existsSync(paths.leadLog)
@@ -17,7 +17,7 @@ function buildTerminalTimeline(paths: ReturnType<typeof getCapturePaths>, manife
 	if (existsSync(paths.subagentsDir)) {
 		const files = readdirSync(paths.subagentsDir).filter(f => f.endsWith('.jsonl'));
 		for (const file of files) {
-			const agentId = file.replace('agent-', '').replace('.jsonl', '');
+			const agentId = file.replace(/\.jsonl$/, '');
 			const agent = manifest.agents.find(a => a.agentId === agentId);
 			const name = agent?.name ?? agentId;
 			agents[name] = parseSessionLog(join(paths.subagentsDir, file), name);

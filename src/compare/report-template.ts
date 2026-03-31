@@ -1,4 +1,4 @@
-import type { Scorecard, KeyMoment } from './types';
+import type { Scorecard, KeyMoment } from './types.js';
 
 function escapeHtml(text: string): string {
 	return text

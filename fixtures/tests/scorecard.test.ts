@@ -1,12 +1,12 @@
 import { describe, test, expect } from 'bun:test';
-import { computeScorecard, detectKeyMoments } from '../../src/compare/scorecard';
-import { parseSessionLog } from '../../src/compare/parser';
-import { parseInboxes } from '../../src/compare/protocol-parser';
+import { computeScorecard, detectKeyMoments } from '../../src/compare/scorecard.js';
+import { parseSessionLog } from '../../src/compare/parser.js';
+import { parseInboxes } from '../../src/compare/protocol-parser.js';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import type { CaptureManifest } from '../../src/capture/types';
-import type { ParsedSession } from '../../src/compare/types';
-import type { ChatEvent, JournalEntry } from '../../src/shared/types';
+import type { CaptureManifest } from '../../src/capture/types.js';
+import type { ParsedSession } from '../../src/compare/types.js';
+import type { ChatEvent, JournalEntry } from '../../src/shared/types.js';
 
 const FIXTURE_DIR = join(import.meta.dir, '../captures/test-session');
 
