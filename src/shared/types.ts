@@ -97,6 +97,7 @@ export type SystemEventType =
 	| 'team-deleted'
 	| 'idle-surfaced'
 	| 'nudge'
+	| 'task-assigned'
 	| 'bottleneck'
 	| 'session-summary';
 

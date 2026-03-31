@@ -59,9 +59,11 @@ export class FileWatcher {
 		this.ensureDir(this.inboxDir);
 		this.ensureDir(this.tasksDir);
 
-		// Watch config.json
+		// Watch config.json directly if it already exists
 		if (fs.existsSync(this.configPath)) {
-			this.watchFile(this.configPath, () => this.handleConfigChange());
+			this.watchFile(this.configPath, () =>
+				this.debouncedAction('config', () => this.handleConfigChange()),
+			);
 		}
 
 		// Watch inboxes directory for new/changed files
@@ -79,7 +81,7 @@ export class FileWatcher {
 			}
 		});
 
-		// Also watch team dir for config.json creation
+		// Watch team dir for config.json creation (catches late-arriving config)
 		this.watchDir(this.teamDir, (filename) => {
 			if (filename === 'config.json') {
 				this.debouncedAction('config', () => this.handleConfigChange());
@@ -112,7 +114,7 @@ export class FileWatcher {
 	private watchFile(filePath: string, callback: () => void): void {
 		try {
 			const watcher = fs.watch(filePath, () => {
-				this.debouncedAction(filePath, callback);
+				callback();
 			});
 			this.watchers.push(watcher);
 		} catch {
