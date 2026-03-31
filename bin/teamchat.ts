@@ -168,28 +168,40 @@ EXPORT OPTIONS:
 `);
 }
 
+// === Team freshness check ===
+
+const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+function isTeamFresh(teamsDir: string, teamDir: string): boolean {
+	const teamPath = path.join(teamsDir, teamDir);
+	try {
+		const stat = fs.statSync(teamPath);
+		return Date.now() - stat.mtimeMs < STALE_THRESHOLD_MS;
+	} catch {
+		return false;
+	}
+}
+
 // === Setup command ===
 
 function runSetup(): void {
 	const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '~';
 	const settingsPath = path.join(homeDir, '.claude', 'settings.json');
 
+	const launchCommand =
+		"bash -c 'TEAM=$(cat | jq -r \".tool_input.team_name // empty\"); " +
+		"TEAM=$(printf \"%s\" \"$TEAM\" | tr -cd \"a-zA-Z0-9_-\"); " +
+		'if [ -n "$TEAM" ] && ! pgrep -f "teamchat.*$TEAM" > /dev/null; ' +
+		"then teamchat --team \"$TEAM\" & fi'";
+	const hookEntry = (matcher: string) => ({
+		matcher,
+		hooks: [
+			{ type: 'command', command: launchCommand, async: true, timeout: 5 },
+		],
+	});
 	const hookConfig = {
 		hooks: {
-			PostToolUse: [
-				{
-					matcher: 'Teammate',
-					hooks: [
-						{
-							type: 'command',
-							command:
-								"bash -c 'TEAM=$(cat | jq -r \".tool_input.team_name // empty\"); if [ -n \"$TEAM\" ] && ! pgrep -f \"teamchat.*$TEAM\" > /dev/null; then teamchat --team \"$TEAM\" & fi'",
-							async: true,
-							timeout: 5,
-						},
-					],
-				},
-			],
+			PostToolUse: [hookEntry('TeamCreate')],
 		},
 	};
 
@@ -206,7 +218,7 @@ function runSetup(): void {
 	const existingHooks = (existing.hooks ?? {}) as Record<string, unknown>;
 	const existingPostToolUse = (existingHooks.PostToolUse ?? []) as unknown[];
 	const hasTeamchatHook = existingPostToolUse.some(
-		(h: unknown) => (h as Record<string, unknown>).matcher === 'Teammate',
+		(h: unknown) => (h as Record<string, unknown>).matcher === 'TeamCreate',
 	);
 
 	if (hasTeamchatHook) {
@@ -240,7 +252,8 @@ function startWatchMode(watchDir: string, port: number, compact: boolean, noJour
 			const dirs = fs.readdirSync(teamsDir);
 			for (const dir of dirs) {
 				const configPath = path.join(teamsDir, dir, 'config.json');
-				if (fs.existsSync(configPath) && !activeTeams.has(dir)) {
+				const fresh = isTeamFresh(teamsDir, dir);
+				if (fs.existsSync(configPath) && !activeTeams.has(dir) && fresh) {
 					activeTeams.add(dir);
 					console.log(`Detected team: ${dir}`);
 					startTeamSession(dir, port + activeTeams.size - 1, compact, noJournal);
@@ -253,6 +266,13 @@ function startWatchMode(watchDir: string, port: number, compact: boolean, noJour
 
 	checkForTeams();
 	setInterval(checkForTeams, 2000);
+
+	// Bun exits when no I/O is pending — keep alive with a idle server
+	Bun.serve({
+		port,
+		fetch: () => new Response('teamchat watch mode — waiting for teams'),
+	});
+	console.log(`Watch mode active on port ${port}, polling every 2s...`);
 }
 
 // === Auto mode (lobby — single server, waits for first team) ===
@@ -352,7 +372,7 @@ function startAutoMode(teamsDir: string, port: number, compact: boolean, noJourn
 			const dirs = fs.readdirSync(teamsDir);
 			for (const dir of dirs) {
 				const configPath = path.join(teamsDir, dir, 'config.json');
-				if (fs.existsSync(configPath)) {
+				if (fs.existsSync(configPath) && isTeamFresh(teamsDir, dir)) {
 					tryActivate(dir);
 					return;
 				}
