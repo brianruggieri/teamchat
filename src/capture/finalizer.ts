@@ -19,14 +19,35 @@ function countJsonlLines(filePath: string): number {
 	return readFileSync(filePath, 'utf-8').split('\n').filter(l => l.trim()).length;
 }
 
+function extractTimestamp(entry: Record<string, unknown>): string | null {
+	if (typeof entry.timestamp === 'string') return entry.timestamp;
+	if (entry.snapshot && typeof (entry.snapshot as Record<string, unknown>).timestamp === 'string') {
+		return (entry.snapshot as Record<string, unknown>).timestamp as string;
+	}
+	return null;
+}
+
 function getTimestampRange(filePath: string): { start: string; end: string } {
 	if (!existsSync(filePath)) return { start: new Date().toISOString(), end: new Date().toISOString() };
 	const lines = readFileSync(filePath, 'utf-8').split('\n').filter(l => l.trim());
-	const first = JSON.parse(lines[0]);
-	const last = JSON.parse(lines[lines.length - 1]);
+
+	// Scan forward for first valid timestamp
+	let start: string | null = null;
+	for (const line of lines) {
+		start = extractTimestamp(JSON.parse(line));
+		if (start) break;
+	}
+
+	// Scan backward for last valid timestamp
+	let end: string | null = null;
+	for (let i = lines.length - 1; i >= 0; i--) {
+		end = extractTimestamp(JSON.parse(lines[i]));
+		if (end) break;
+	}
+
 	return {
-		start: first.timestamp ?? new Date().toISOString(),
-		end: last.timestamp ?? new Date().toISOString(),
+		start: start ?? new Date().toISOString(),
+		end: end ?? new Date().toISOString(),
 	};
 }
 
