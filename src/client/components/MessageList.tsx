@@ -13,6 +13,7 @@ import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
 import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { SetupCard } from './SetupCard.jsx';
+import { CascadeCard } from './CascadeCard.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { SessionSummaryCard } from './SessionSummaryCard.jsx';
@@ -148,6 +149,7 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 										<SystemEventComponent
 											key={laneItem.events[0].id}
 											event={laneItem.events[0]}
+											inline
 										/>
 									);
 								}
@@ -166,6 +168,17 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 									<SetupCard
 										key={`setup-${laneItem.events[0]?.id ?? 'card'}`}
 										events={laneItem.events}
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'cascade') {
+								return (
+									<CascadeCard
+										key={`cascade-${laneItem.completion.id}`}
+										completion={laneItem.completion}
+										unblocks={laneItem.unblocks}
+										claims={laneItem.claims}
 									/>
 								);
 							}

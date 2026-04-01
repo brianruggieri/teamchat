@@ -178,3 +178,103 @@
 .tc-system-inline .tc-system-icon { font-size: 0.85rem; flex-shrink: 0; }
 .tc-system-inline .tc-system-agent { font-weight: 500; }
 .tc-system-inline .tc-system-time { color: var(--text-muted); font-size: 0.72rem; margin-left: auto; }
+
+/* === Cascade card (task-completed → task-unblocked chain) === */
+
+.tc-cascade-card {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 10px 14px;
+	border: 1px solid rgba(42, 208, 108, 0.22);
+	border-radius: var(--radius-10);
+	background: rgba(11, 19, 30, 0.72);
+	width: fit-content;
+	max-width: min(100%, var(--thread-card-max-width));
+}
+
+.tc-cascade-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.82rem;
+	flex-wrap: wrap;
+}
+
+.tc-cascade-icon {
+	flex-shrink: 0;
+	font-size: 0.78rem;
+}
+
+.tc-cascade-agent {
+	font-weight: 600;
+	flex-shrink: 0;
+}
+
+.tc-cascade-chip {
+	padding: 0 6px;
+	border: 1px solid var(--border-subtle);
+	border-radius: 999px;
+	background: rgba(18, 30, 45, 0.68);
+	color: var(--text-secondary);
+	font-size: 0.72rem;
+	flex-shrink: 0;
+}
+
+.tc-cascade-subject {
+	color: var(--text-primary);
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tc-cascade-time {
+	margin-left: auto;
+	color: var(--text-muted);
+	font-size: 0.72rem;
+	flex-shrink: 0;
+}
+
+.tc-cascade-unblocks {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	padding-left: 4px;
+	border-left: 2px solid rgba(91, 109, 247, 0.24);
+}
+
+.tc-cascade-unblock-item {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 0.78rem;
+	color: var(--text-secondary);
+	flex-wrap: wrap;
+}
+
+.tc-cascade-unblock-icon {
+	flex-shrink: 0;
+	font-size: 0.72rem;
+}
+
+.tc-cascade-unblock-subject {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tc-cascade-claim {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	flex-shrink: 0;
+}
