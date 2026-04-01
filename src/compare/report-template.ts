@@ -1,5 +1,5 @@
 import type { Scorecard, KeyMoment, ParsedSession, TerminalEntry, ProtocolMessage } from './types.js';
-import type { ChatEvent } from '../shared/types.js';
+import type { ChatEvent, SystemEvent } from '../shared/types.js';
 
 function escapeHtml(text: string): string {
 	return text
@@ -436,6 +436,376 @@ function renderTimeline(session: ParsedSession): string {
 </section>`;
 }
 
+// --- Coordination Chains ---
+
+interface ChainEvent {
+	timestamp: string;
+	layer: 'terminal' | 'hidden' | 'teamchat';
+	phase: 'dispatch' | 'work' | 'completion' | 'shutdown';
+	text: string;
+}
+
+interface CoordinationChain {
+	agentName: string;
+	agentType: string;
+	durationMs: number;
+	events: ChainEvent[];
+}
+
+function buildCoordinationChains(session: ParsedSession): CoordinationChain[] {
+	const chains: CoordinationChain[] = [];
+	const { manifest, terminal, protocol, teamchat } = session;
+
+	// Build unique role names from manifest (excluding lead).
+	// Protocol messages and teamchat events identify agents by their role name
+	// (agentType), not their raw agentId, so we iterate over unique role names.
+	const subagents = manifest.agents.filter(a => a.agentType !== 'lead');
+	const seenRoles = new Set<string>();
+	const uniqueRoles: { roleName: string; agentType: string }[] = [];
+	for (const agent of subagents) {
+		if (!seenRoles.has(agent.agentType)) {
+			seenRoles.add(agent.agentType);
+			uniqueRoles.push({ roleName: agent.agentType, agentType: agent.agentType });
+		}
+	}
+	if (uniqueRoles.length === 0) return chains;
+
+	for (const role of uniqueRoles) {
+		const roleName = role.roleName;
+		const events: ChainEvent[] = [];
+
+		// 1. Find Agent() dispatch in terminal.lead
+		const dispatch = terminal.lead.find(e =>
+			e.type === 'tool-call' &&
+			e.toolName === 'Agent' &&
+			e.content.includes(`"name":"${roleName}"`)
+		);
+		if (dispatch) {
+			// Extract the description from the Agent call if available
+			const descMatch = dispatch.content.match(/"description":"([^"]{0,80})/);
+			const desc = descMatch ? descMatch[1] : truncate(dispatch.content, 80);
+			events.push({
+				timestamp: dispatch.timestamp,
+				layer: 'terminal',
+				phase: 'dispatch',
+				text: `lead dispatches Agent("${roleName}: ${desc}")`,
+			});
+		}
+
+		// 2. Find member-joined events in teamchat (may have multiple joins for same role)
+		const joinEvents = teamchat.events.filter(e =>
+			e.type === 'system' && e.subtype === 'member-joined' && e.agentName === roleName
+		) as SystemEvent[];
+		// Use first join for the dispatch phase (deduplicate multiple instances)
+		if (joinEvents.length > 0) {
+			events.push({
+				timestamp: joinEvents[0].timestamp,
+				layer: 'teamchat',
+				phase: 'dispatch',
+				text: `${roleName} joined the chat`,
+			});
+		}
+
+		// 3. Find task-claimed events in teamchat (deduplicate by taskId)
+		const claimEvents = teamchat.events.filter(e =>
+			e.type === 'system' && e.subtype === 'task-claimed' && e.agentName === roleName
+		) as SystemEvent[];
+		const seenTaskClaims = new Set<string>();
+		for (const claim of claimEvents) {
+			const key = claim.taskId ?? claim.timestamp;
+			if (seenTaskClaims.has(key)) continue;
+			seenTaskClaims.add(key);
+			const taskLabel = claim.taskId ? `Task #${claim.taskId}` : 'a task';
+			events.push({
+				timestamp: claim.timestamp,
+				layer: 'teamchat',
+				phase: 'dispatch',
+				text: `${roleName} claimed ${taskLabel}`,
+			});
+		}
+
+		// Helper: check if a protocol message is a control/noise message
+		function isProtocolNoise(content: string): boolean {
+			try {
+				const parsed = JSON.parse(content);
+				const noiseTypes = ['idle_notification', 'idle', 'shutdown_request', 'task_assignment', 'shutdown_approved'];
+				return noiseTypes.includes(parsed.type);
+			} catch {
+				return false;
+			}
+		}
+
+		// 4. Find DMs TO this agent (messages they received from other agents during work)
+		const dmsReceived = protocol.messages.filter(m =>
+			m.to === roleName && m.isDM && m.from !== 'team-lead' && m.from !== roleName
+		);
+		for (const dm of dmsReceived) {
+			if (isProtocolNoise(dm.content)) continue;
+			events.push({
+				timestamp: dm.timestamp,
+				layer: 'hidden',
+				phase: 'work',
+				text: `${roleName}\u2190${dm.from}: "${truncate(dm.content, 80)}"`,
+			});
+		}
+
+		// 5. Find DMs FROM this agent (their completion announcements and reports)
+		const dmsSent = protocol.messages.filter(m =>
+			m.from === roleName && m.isDM && m.to !== roleName
+		);
+		for (const dm of dmsSent) {
+			if (isProtocolNoise(dm.content)) continue;
+			const phase = dm.to === 'team-lead' ? 'completion' as const : 'work' as const;
+			events.push({
+				timestamp: dm.timestamp,
+				layer: 'hidden',
+				phase,
+				text: `${roleName}\u2192${dm.to}: "${truncate(dm.content, 80)}"`,
+			});
+		}
+
+		// 6. Find broadcasts FROM this agent
+		const broadcastsSent = protocol.messages.filter(m =>
+			m.from === roleName && m.isBroadcast
+		);
+		// Deduplicate broadcasts (same content sent to multiple recipients)
+		const seenBroadcasts = new Set<string>();
+		for (const bc of broadcastsSent) {
+			const key = bc.content.slice(0, 100);
+			if (seenBroadcasts.has(key)) continue;
+			seenBroadcasts.add(key);
+			const recipientCount = broadcastsSent.filter(m => m.content.slice(0, 100) === key).length;
+			events.push({
+				timestamp: bc.timestamp,
+				layer: 'hidden',
+				phase: 'work',
+				text: `${roleName} broadcast to ${recipientCount} agents: "${truncate(bc.content, 60)}"`,
+			});
+		}
+
+		// 7. Find task-completed events in teamchat (deduplicate by taskId)
+		const completionEvents = teamchat.events.filter(e =>
+			e.type === 'system' && e.subtype === 'task-completed' && e.agentName === roleName
+		) as SystemEvent[];
+		const seenTaskCompletions = new Set<string>();
+		const dedupedCompletions: SystemEvent[] = [];
+		for (const comp of completionEvents) {
+			const key = comp.taskId ?? comp.timestamp;
+			if (seenTaskCompletions.has(key)) continue;
+			seenTaskCompletions.add(key);
+			dedupedCompletions.push(comp);
+			// Look for unblocked tasks near this completion
+			const compTime = new Date(comp.timestamp).getTime();
+			const unblocks = teamchat.events.filter(e =>
+				e.type === 'system' && e.subtype === 'task-unblocked' &&
+				Math.abs(new Date(e.timestamp).getTime() - compTime) < 5000
+			) as SystemEvent[];
+			const taskLabel = comp.taskId ? `Task #${comp.taskId}` : 'task';
+			const unblockedSuffix = unblocks.length > 0
+				? ` \u2192 ${unblocks.length} task${unblocks.length > 1 ? 's' : ''} unblocked`
+				: '';
+			events.push({
+				timestamp: comp.timestamp,
+				layer: 'teamchat',
+				phase: 'completion',
+				text: `${taskLabel} completed${unblockedSuffix}`,
+			});
+		}
+
+		// Also find lead marking task completed in terminal (near a completion event for this agent)
+		const usedLeadEntries = new Set<string>();
+		for (const comp of dedupedCompletions) {
+			const compTime = new Date(comp.timestamp).getTime();
+			const leadEntry = terminal.lead.find(e => {
+				const t = new Date(e.timestamp).getTime();
+				return !usedLeadEntries.has(e.timestamp + e.content) &&
+					Math.abs(t - compTime) < 10000 &&
+					e.type === 'tool-call' &&
+					e.content.toLowerCase().includes('completed');
+			});
+			if (leadEntry) {
+				usedLeadEntries.add(leadEntry.timestamp + leadEntry.content);
+				events.push({
+					timestamp: leadEntry.timestamp,
+					layer: 'terminal',
+					phase: 'completion',
+					text: `lead marks task completed`,
+				});
+			}
+		}
+
+		// 8. Find shutdown_request in protocol messages (from lead to this agent)
+		const shutdownMsgs = protocol.messages.filter(m => {
+			if (m.to !== roleName) return false;
+			try {
+				const parsed = JSON.parse(m.content);
+				return parsed.type === 'shutdown_request';
+			} catch {
+				return false;
+			}
+		});
+		for (const shutdownMsg of shutdownMsgs) {
+			events.push({
+				timestamp: shutdownMsg.timestamp,
+				layer: 'terminal',
+				phase: 'shutdown',
+				text: `lead sends shutdown to ${roleName}`,
+			});
+		}
+
+		// 9. Find shutdown-approved/requested system events (deduplicate by subtype)
+		const shutdownEvents = teamchat.events.filter(e =>
+			e.type === 'system' && (e.subtype === 'shutdown-approved' || e.subtype === 'shutdown-requested') &&
+			e.agentName === roleName
+		) as SystemEvent[];
+		const seenShutdownSubtypes = new Set<string>();
+		for (const se of shutdownEvents) {
+			if (seenShutdownSubtypes.has(se.subtype)) continue;
+			seenShutdownSubtypes.add(se.subtype);
+			events.push({
+				timestamp: se.timestamp,
+				layer: 'teamchat',
+				phase: 'shutdown',
+				text: `${roleName} shutdown ${se.subtype === 'shutdown-approved' ? 'approved' : 'requested'}`,
+			});
+		}
+
+		// 10. Find member-left event (first only — deduplicate multiple instances)
+		const leftEvent = teamchat.events.find(e =>
+			e.type === 'system' && e.subtype === 'member-left' && e.agentName === roleName
+		) as SystemEvent | undefined;
+		if (leftEvent) {
+			events.push({
+				timestamp: leftEvent.timestamp,
+				layer: 'teamchat',
+				phase: 'shutdown',
+				text: `${roleName} left`,
+			});
+		}
+
+		// Sort events by timestamp
+		events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+		// Compute duration from first to last event
+		let durationMs = 0;
+		if (events.length >= 2) {
+			const first = new Date(events[0].timestamp).getTime();
+			const last = new Date(events[events.length - 1].timestamp).getTime();
+			durationMs = last - first;
+		}
+
+		if (events.length > 0) {
+			chains.push({
+				agentName: roleName,
+				agentType: role.agentType,
+				durationMs,
+				events,
+			});
+		}
+	}
+
+	// Sort chains by dispatch time (first event timestamp)
+	chains.sort((a, b) =>
+		new Date(a.events[0].timestamp).getTime() - new Date(b.events[0].timestamp).getTime()
+	);
+
+	return chains;
+}
+
+function formatDurationCompact(ms: number): string {
+	const totalSeconds = Math.floor(ms / 1000);
+	const min = Math.floor(totalSeconds / 60);
+	const sec = totalSeconds % 60;
+	if (min < 60) return `${min} min ${sec}s`;
+	const h = Math.floor(min / 60);
+	const m = min % 60;
+	return `${h}h ${m}m ${sec}s`;
+}
+
+function renderChainCard(chain: CoordinationChain): string {
+	const phases: ('dispatch' | 'work' | 'completion' | 'shutdown')[] = ['dispatch', 'work', 'completion', 'shutdown'];
+	const phaseLabels: Record<string, string> = {
+		dispatch: 'DISPATCH',
+		work: 'WORK (hidden from lead terminal)',
+		completion: 'COMPLETION',
+		shutdown: 'SHUTDOWN',
+	};
+	const phaseIcons: Record<string, string> = {
+		dispatch: '\u{1F4E4}',
+		work: '\u{1F528}',
+		completion: '\u2705',
+		shutdown: '\u{1F534}',
+	};
+
+	let phasesHtml = '';
+	for (const phase of phases) {
+		const phaseEvents = chain.events.filter(e => e.phase === phase);
+		if (phaseEvents.length === 0 && phase === 'work') {
+			phasesHtml += `
+			<div class="chain-phase">
+				<div class="chain-phase-label">${phaseIcons[phase]} ${phaseLabels[phase]}</div>
+				<div class="chain-event"><span class="chain-empty">No inter-agent messages during this agent's work period</span></div>
+			</div>`;
+			continue;
+		}
+		if (phaseEvents.length === 0) continue;
+
+		const eventLines = phaseEvents.map(e => {
+			const time = formatTime(e.timestamp);
+			const layerClass = e.layer === 'terminal' ? 'layer-terminal' : e.layer === 'hidden' ? 'layer-hidden' : 'layer-teamchat';
+			const layerLabel = e.layer;
+			return `<div class="chain-event"><span class="chain-time">[${time}]</span> <span class="chain-layer ${layerClass}">${layerLabel}</span> ${escapeHtml(e.text)}</div>`;
+		}).join('\n');
+
+		phasesHtml += `
+		<div class="chain-phase">
+			<div class="chain-phase-label">${phaseIcons[phase]} ${phaseLabels[phase]}</div>
+			${eventLines}
+		</div>`;
+	}
+
+	return `
+	<div class="chain-card">
+		<div class="chain-header">
+			<span class="chain-agent-name">${escapeHtml(chain.agentName)}</span>
+			<span class="chain-agent-type">${escapeHtml(chain.agentType)}</span>
+			<span class="chain-duration">${formatDurationCompact(chain.durationMs)}</span>
+		</div>
+		<div class="chain-timeline">
+			<div class="chain-rail"></div>
+			${phasesHtml}
+		</div>
+	</div>`;
+}
+
+function renderCoordinationChains(session: ParsedSession): string {
+	const chains = buildCoordinationChains(session);
+	if (chains.length === 0) return '';
+
+	const INITIAL_MAX = 5;
+	const initialChains = chains.slice(0, INITIAL_MAX);
+	const remainingChains = chains.slice(INITIAL_MAX);
+
+	const initialHtml = initialChains.map(c => renderChainCard(c)).join('\n');
+	const remainingHtml = remainingChains.length > 0
+		? `<details class="chains-collapse">
+			<summary class="chains-toggle">Show all ${chains.length} agents (${remainingChains.length} more)</summary>
+			<div class="chains-overflow">
+				${remainingChains.map(c => renderChainCard(c)).join('\n')}
+			</div>
+		</details>`
+		: '';
+
+	return `
+<section>
+<div class="container">
+	<div class="section-header"><h2>Coordination Chains</h2><p>Each agent's lifecycle traced across terminal, hidden protocol, and teamchat layers.</p></div>
+	${initialHtml}
+	${remainingHtml}
+</div>
+</section>`;
+}
+
 // --- Main render ---
 
 export function renderReport(scorecard: Scorecard, session?: ParsedSession): string {
@@ -443,6 +813,7 @@ export function renderReport(scorecard: Scorecard, session?: ParsedSession): str
 	const momentCards = keyMoments.map((m, i) => renderMomentCard(m, i, session ?? null)).join('\n');
 
 	const gapSection = session ? renderGapBreakdown(scorecard, session) : '';
+	const chainsSection = session ? renderCoordinationChains(session) : '';
 	const timelineSection = session ? renderTimeline(session) : '';
 
 	return `<!DOCTYPE html>
@@ -577,6 +948,33 @@ details[open] .timeline-toggle::before{content:'- '}
 .footer h2{font-size:1.2rem;margin-bottom:16px}
 .footer p{font-size:.85rem;color:var(--text-dim);line-height:1.7;max-width:700px;margin-bottom:12px}
 .footer code{background:var(--bg-elevated);padding:2px 6px;border-radius:4px;font-size:.8rem}
+
+/* Coordination chains section */
+.chain-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+.chain-header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--border)}
+.chain-agent-name{font-weight:700;font-size:.95rem;color:var(--text)}
+.chain-agent-type{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:5px;background:rgba(91,141,239,.12);color:var(--accent-blue);font-weight:600}
+.chain-duration{margin-left:auto;font-size:.8rem;color:var(--text-dim);font-family:'SF Mono',monospace}
+.chain-timeline{position:relative;padding:20px 24px 20px 40px}
+.chain-rail{position:absolute;left:30px;top:16px;bottom:16px;width:2px;background:var(--border)}
+.chain-phase{margin-bottom:16px}
+.chain-phase:last-child{margin-bottom:0}
+.chain-phase-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);font-weight:600;margin-bottom:6px;padding-left:4px}
+.chain-event{font-size:.8rem;line-height:1.6;padding:2px 0 2px 4px;position:relative}
+.chain-event::before{content:'';position:absolute;left:-14px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--border)}
+.chain-time{font-family:'SF Mono',monospace;font-size:.72rem;color:var(--text-dim)}
+.chain-layer{display:inline-block;font-size:.62rem;text-transform:uppercase;letter-spacing:.04em;padding:1px 5px;border-radius:3px;font-weight:600;margin:0 4px;vertical-align:middle}
+.chain-layer.layer-terminal{background:rgba(92,96,120,.2);color:var(--text-dim)}
+.chain-layer.layer-hidden{background:rgba(245,158,11,.15);color:var(--accent-amber)}
+.chain-layer.layer-teamchat{background:rgba(74,222,128,.15);color:var(--accent-green)}
+.chain-empty{color:var(--text-dim);font-style:italic;font-size:.78rem}
+.chains-collapse{margin-top:8px}
+.chains-toggle{cursor:pointer;padding:14px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;font-size:.88rem;color:var(--text-muted);list-style:none;user-select:none;transition:background .15s}
+.chains-toggle:hover{background:var(--bg-elevated)}
+.chains-toggle::-webkit-details-marker{display:none}
+.chains-toggle::before{content:'+ ';color:var(--accent-blue);font-weight:700}
+details[open] .chains-toggle::before{content:'- '}
+.chains-overflow{margin-top:16px}
 </style>
 </head>
 <body>
@@ -607,6 +1005,8 @@ ${gapSection}
 ${momentCards}
 </div>
 </section>
+
+${chainsSection}
 
 <section>
 <div class="container">
