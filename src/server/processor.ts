@@ -10,7 +10,6 @@ import type {
 	TaskInfo,
 	TaskUpdate,
 	TeamConfig,
-	ThreadMarker,
 	ThreadStatus,
 } from '../shared/types.js';
 import {
@@ -153,6 +152,12 @@ export class EventProcessor {
 	private recentShutdownRequests: Map<string, string> = new Map(); // agent name → event ID
 	private recentNudges: Map<string, { eventId: string; timestamp: string }> = new Map(); // agent name → nudge info
 	private recentBroadcasts: { eventId: string; timestamp: string; from: string }[] = [];
+
+	// Dedup tracking (Rules 6, 9)
+	/** Rule 6: track recently emitted broadcast text+timestamp to suppress matching DMs. */
+	private recentBroadcastKeys: { text: string; timestamp: string }[] = [];
+	/** Rule 9: last pending task-update fingerprint per task ID — suppress consecutive pending updates. */
+	private lastPendingTaskUpdateKey: Map<string, string> = new Map();
 
 	// Color lookup cache — populated on first observation of each agent's color
 	private agentColorCache: Map<string, string> = new Map();
@@ -367,14 +372,9 @@ export class EventProcessor {
 					),
 					this.makePresenceChange(msg.from, 'offline', msg.timestamp),
 				];
-				// Emit 👋 reaction on the original shutdown-requested event
-				const requestEventId = this.recentShutdownRequests.get(msg.from);
-				if (requestEventId) {
-					approvalEvents.push(
-						this.makeReaction(requestEventId, '👋', msg.from, msg.color, msg.timestamp, 'shutdown compliance'),
-					);
-					this.recentShutdownRequests.delete(msg.from);
-				}
+				// Rule 8: 👋 reaction on shutdown-requested is suppressed —
+				// shutdown-approved system event already conveys the same info.
+				this.recentShutdownRequests.delete(msg.from);
 				this.emit(approvalEvents);
 				break;
 			}
@@ -547,20 +547,20 @@ export class EventProcessor {
 	}
 
 	private emitDM(inboxOwner: string, msg: RawInboxMessage): void {
+		// Rule 6: suppress DM if a broadcast with matching text+timestamp was already emitted
+		// within a 1s window.
+		for (const bk of this.recentBroadcastKeys) {
+			if (bk.text === msg.text.slice(0, 100) && isWithinWindow(bk.timestamp, msg.timestamp, 1000)) {
+				return;
+			}
+		}
+
 		const events: ChatEvent[] = [];
 		const participants = [msg.from, inboxOwner].sort();
 		const threadKey = participants.join(':');
 
-		// Check if we need a thread-start marker
-		if (!this.isInActiveThread(participants)) {
-			events.push({
-				type: 'thread-marker',
-				id: generateEventId(),
-				subtype: 'thread-start',
-				participants,
-				timestamp: msg.timestamp,
-			});
-		}
+		// Rule 7: thread-start markers are suppressed — the DM message itself signals
+		// the thread start, and ThreadBlock groups DMs by participants.
 
 		const contentMsg = this.buildContentMessage(msg, false, true, participants);
 		events.push(contentMsg);
@@ -729,6 +729,15 @@ export class EventProcessor {
 			}
 		}
 
+		// Rule 6: record this broadcast/non-DM message so matching DMs can be suppressed.
+		if (isBroadcast) {
+			this.recentBroadcastKeys.push({ text: msg.text.slice(0, 100), timestamp: msg.timestamp });
+			// Keep only last 100 entries to prevent unbounded growth
+			if (this.recentBroadcastKeys.length > 100) {
+				this.recentBroadcastKeys.shift();
+			}
+		}
+
 		// Compact mode acknowledgment detection
 		if (this.compactMode && pending.text.length < 50 && !isBroadcast) {
 			const ackEmoji = this.detectAcknowledgment(pending.text);
@@ -776,6 +785,10 @@ export class EventProcessor {
 		const currMap = new Map(current.map((t) => [t.id, t]));
 		const events: ChatEvent[] = [];
 
+		// Rules 2-4: track which task IDs had a system event emitted in this batch.
+		// TaskUpdates for those IDs with matching status transitions are suppressed.
+		const taskIdsWithSystemEvent = new Set<string>();
+
 		// Detect new tasks (deduplicate — replay can re-fire)
 		for (const [id, task] of currMap) {
 			if (!prevMap.has(id) && !this.emittedTaskIds.has(id)) {
@@ -791,7 +804,8 @@ export class EventProcessor {
 						task.created || undefined,
 					),
 				);
-				events.push(this.makeTaskUpdate(task));
+				// Rule 2: suppress task-update(pending) when task-created was emitted.
+				taskIdsWithSystemEvent.add(id);
 			}
 		}
 
@@ -812,14 +826,11 @@ export class EventProcessor {
 						curr.subject,
 					),
 				);
+				// Rule 3: suppress task-update(in_progress) when task-claimed was emitted.
+				taskIdsWithSystemEvent.add(id);
 
-				// Correlate with lead assignment message for ✋ reaction
-				const leadMsg = this.findLeadMessageAboutTask(curr.id, curr.subject, curr.updated);
-				if (leadMsg) {
-					events.push(
-						this.makeReaction(leadMsg, '✋', curr.owner, '', curr.updated),
-					);
-				}
+				// Rule 8: suppress ✋ reaction on lead message — task-claimed system event
+				// already conveys the same information.
 			}
 
 			// Status change
@@ -835,6 +846,8 @@ export class EventProcessor {
 							curr.subject,
 						),
 					);
+					// Rule 4: suppress task-update(completed) when task-completed was emitted.
+					taskIdsWithSystemEvent.add(id);
 				} else if (curr.status === 'failed') {
 					events.push(
 						this.makeSystemEvent(
@@ -849,8 +862,32 @@ export class EventProcessor {
 				}
 			}
 
-			// Emit task update for any change
+			// Emit task update for any change — subject to dedup rules
 			if (taskChanged(prev, curr)) {
+				const hasSystemEvent = taskIdsWithSystemEvent.has(id);
+				const statusTransition =
+					(curr.status === 'in_progress' && prev.status === 'pending') ||
+					(curr.status === 'completed' && prev.status !== 'completed');
+
+				if (hasSystemEvent && statusTransition) {
+					// Rules 2-4: suppress the TaskUpdate — system event already conveys status change.
+					continue;
+				}
+
+				// Rule 9: collapse consecutive pending task-updates for the same task.
+				if (curr.status === 'pending') {
+					const pendingKey = JSON.stringify({ id: curr.id, status: curr.status, owner: curr.owner, blockedBy: curr.blockedBy });
+					const lastKey = this.lastPendingTaskUpdateKey.get(curr.id);
+					if (lastKey === pendingKey) {
+						// Identical pending state — suppress duplicate.
+						continue;
+					}
+					this.lastPendingTaskUpdateKey.set(curr.id, pendingKey);
+				} else {
+					// Clear pending tracking when task leaves pending status
+					this.lastPendingTaskUpdateKey.delete(curr.id);
+				}
+
 				events.push(this.makeTaskUpdate(curr));
 			}
 		}
@@ -1089,22 +1126,6 @@ export class EventProcessor {
 		}
 
 		return contentMsg;
-	}
-
-	private isInActiveThread(participants: string[]): boolean {
-		const key = [...participants].sort().join(':');
-		// Check recent events for an active thread with these participants
-		for (let i = this.allEvents.length - 1; i >= 0; i--) {
-			const ev = this.allEvents[i]!;
-			if (ev.type === 'thread-marker') {
-				const marker = ev as ThreadMarker;
-				const markerKey = [...marker.participants].sort().join(':');
-				if (markerKey === key) {
-					return marker.subtype === 'thread-start';
-				}
-			}
-		}
-		return false;
 	}
 
 	private findRecentMessageFrom(
