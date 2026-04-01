@@ -102,20 +102,14 @@ The `ChatEvent` union type in `src/shared/types.ts` is the core contract:
 Planning docs live in `.claude/` (some specs are committed; local plans are gitignored):
 
 **Active plans (have remaining work):**
-- `plan-v2-kickoff.md` — master plan: Waves 1–2 complete, Waves 3–4 pending
-- `v1-showcase-and-launch-plan.md` — launch tasks 10–15 (showcase sessions, demo GIF, launch post)
+- `ROADMAPv2.md` — master roadmap: 14 work items across 4 waves
+- `plan-v2-kickoff.md` — Wave 1 execution (3 quick-win tasks)
 - `v1-event-enrichment-plan.md` — P1 done, P2–5 remaining (advanced reactions, post-mortem)
 - `ui-polish-and-postmortem-plan.md` — sidebar layout, celebrations, post-mortem pipeline
-- `2025-03-15-chat-ux-improvements-plan.md` — timeline lead glow and overlap handling
+- `frontend-redesign-spec.md` — Playwright-driven UI audit (918 lines of findings), phases remaining
+- `pulse-showcase-runbook.md` — runbook for Pulse showcase session
 
-**Active reference (useful context):**
-- `teamchat-spec-v02.md` — original product spec (protocol ground truth)
-- `teamchat-build-handoff.md` — architecture decisions and rationale
-- `market-research-and-plan.md` — competitive analysis, GTM strategy
-- `pulse-spec.md` — spec for the pulse showcase session (Wave 3)
-- `frontend-redesign-spec.md` — Playwright-driven UI audit (918 lines of findings)
-
-**Archived (completed work):** in `.claude/archive/`
+**Archived (completed work):** 24 docs in `.claude/archive/`
 
 ## What NOT to Do
 
