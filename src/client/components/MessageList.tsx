@@ -8,6 +8,7 @@ import type {
 	ThreadStatus,
 } from '../types.js';
 import { ThreadBlock } from './ThreadBlock.jsx';
+import { ContinuedBelow } from './ContinuedBelow.jsx';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
 import { SystemEventGroup } from './SystemEventGroup.jsx';
@@ -26,6 +27,8 @@ interface MessageListProps {
 	team: TeamState | null;
 	threadStatuses: Record<string, ThreadStatus>;
 	sessionStart: string | null;
+	resurfacedThreadKeys?: Set<string>;
+	threadFilter?: string | null;
 }
 
 interface AccumulatedThread {
@@ -36,20 +39,48 @@ interface AccumulatedThread {
 	topic: string;
 }
 
+interface ContinuedBelowItem {
+	kind: 'continued-below';
+	threadKey: string;
+	participants: string[];
+}
+
 interface FlatEventsGroup {
 	kind: 'flat-events';
 	events: ChatEvent[];
 	laneItems: MessageLaneItem[];
 }
 
-type RenderItem = AccumulatedThread | FlatEventsGroup;
+type RenderItem = AccumulatedThread | ContinuedBelowItem | FlatEventsGroup;
 
-export function MessageList({ events, reactions, tasks, team, threadStatuses, sessionStart }: MessageListProps) {
-	const items = useMemo(() => groupEvents(events), [events]);
+export function MessageList({ events, reactions, tasks, team, threadStatuses, sessionStart, resurfacedThreadKeys, threadFilter }: MessageListProps) {
+	const items = useMemo(
+		() => groupEvents(events, resurfacedThreadKeys),
+		[events, resurfacedThreadKeys],
+	);
+
+	// Apply thread filter: when active, only show items related to that thread
+	const visibleItems = useMemo(() => {
+		if (!threadFilter) return items;
+		return items.filter((item) => {
+			if (item.kind === 'accumulated-thread') return item.threadKey === threadFilter;
+			if (item.kind === 'continued-below') return item.threadKey === threadFilter;
+			// Show flat events from agents involved in the filtered thread
+			if (item.kind === 'flat-events') {
+				const threadParts = threadFilter.split(':');
+				return item.events.some((e) => {
+					if (e.type === 'message') return threadParts.includes((e as ContentMessage).from);
+					if (e.type === 'system') return threadParts.includes(e.agentName ?? '');
+					return false;
+				});
+			}
+			return true;
+		});
+	}, [items, threadFilter]);
 
 	return (
 		<div className="tc-message-list">
-			{items.map((item, index) => {
+			{visibleItems.map((item, index) => {
 				if (item.kind === 'accumulated-thread') {
 					return (
 						<ThreadBlock
@@ -59,6 +90,16 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 							events={item.events}
 							reactions={reactions}
 							topic={item.topic}
+						/>
+					);
+				}
+
+				if (item.kind === 'continued-below') {
+					return (
+						<ContinuedBelow
+							key={`continued-${item.threadKey}`}
+							threadKey={item.threadKey}
+							participants={item.participants}
 						/>
 					);
 				}
@@ -184,13 +225,18 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
  * Group events into accumulated thread blocks and flat event groups.
  *
  * All DMs for each participant pair are accumulated into a single
- * thread block, placed at the position of the first DM for that pair.
- * Thread markers are ignored entirely (legacy compat).
+ * thread block. For re-surfaced threads (3+ messages), the block is
+ * placed at the LAST DM position (WhatsApp-style) and a "continued
+ * below" placeholder marks the original position.
+ *
+ * Non-resurfaced threads are placed at the first DM position (original
+ * behavior). Thread markers are ignored entirely (legacy compat).
  */
-function groupEvents(events: ChatEvent[]): RenderItem[] {
+function groupEvents(events: ChatEvent[], resurfacedThreadKeys?: Set<string>): RenderItem[] {
 	const items: RenderItem[] = [];
 	const dmsByPair = new Map<string, ChatEvent[]>();
-	const dmPairInserted = new Set<string>();
+	const dmPairFirstSeen = new Set<string>();
+	const dmPairLastSeen = new Set<string>();
 	let flatBuffer: ChatEvent[] = [];
 
 	const sessionStartMs = events.length > 0 ? new Date(events[0]!.timestamp).getTime() : undefined;
@@ -219,29 +265,77 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 		}
 	}
 
+	// Determine which pairs are re-surfaced
+	const resurfaced = resurfacedThreadKeys ?? new Set<string>();
+
+	// Find the index of the last DM for each resurfaced pair
+	const lastDmIndex = new Map<string, number>();
+	for (let i = events.length - 1; i >= 0; i--) {
+		const event = events[i]!;
+		if (event.type === 'message' && (event as ContentMessage).isDM) {
+			const msg = event as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			if (resurfaced.has(key) && !lastDmIndex.has(key)) {
+				lastDmIndex.set(key, i);
+			}
+		}
+	}
+
 	// Build timeline with accumulated thread blocks
-	for (const event of events) {
+	for (let i = 0; i < events.length; i++) {
+		const event = events[i]!;
+
 		// Skip thread markers entirely
 		if (event.type === 'thread-marker') continue;
 
 		if (event.type === 'message' && (event as ContentMessage).isDM) {
 			const msg = event as ContentMessage;
 			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			const isResurfaced = resurfaced.has(key);
 
-			if (!dmPairInserted.has(key)) {
-				// First DM for this pair — insert the accumulated block here
-				pushFlat();
-				dmPairInserted.add(key);
-				const allDMs = dmsByPair.get(key) ?? [];
-				items.push({
-					kind: 'accumulated-thread',
-					threadKey: key,
-					participants: [...(msg.dmParticipants ?? [])].sort(),
-					events: allDMs,
-					topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
-				});
+			if (isResurfaced) {
+				// Re-surfaced thread: place "continued below" at first DM,
+				// place accumulated block at last DM
+				if (!dmPairFirstSeen.has(key)) {
+					dmPairFirstSeen.add(key);
+					pushFlat();
+					items.push({
+						kind: 'continued-below',
+						threadKey: key,
+						participants: [...(msg.dmParticipants ?? [])].sort(),
+					});
+				}
+
+				if (!dmPairLastSeen.has(key) && i === lastDmIndex.get(key)) {
+					dmPairLastSeen.add(key);
+					pushFlat();
+					const allDMs = dmsByPair.get(key) ?? [];
+					items.push({
+						kind: 'accumulated-thread',
+						threadKey: key,
+						participants: [...(msg.dmParticipants ?? [])].sort(),
+						events: allDMs,
+						topic: allDMs.length > 0
+							? (allDMs[0] as ContentMessage).text.slice(0, 60).replace(/\n/g, ' ')
+							: '',
+					});
+				}
+			} else {
+				// Non-resurfaced: place block at first DM (original behavior)
+				if (!dmPairFirstSeen.has(key)) {
+					pushFlat();
+					dmPairFirstSeen.add(key);
+					const allDMs = dmsByPair.get(key) ?? [];
+					items.push({
+						kind: 'accumulated-thread',
+						threadKey: key,
+						participants: [...(msg.dmParticipants ?? [])].sort(),
+						events: allDMs,
+						topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+					});
+				}
 			}
-			// Subsequent DMs for this pair are already in the accumulated block — skip
+			// All DM events are in the accumulated block — skip individual rendering
 			continue;
 		}
 
@@ -252,3 +346,5 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 	pushFlat();
 	return items;
 }
+
+export { type RenderItem, type ContinuedBelowItem, type AccumulatedThread };

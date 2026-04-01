@@ -26,6 +26,12 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 			return next;
 		}
 
+		case 'SET_THREAD_FILTER': {
+			const next = cloneChatState(state);
+			next.threadFilter = action.threadKey;
+			return next;
+		}
+
 		default:
 			return state;
 	}

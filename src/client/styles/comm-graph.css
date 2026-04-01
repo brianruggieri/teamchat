@@ -1,0 +1,30 @@
+/* === Communication Graph === */
+.tc-comm-graph-canvas-wrap {
+	display: flex;
+	justify-content: center;
+	padding: 4px 0;
+}
+
+.tc-comm-graph-canvas {
+	cursor: pointer;
+	border-radius: var(--radius-10);
+}
+
+.tc-comm-graph-clear {
+	background: none;
+	border: 1px solid var(--border-subtle);
+	border-radius: 999px;
+	padding: 2px 8px;
+	font-size: 0.62rem;
+	font-weight: 600;
+	color: var(--text-muted);
+	cursor: pointer;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	transition: border-color 0.15s, color 0.15s;
+}
+
+.tc-comm-graph-clear:hover {
+	border-color: var(--border-strong);
+	color: var(--text-secondary);
+}

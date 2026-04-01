@@ -19,6 +19,7 @@ import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
 import { AvatarMarkProvider } from './components/AvatarMarkContext.js';
 import { ThreadSummary } from './components/ThreadSummary.jsx';
+import { CommGraph } from './components/CommGraph.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap, ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -214,6 +215,13 @@ function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode:
 							tasks={state.tasks}
 							onAgentClick={onAgentClick}
 						/>,
+						<CommGraph
+							key="comm-graph"
+							members={state.team?.members ?? []}
+							threadStatuses={state.threadStatuses}
+							activeFilter={state.threadFilter}
+							onFilterThread={(threadKey) => dispatch({ type: 'SET_THREAD_FILTER', threadKey })}
+						/>,
 						<ThreadSummary
 							key="threads"
 							threadStatuses={state.threadStatuses}
@@ -314,9 +322,14 @@ function ReplayWorkspaceLoaded({
 	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
 	const [activeAgentKey, setActiveAgentKey] = useState<string | null>(null);
+	const [replayThreadFilter, setReplayThreadFilter] = useState<string | null>(null);
 
-	const handleSelectAgent = useCallback((action: { type: 'SELECT_AGENT'; agentName: string | null }) => {
-		setActiveAgentKey(action.agentName);
+	const handleDispatch = useCallback((action: { type: 'SELECT_AGENT'; agentName: string | null } | { type: 'SET_THREAD_FILTER'; threadKey: string | null }) => {
+		if (action.type === 'SELECT_AGENT') {
+			setActiveAgentKey(action.agentName);
+		} else if (action.type === 'SET_THREAD_FILTER') {
+			setReplayThreadFilter(action.threadKey);
+		}
 	}, []);
 
 	useEffect(() => {
@@ -460,13 +473,13 @@ function ReplayWorkspaceLoaded({
 			<TimeProvider nowMs={controller.state.virtualNowMs}>
 				<>
 					<TeamChatScaffold
-						state={{ ...controller.derivedState.chatState, activeAgentKey }}
+						state={{ ...controller.derivedState.chatState, activeAgentKey, threadFilter: replayThreadFilter }}
 						mode="replay"
 						headerStatusText={replayStatusText}
 						topContent={replayTopContent}
 						emptyTitle="Replay ready"
 						emptyDescription="Press play, step through the session, or scrub the timeline."
-						dispatch={handleSelectAgent}
+						dispatch={handleDispatch}
 						renderPanels={(onTaskClick, onAgentClick) => [
 							<ReplayArtifactPanel
 								key="artifacts"
@@ -484,6 +497,13 @@ function ReplayWorkspaceLoaded({
 								threadStatuses={controller.derivedState.chatState.threadStatuses}
 								tasks={controller.derivedState.chatState.tasks}
 								onAgentClick={onAgentClick}
+							/>,
+							<CommGraph
+								key="comm-graph"
+								members={controller.derivedState.chatState.team?.members ?? []}
+								threadStatuses={controller.derivedState.chatState.threadStatuses}
+								activeFilter={replayThreadFilter}
+								onFilterThread={(threadKey) => setReplayThreadFilter(threadKey)}
 							/>,
 							<ThreadSummary
 								key="threads"
@@ -535,7 +555,7 @@ function TeamChatScaffold({
 	emptyTitle: string;
 	emptyDescription: string;
 	renderPanels: (onTaskClick: (taskId: string) => void, onAgentClick?: (name: string) => void) => React.ReactNode[];
-	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null }) => void;
+	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null } | { type: 'SET_THREAD_FILTER'; threadKey: string | null }) => void;
 }) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
@@ -676,6 +696,8 @@ function TeamChatScaffold({
 								team={state.team}
 								threadStatuses={state.threadStatuses}
 								sessionStart={state.sessionStart}
+								resurfacedThreadKeys={state.resurfacedThreadKeys}
+								threadFilter={state.threadFilter}
 							/>
 						</div>
 					</div>
