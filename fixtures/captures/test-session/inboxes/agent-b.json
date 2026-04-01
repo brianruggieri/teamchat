@@ -1,0 +1,4 @@
+[
+	{"from":"team-lead","text":"Please build the login page with email/password fields.","summary":"Build login page","timestamp":"2026-03-31T17:55:10.000Z","color":"indigo","read":true},
+	{"from":"team-lead","text":"Please build the API auth endpoint.","summary":"Build API endpoint","timestamp":"2026-03-31T17:55:12.000Z","color":"indigo","read":true}
+]

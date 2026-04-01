@@ -1,0 +1,4 @@
+[
+	{"id":"task-1","subject":"Build login page","description":"Create login component with email/password","status":"completed","owner":"agent-a","blockedBy":null,"activeForm":null,"created":"2026-03-31T17:55:01.000Z","updated":"2026-03-31T17:58:00.000Z"},
+	{"id":"task-2","subject":"Build API endpoint","description":"Create auth API endpoint","status":"completed","owner":"agent-b","blockedBy":null,"activeForm":null,"created":"2026-03-31T17:55:01.000Z","updated":"2026-03-31T17:59:00.000Z"}
+]
