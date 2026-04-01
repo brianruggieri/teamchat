@@ -131,15 +131,15 @@ export function formatComparisonOutput(
 		const label = c.regressed ? ' \u2190 REGRESSION' : '';
 
 		if (c.metric === 'Scroll depth') {
-			lines.push(`${icon} Scroll depth:         ${c.baseline.toFixed(1)} \u2192 ${c.current.toFixed(1)} screens (${sign}${c.deltaPercent}%)`);
+			lines.push(`${icon} Scroll depth:         ${c.baseline.toFixed(1)} \u2192 ${c.current.toFixed(1)} screens (${sign}${c.deltaPercent}%)${label}`);
 		} else if (c.metric === 'Viewport density') {
-			lines.push(`${icon} Viewport density:     ${Math.round(c.baseline)} \u2192 ${Math.round(c.current)} events/screen (${sign}${c.deltaPercent}%)`);
+			lines.push(`${icon} Viewport density:     ${Math.round(c.baseline)} \u2192 ${Math.round(c.current)} events/screen (${sign}${c.deltaPercent}%)${label}`);
 		} else if (c.metric === 'Render completeness') {
 			const deltaAbs = c.current - c.baseline;
 			const absSuffix = deltaAbs !== 0 ? ` (${deltaAbs > 0 ? '+' : ''}${deltaAbs} events)` : '';
 			lines.push(`${icon} Render completeness:  ${Math.round(c.baseline)} \u2192 ${Math.round(c.current)}${absSuffix}${label}`);
 		} else if (c.metric === 'Whitespace ratio') {
-			lines.push(`${icon} Whitespace ratio:     ${c.baseline.toFixed(2)} \u2192 ${c.current.toFixed(2)} (${sign}${c.deltaPercent}%)`);
+			lines.push(`${icon} Whitespace ratio:     ${c.baseline.toFixed(2)} \u2192 ${c.current.toFixed(2)} (${sign}${c.deltaPercent}%)${label}`);
 		}
 	}
 
@@ -172,7 +172,7 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
 	// Start replay server — use scorecard team name since capture manifests
 	// use 'team' field while replay manifests use 'teamName'
 	const server = new TeamChatServer({
-		port: port || 0,
+		port,
 		teamName: scorecard.session.team,
 		mode: 'replay',
 		replay,
@@ -191,7 +191,7 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
 			chromium = pw.chromium;
 		} catch {
 			throw new Error(
-				'Playwright not installed. Run: npx playwright install chromium'
+				'Playwright not installed. Install with: bun add -d playwright && npx playwright install chromium'
 			);
 		}
 
@@ -252,32 +252,35 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
  * Measure viewport metrics using Playwright page evaluation.
  */
 async function measureViewport(page: any, scorecard: Scorecard): Promise<ViewportMetrics> {
-	// Count visible event elements
+	// Count visible event elements (precompute bounds to avoid O(screens * elements))
 	const eventsPerScreen = await page.evaluate(() => {
 		const selectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block';
 		const allElements = document.querySelectorAll(selectors);
 		const viewportHeight = window.innerHeight;
-		const screens: number[] = [];
 
 		if (allElements.length === 0) {
 			return [0];
 		}
 
-		// Count visible elements at each "screen" position
+		// Precompute absolute bounds once
+		const scrollY = window.scrollY;
+		const bounds = Array.from(allElements).map(el => {
+			const rect = el.getBoundingClientRect();
+			return { top: rect.top + scrollY, bottom: rect.bottom + scrollY };
+		});
+
+		// Count elements per screen using cached bounds
 		const scrollHeight = document.documentElement.scrollHeight;
 		const screenCount = Math.max(1, Math.ceil(scrollHeight / viewportHeight));
+		const screens: number[] = [];
 
 		for (let i = 0; i < screenCount; i++) {
 			const screenTop = i * viewportHeight;
 			const screenBottom = screenTop + viewportHeight;
 			let count = 0;
 
-			for (const el of allElements) {
-				const rect = el.getBoundingClientRect();
-				// Account for current scroll position
-				const elTop = rect.top + window.scrollY;
-				const elBottom = rect.bottom + window.scrollY;
-				if (elBottom > screenTop && elTop < screenBottom) {
+			for (const b of bounds) {
+				if (b.bottom > screenTop && b.top < screenBottom) {
 					count++;
 				}
 			}
@@ -312,63 +315,47 @@ async function measureViewport(page: any, scorecard: Scorecard): Promise<Viewpor
 }
 
 /**
- * Take a full-page screenshot and analyze the ratio of background-color pixels.
- * Uses PNG pixel data to estimate how much of the page is "empty" whitespace.
+ * Estimate whitespace ratio by sampling a grid of viewport points.
+ * Uses document.elementFromPoint to avoid double-counting overlapping elements.
  */
 async function measureWhitespace(page: any): Promise<number> {
 	try {
-		// Get the background color of the page
-		const bgColor = await page.evaluate(() => {
-			const body = document.body;
-			const computed = getComputedStyle(body);
-			return computed.backgroundColor;
-		});
-
-		// Take a screenshot as a buffer
-		const screenshotBuffer = await page.screenshot({ fullPage: false }) as Buffer;
-
-		// Use a simple heuristic: parse PNG pixel data
-		// Playwright returns PNG format. We'll evaluate pixel sampling in the browser instead
-		// for reliability across environments.
-		const ratio = await page.evaluate((bgColorStr: string) => {
-			const canvas = document.createElement('canvas');
-			const ctx = canvas.getContext('2d');
-			if (!ctx) return 0.5;
-
-			// Sample visible viewport
+		const ratio = await page.evaluate(() => {
 			const width = window.innerWidth;
 			const height = window.innerHeight;
-			canvas.width = width;
-			canvas.height = height;
-
-			// We can't directly capture the rendered page in canvas from JS alone
-			// without html2canvas. Instead, we estimate by checking how much of the
-			// viewport area is covered by content elements.
 			const contentSelectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block, .tc-header, .tc-roster-list, .tc-replay-controls, .tc-replay-timeline';
-			const contentElements = document.querySelectorAll(contentSelectors);
-			let coveredArea = 0;
-			const totalArea = width * height;
 
-			for (const el of contentElements) {
-				const rect = el.getBoundingClientRect();
-				// Clip to viewport
-				const top = Math.max(rect.top, 0);
-				const bottom = Math.min(rect.bottom, height);
-				const left = Math.max(rect.left, 0);
-				const right = Math.min(rect.right, width);
+			// Sample a 40x40 grid of points to approximate coverage
+			const gridSize = 40;
+			let coveredSamples = 0;
+			const totalSamples = gridSize * gridSize;
 
-				if (bottom > top && right > left) {
-					coveredArea += (bottom - top) * (right - left);
+			for (let i = 0; i < gridSize; i++) {
+				const y = (i + 0.5) * (height / gridSize);
+				for (let j = 0; j < gridSize; j++) {
+					const x = (j + 0.5) * (width / gridSize);
+					const el = document.elementFromPoint(x, y);
+					if (!el) continue;
+
+					// Walk up the DOM to check if this point is within a content element
+					let node: Element | null = el as Element;
+					while (node) {
+						if (node instanceof Element && node.matches(contentSelectors)) {
+							coveredSamples++;
+							break;
+						}
+						node = node.parentElement;
+					}
 				}
 			}
 
-			// Whitespace = uncovered area ratio (clamped to [0, 1])
-			return Math.max(0, Math.min(1, 1 - (coveredArea / totalArea)));
-		}, bgColor);
+			const coveredRatio = totalSamples > 0 ? (coveredSamples / totalSamples) : 0;
+			return Math.max(0, Math.min(1, 1 - coveredRatio));
+		});
 
 		return ratio as number;
 	} catch {
-		// If screenshot analysis fails, return a neutral estimate
+		// If measurement fails, return a neutral estimate
 		return 0.5;
 	}
 }
