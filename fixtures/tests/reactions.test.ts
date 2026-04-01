@@ -148,8 +148,9 @@ describe("Reactions", () => {
 		expect(processor.getPresence()["backend"]).toBe("offline");
 	});
 
-	test("task claim correlates with lead assignment for hand-raise reaction", async () => {
-		// Feed lead's broadcast assignment first
+	test("task claim does NOT emit ✋ reaction (Rule 8: suppressed by task-claimed system event)", async () => {
+		// Rule 8: ✋ reaction on lead message is suppressed when task-claimed system event exists.
+		// The system event already conveys the same information.
 		const assignment = fixtureEvents.find(
 			(e) => e.label === "Lead assigns work (broadcast)",
 		)!;
@@ -179,10 +180,15 @@ describe("Reactions", () => {
 			(e) => e.type === "reaction",
 		) as ReactionEvent[];
 
-		// The assignment message mentions #1 and backend, so it should get a hand-raise
+		// ✋ is suppressed — task-claimed system event conveys the same info
 		const handRaise = reactions.find((r) => r.emoji === "\u270B");
-		expect(handRaise).toBeDefined();
-		expect(handRaise!.fromAgent).toBe("backend");
+		expect(handRaise).toBeUndefined();
+
+		// But the task-claimed system event IS emitted
+		const taskClaimed = collector.events.filter(
+			(e) => e.type === "system" && (e as SystemEvent).subtype === "task-claimed",
+		);
+		expect(taskClaimed).toHaveLength(1);
 	});
 
 	test("compact mode converts short acks into reactions", () => {
@@ -449,8 +455,9 @@ describe("General chat reaction inference", () => {
 		collector.events.length = 0;
 	});
 
-	test("shutdown-approved produces 👋 on shutdown-requested event", () => {
-		// Feed shutdown request
+	test("shutdown-approved does NOT emit 👋 reaction (Rule 8: suppressed by system event)", () => {
+		// Rule 8: 👋 reaction on shutdown-requested is suppressed — shutdown-approved
+		// system event already conveys the same information.
 		const shutdownReq = fixtureEvents.find(e => e.label === "Shutdown request to backend")!;
 		processor.processDelta({
 			type: "inbox",
@@ -474,9 +481,16 @@ describe("General chat reaction inference", () => {
 			current: [shutdownApproval.message],
 		});
 
+		// 👋 reaction is suppressed — shutdown-approved system event conveys the same info
 		const reactions = collector.events.filter(e => e.type === "reaction") as ReactionEvent[];
 		const waveReaction = reactions.find(r => r.emoji === "👋" && r.targetMessageId === requestEventId);
-		expect(waveReaction).toBeDefined();
+		expect(waveReaction).toBeUndefined();
+
+		// But the shutdown-approved system event IS emitted
+		const approvedEvents = collector.events.filter(
+			e => e.type === "system" && (e as SystemEvent).subtype === "shutdown-approved"
+		);
+		expect(approvedEvents).toHaveLength(1);
 	});
 
 	test("broadcast ack: short message after broadcast triggers 👍 on broadcast", async () => {

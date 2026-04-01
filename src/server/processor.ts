@@ -141,7 +141,6 @@ export class EventProcessor {
 	private emittedTaskIds: Set<string> = new Set();
 	private idlePingCount = 0;
 	private idleSurfacedCount = 0;
-	private recentLeadMessages: { id: string; text: string; timestamp: string }[] = [];
 	private threadStatuses: Map<string, ThreadStatus> = new Map();
 	private allEvents: ChatEvent[] = [];
 	private broadcastHoldMs = 500;
@@ -621,12 +620,8 @@ export class EventProcessor {
 			if (ackEmoji) {
 				const recentMsg = this.findRecentMessageFrom(inboxOwner, msg.timestamp, 30_000);
 				if (recentMsg) {
-					// Replace the content message with a reaction, but preserve
-					// thread-start markers that were pushed earlier in this call.
-					const preserved = events.filter((e) => e.type === 'thread-marker');
 					events.length = 0;
 					events.push(
-						...preserved,
 						this.makeReaction(recentMsg, ackEmoji, msg.from, msg.color, msg.timestamp, msg.text),
 					);
 				}
@@ -690,19 +685,8 @@ export class EventProcessor {
 
 		const events: ChatEvent[] = [msg];
 
-		// Track lead messages for task claim correlation
+		// Nudge detection: lead → single idle agent (non-assignment message)
 		if (isLeadAgent(pending.from)) {
-			this.recentLeadMessages.push({
-				id: msg.id,
-				text: msg.text,
-				timestamp: msg.timestamp,
-			});
-			// Keep only last 50 lead messages
-			if (this.recentLeadMessages.length > 50) {
-				this.recentLeadMessages.shift();
-			}
-
-			// Nudge detection: lead → single idle agent (non-assignment message)
 			if (!isBroadcast && pending.inboxes.size === 1) {
 				const target = [...pending.inboxes][0]!;
 				const isIdle = this.presence.get(target) === 'idle';
@@ -804,12 +788,11 @@ export class EventProcessor {
 						task.created || undefined,
 					),
 				);
-				// Rule 2: suppress task-update(pending) when task-created was emitted.
-				taskIdsWithSystemEvent.add(id);
 			}
 		}
 
 		// Detect changes in existing tasks
+		// Rule 2: new tasks (no prev) are skipped structurally by the `if (!prev) continue` guard below.
 		for (const [id, curr] of currMap) {
 			const prev = prevMap.get(id);
 			if (!prev) continue;
@@ -1113,18 +1096,6 @@ export class EventProcessor {
 			replyToId: null,
 		};
 
-		// Track lead messages for task claim correlation
-		if (isLeadAgent(msg.from)) {
-			this.recentLeadMessages.push({
-				id: contentMsg.id,
-				text: contentMsg.text,
-				timestamp: contentMsg.timestamp,
-			});
-			if (this.recentLeadMessages.length > 50) {
-				this.recentLeadMessages.shift();
-			}
-		}
-
 		return contentMsg;
 	}
 
@@ -1173,25 +1144,6 @@ export class EventProcessor {
 				if (msg.from === agentName && msg.text.startsWith('📋 PLAN:')) {
 					return msg.id;
 				}
-			}
-		}
-		return null;
-	}
-
-	private findLeadMessageAboutTask(
-		taskId: string,
-		taskSubject: string,
-		claimTimestamp: string,
-	): string | null {
-		// Look for a lead message within the claim window that references this task
-		for (let i = this.recentLeadMessages.length - 1; i >= 0; i--) {
-			const leadMsg = this.recentLeadMessages[i]!;
-			if (!isWithinWindow(leadMsg.timestamp, claimTimestamp, this.taskClaimWindowMs)) {
-				continue;
-			}
-			const text = leadMsg.text.toLowerCase();
-			if (text.includes(`#${taskId}`) || text.includes(taskSubject.toLowerCase())) {
-				return leadMsg.id;
 			}
 		}
 		return null;
