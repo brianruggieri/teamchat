@@ -38,6 +38,7 @@
 		"@types/bun": "^1.2.0",
 		"@types/react": "^19.0.0",
 		"@types/react-dom": "^19.0.0",
+		"playwright": "^1.59.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0",
 		"tailwindcss": "^4.0.0",
