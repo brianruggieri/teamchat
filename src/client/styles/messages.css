@@ -291,3 +291,70 @@
 	background: rgba(255, 255, 255, 0.06);
 	color: var(--text-secondary);
 }
+
+/* === Heartbeat row (subagent activity) === */
+
+.tc-heartbeat-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-4);
+	padding: 2px var(--space-12);
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	opacity: 0.7;
+}
+
+.tc-heartbeat-agent {
+	font-weight: 600;
+}
+
+.tc-heartbeat-dot {
+	opacity: 0.5;
+}
+
+.tc-heartbeat-activities {
+	font-style: italic;
+}
+
+.tc-heartbeat-ops {
+	opacity: 0.6;
+}
+
+.tc-heartbeat-time {
+	margin-left: auto;
+	color: var(--text-secondary);
+	font-size: 0.72rem;
+}
+
+/* === Thought bubble (lead agent thinking blocks) === */
+
+.tc-thought-bubble {
+	display: flex;
+	align-items: flex-start;
+	gap: var(--space-8);
+	padding: var(--space-8) var(--space-12);
+	margin-left: auto;
+	max-width: 85%;
+	font-style: italic;
+	font-size: 0.82rem;
+	color: var(--text-muted);
+	background: var(--bg-tertiary, rgba(255, 255, 255, 0.03));
+	border-radius: var(--radius-md);
+	opacity: 0.8;
+}
+
+.tc-thought-icon {
+	flex-shrink: 0;
+}
+
+.tc-thought-text {
+	flex: 1;
+	min-width: 0;
+	line-height: 1.4;
+}
+
+.tc-thought-time {
+	flex-shrink: 0;
+	font-size: 0.72rem;
+	opacity: 0.6;
+}

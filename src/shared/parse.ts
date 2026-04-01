@@ -45,3 +45,19 @@ export function parseTimestamp(ts: string): number {
 export function isWithinWindow(ts1: string, ts2: string, windowMs: number): boolean {
 	return Math.abs(parseTimestamp(ts1) - parseTimestamp(ts2)) <= windowMs;
 }
+
+/**
+ * Calculate word overlap ratio between two texts.
+ * Returns 0-1 where 1 means all words in `a` appear in `b`.
+ * Words of 2 characters or fewer are ignored (stop-word filter).
+ */
+export function wordOverlapRatio(a: string, b: string): number {
+	const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+	const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+	if (wordsA.size === 0) return 0;
+	let overlap = 0;
+	for (const word of wordsA) {
+		if (wordsB.has(word)) overlap++;
+	}
+	return overlap / wordsA.size;
+}
