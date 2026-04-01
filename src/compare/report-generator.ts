@@ -34,11 +34,31 @@ function buildTerminalTimeline(paths: ReturnType<typeof getCapturePaths>, manife
 function loadJournal(journalPath: string): TeamchatTimeline {
 	if (!existsSync(journalPath)) return { events: [] };
 	const text = readFileSync(journalPath, 'utf-8');
+	const seen = new Set<string>();
 	const events: ChatEvent[] = text
 		.split('\n')
 		.filter(l => l.trim())
-		.map(l => (JSON.parse(l) as JournalEntry).event);
+		.map(l => (JSON.parse(l) as JournalEntry).event)
+		.filter(e => {
+			if (seen.has(e.id)) return false;
+			seen.add(e.id);
+			return true;
+		});
 	return { events };
+}
+
+const ROLE_COLORS = [
+	'purple', 'cyan', 'emerald', 'amber', 'rose', 'sky',
+	'lime', 'orange', 'violet', 'teal', 'pink', 'yellow',
+	'fuchsia', 'blue'
+];
+
+function roleColor(agentType: string): string {
+	let hash = 0;
+	for (let i = 0; i < agentType.length; i++) {
+		hash = ((hash << 5) - hash + agentType.charCodeAt(i)) | 0;
+	}
+	return ROLE_COLORS[Math.abs(hash) % ROLE_COLORS.length];
 }
 
 export function parseCapture(bundlePath: string): ParsedSession {
@@ -49,6 +69,29 @@ export function parseCapture(bundlePath: string): ParsedSession {
 		? parseInboxes(paths.inboxesDir)
 		: { messages: [] };
 	const teamchat = loadJournal(paths.journal);
+
+	// Patch taskCount from journal if manifest shows 0 (tasks may have been cleaned up)
+	if (manifest.taskCount === 0 && existsSync(paths.journal)) {
+		const journalText = readFileSync(paths.journal, 'utf-8');
+		const taskLines = journalText.split('\n').filter(l => l.includes('"task-created"'));
+		const taskIds = new Set<string>();
+		for (const line of taskLines) {
+			try {
+				const entry = JSON.parse(line);
+				const taskId = entry.event?.taskId;
+				if (taskId) taskIds.add(taskId);
+			} catch {}
+		}
+		manifest.taskCount = taskIds.size > 0 ? taskIds.size : taskLines.length;
+	}
+
+	// Patch agent colors if all subagents are gray (pre-fix captures)
+	const subagents = manifest.agents.filter(a => a.agentType !== 'lead');
+	if (subagents.length > 0 && subagents.every(a => a.color === 'gray')) {
+		for (const agent of subagents) {
+			agent.color = roleColor(agent.agentType);
+		}
+	}
 
 	return { manifest, terminal, protocol, teamchat };
 }

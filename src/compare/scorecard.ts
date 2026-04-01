@@ -116,12 +116,13 @@ export function detectKeyMoments(session: ParsedSession): KeyMoment[] {
 	for (const [pair, msgs] of dmPairs) {
 		if (msgs.length >= 2) {
 			const [a, b] = pair.split(':');
+			const preview = msgs[0].content.slice(0, 80).replace(/\n/g, ' ');
 			moments.push({
 				timestamp: msgs[0].timestamp,
 				type: 'dm',
 				description: `DM thread between ${a} and ${b}: ${msgs.length} messages`,
 				terminalSummary: 'No terminal output — DMs are invisible to all terminals.',
-				teamchatSummary: `${msgs.length}-message DM thread with beat detection and resolution tracking.`,
+				teamchatSummary: `${msgs.length}-message DM thread. Preview: "${preview}${msgs[0].content.length > 80 ? '…' : ''}"`,
 				terminalLines: 0,
 				teamchatEvents: msgs.length + 1,
 				gapScore: 1.0,
@@ -211,7 +212,47 @@ export function detectKeyMoments(session: ParsedSession): KeyMoment[] {
 		});
 	}
 
-	// Sort by gap score descending, take top 10
-	moments.sort((a, b) => b.gapScore - a.gapScore);
-	return moments.slice(0, 10);
+	// Type-diversity selection: ensure representation across moment types
+	const MAX_MOMENTS = 10;
+	const MAX_PER_TYPE = 4;
+
+	// Group by type, each group sorted by gapScore descending
+	const byType = new Map<string, KeyMoment[]>();
+	for (const m of moments) {
+		const group = byType.get(m.type) ?? [];
+		group.push(m);
+		byType.set(m.type, group);
+	}
+	for (const group of byType.values()) {
+		group.sort((a, b) => b.gapScore - a.gapScore);
+	}
+
+	const selected = new Set<KeyMoment>();
+	const typeCount = new Map<string, number>();
+
+	// Round 1: take the best moment from each type that has candidates
+	for (const [type, group] of byType) {
+		if (group.length > 0 && selected.size < MAX_MOMENTS) {
+			selected.add(group[0]);
+			typeCount.set(type, 1);
+		}
+	}
+
+	// Round 2: fill remaining slots by gapScore, capping each type at MAX_PER_TYPE
+	const remaining = moments
+		.filter(m => !selected.has(m))
+		.sort((a, b) => b.gapScore - a.gapScore);
+	for (const m of remaining) {
+		if (selected.size >= MAX_MOMENTS) break;
+		const count = typeCount.get(m.type) ?? 0;
+		if (count >= MAX_PER_TYPE) continue;
+		selected.add(m);
+		typeCount.set(m.type, count + 1);
+	}
+
+	// Sort final list chronologically for readable output
+	const result = [...selected].sort(
+		(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+	);
+	return result;
 }

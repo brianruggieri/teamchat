@@ -106,11 +106,34 @@ describe('detectKeyMoments', () => {
 		}
 	});
 
-	test('moments are sorted by gap score descending', () => {
+	test('moments are sorted chronologically by timestamp', () => {
 		const session = loadTestSession();
 		const moments = detectKeyMoments(session);
 		for (let i = 1; i < moments.length; i++) {
-			expect(moments[i].gapScore).toBeLessThanOrEqual(moments[i - 1].gapScore);
+			expect(new Date(moments[i].timestamp).getTime())
+				.toBeGreaterThanOrEqual(new Date(moments[i - 1].timestamp).getTime());
+		}
+	});
+
+	test('no single type exceeds 4 moments', () => {
+		const session = loadTestSession();
+		const moments = detectKeyMoments(session);
+		const counts = new Map<string, number>();
+		for (const m of moments) {
+			counts.set(m.type, (counts.get(m.type) ?? 0) + 1);
+		}
+		for (const [, count] of counts) {
+			expect(count).toBeLessThanOrEqual(4);
+		}
+	});
+
+	test('DM moments include content preview text', () => {
+		const session = loadTestSession();
+		const moments = detectKeyMoments(session);
+		const dms = moments.filter(m => m.type === 'dm');
+		expect(dms.length).toBeGreaterThanOrEqual(1);
+		for (const dm of dms) {
+			expect(dm.teamchatSummary).toContain('Preview: "');
 		}
 	});
 });

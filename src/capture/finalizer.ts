@@ -2,6 +2,20 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFi
 import { join } from 'path';
 import type { CaptureManifest } from './types.js';
 
+const ROLE_COLORS = [
+	'purple', 'cyan', 'emerald', 'amber', 'rose', 'sky',
+	'lime', 'orange', 'violet', 'teal', 'pink', 'yellow',
+	'fuchsia', 'blue'
+];
+
+function roleColor(agentType: string): string {
+	let hash = 0;
+	for (let i = 0; i < agentType.length; i++) {
+		hash = ((hash << 5) - hash + agentType.charCodeAt(i)) | 0;
+	}
+	return ROLE_COLORS[Math.abs(hash) % ROLE_COLORS.length];
+}
+
 export interface FinalizeOptions {
 	sessionId: string;
 	team: string;
@@ -80,7 +94,7 @@ export async function finalizeCaptureBundle(opts: FinalizeOptions): Promise<stri
 					name: agentId,
 					agentId,
 					agentType: meta.agentType ?? 'general-purpose',
-					color: 'gray',
+					color: roleColor(meta.agentType ?? 'general-purpose'),
 				});
 			}
 		}
@@ -128,11 +142,22 @@ export async function finalizeCaptureBundle(opts: FinalizeOptions): Promise<stri
 		endedAt: end,
 	};
 
-	// Count tasks from final.json if available
-	const finalTasksPath = join(bundlePath, 'tasks', 'final.json');
-	if (existsSync(finalTasksPath)) {
-		const tasks = JSON.parse(readFileSync(finalTasksPath, 'utf-8'));
-		manifest.taskCount = Array.isArray(tasks) ? tasks.length : 0;
+	// Count tasks from journal events (tasks may be cleaned up at session end)
+	const journalPath = join(bundlePath, 'journal.jsonl');
+	if (existsSync(journalPath)) {
+		const journalText = readFileSync(journalPath, 'utf-8');
+		const taskLines = journalText.split('\n').filter(l => l.includes('"task-created"'));
+		let taskCount = taskLines.length;
+		// Deduplicate: journal may record the same task-created event multiple times
+		const taskIds = new Set<string>();
+		for (const line of taskLines) {
+			try {
+				const entry = JSON.parse(line);
+				const taskId = entry.event?.taskId;
+				if (taskId) taskIds.add(taskId);
+			} catch {}
+		}
+		manifest.taskCount = taskIds.size > 0 ? taskIds.size : taskCount;
 	}
 
 	writeFileSync(join(bundlePath, 'manifest.json'), JSON.stringify(manifest, null, '\t'));
