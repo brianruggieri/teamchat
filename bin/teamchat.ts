@@ -25,7 +25,7 @@ interface CliArgs {
 	demo: boolean;
 	auto: boolean;
 	// Export subcommand
-	subcommand: 'export' | 'scan' | 'capture' | 'report' | null;
+	subcommand: 'export' | 'scan' | 'capture' | 'report' | 'benchmark' | null;
 	subcommandArg: string | null;
 	// Export flags
 	latest: boolean;
@@ -139,6 +139,12 @@ function parseArgs(argv: string[]): CliArgs {
 					args.subcommandArg = argv[++i] ?? null;
 				}
 				break;
+			case 'benchmark':
+				args.subcommand = 'benchmark';
+				if (argv[i + 1] && !argv[i + 1]!.startsWith('-')) {
+					args.subcommandArg = argv[++i] ?? null;
+				}
+				break;
 		}
 	}
 
@@ -160,6 +166,7 @@ USAGE:
   teamchat scan <file.jsonl>       Scan a session for secrets
   teamchat capture <session-id>    Bundle a session for comparison reports
   teamchat report <bundle>         Generate an HTML comparison report
+  teamchat benchmark <bundle>      Run Playwright benchmark for UI density metrics
   teamchat setup                   Configure auto-launch hook
 
 OPTIONS:
@@ -662,6 +669,15 @@ if (args.subcommand === 'export') {
 	}
 	const { runCapture } = await import('../src/capture/cli');
 	await runCapture(args.subcommandArg);
+} else if (args.subcommand === 'benchmark') {
+	if (!args.subcommandArg) {
+		console.error('Usage: teamchat benchmark <capture-bundle-path> [--save-baseline] [--compare <baseline>] [--port N]');
+		process.exit(1);
+	}
+	const { runBenchmarkCommand } = await import('../src/compare/benchmark-cli');
+	// Pass remaining args (everything after the subcommand and its positional arg)
+	const subArgs = [args.subcommandArg, ...process.argv.slice(process.argv.indexOf('benchmark') + 2)];
+	await runBenchmarkCommand(subArgs);
 } else if (args.replay) {
 	const replayPath = args.demo
 		? path.resolve(import.meta.dir ?? '.', '../fixtures/replays/demo/session.teamchat-replay')

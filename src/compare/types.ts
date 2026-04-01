@@ -83,13 +83,25 @@ export interface Scorecard {
 	generatedAt: string;
 }
 
+export interface ViewportMetrics {
+	eventsPerScreen: number[];
+	scrollDepth: number;
+	renderCompleteness: number;
+	whitespaceRatio: number;
+}
+
 export interface BenchmarkResult {
 	scorecard: Scorecard;
-	viewport: {
-		eventsPerScreen: number[];
-		scrollDepth: number;
-		renderCompleteness: number;
-		whitespaceRatio: number;
-	};
+	viewport: ViewportMetrics;
 	generatedAt: string;
+}
+
+export interface BenchmarkComparison {
+	metric: string;
+	baseline: number;
+	current: number;
+	delta: number;
+	deltaPercent: number;
+	improved: boolean;
+	regressed: boolean;
 }

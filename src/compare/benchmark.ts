@@ -1,0 +1,361 @@
+// src/compare/benchmark.ts — Playwright benchmark harness for UI density regression testing
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { parseCapture } from './report-generator.js';
+import { computeScorecard } from './scorecard.js';
+import type { BenchmarkResult, BenchmarkComparison, Scorecard, ViewportMetrics } from './types.js';
+import { loadReplaySource } from '../server/replay.js';
+import { TeamChatServer } from '../server/server.js';
+
+export interface BenchmarkOptions {
+	bundlePath: string;
+	baselinePath?: string;
+	saveBaseline?: boolean;
+	port?: number;
+}
+
+/**
+ * Compare two BenchmarkResults and produce structured comparison data.
+ * This is a pure function — no Playwright or server needed — so it's fully testable.
+ */
+export function compareBenchmarks(
+	current: BenchmarkResult,
+	baseline: BenchmarkResult,
+): BenchmarkComparison[] {
+	const comparisons: BenchmarkComparison[] = [];
+
+	const avgCurrent = current.viewport.eventsPerScreen.length > 0
+		? current.viewport.eventsPerScreen.reduce((a, b) => a + b, 0) / current.viewport.eventsPerScreen.length
+		: 0;
+	const avgBaseline = baseline.viewport.eventsPerScreen.length > 0
+		? baseline.viewport.eventsPerScreen.reduce((a, b) => a + b, 0) / baseline.viewport.eventsPerScreen.length
+		: 0;
+
+	// Scroll depth — lower is better (less scrolling needed)
+	comparisons.push(makeComparison(
+		'Scroll depth',
+		baseline.viewport.scrollDepth,
+		current.viewport.scrollDepth,
+		'lower',
+	));
+
+	// Viewport density — higher is better (more events per screen)
+	comparisons.push(makeComparison(
+		'Viewport density',
+		avgBaseline,
+		avgCurrent,
+		'higher',
+	));
+
+	// Render completeness — higher is better (as absolute count of rendered events)
+	const baselineRendered = Math.round(baseline.viewport.renderCompleteness * baseline.scorecard.metrics.teamchatEvents);
+	const currentRendered = Math.round(current.viewport.renderCompleteness * current.scorecard.metrics.teamchatEvents);
+	comparisons.push(makeComparison(
+		'Render completeness',
+		baselineRendered,
+		currentRendered,
+		'higher',
+	));
+
+	// Whitespace ratio — lower is better (more content, less empty space)
+	comparisons.push(makeComparison(
+		'Whitespace ratio',
+		baseline.viewport.whitespaceRatio,
+		current.viewport.whitespaceRatio,
+		'lower',
+	));
+
+	return comparisons;
+}
+
+function makeComparison(
+	metric: string,
+	baseline: number,
+	current: number,
+	betterDirection: 'higher' | 'lower',
+): BenchmarkComparison {
+	const delta = current - baseline;
+	const deltaPercent = baseline !== 0 ? Math.round((delta / baseline) * 100) : 0;
+	const improved = betterDirection === 'higher' ? delta > 0 : delta < 0;
+	const regressed = betterDirection === 'higher' ? delta < 0 : delta > 0;
+
+	return { metric, baseline, current, delta, deltaPercent, improved, regressed };
+}
+
+/**
+ * Format a standalone benchmark result for terminal output.
+ */
+export function formatStandaloneOutput(result: BenchmarkResult, savedTo?: string): string {
+	const teamName = result.scorecard.session.team;
+	const avg = result.viewport.eventsPerScreen.length > 0
+		? Math.round(result.viewport.eventsPerScreen.reduce((a, b) => a + b, 0) / result.viewport.eventsPerScreen.length)
+		: 0;
+	const totalEvents = result.scorecard.metrics.teamchatEvents;
+	const rendered = Math.round(result.viewport.renderCompleteness * totalEvents);
+	const pct = totalEvents > 0 ? (result.viewport.renderCompleteness * 100).toFixed(1) : '0.0';
+
+	const lines = [
+		`Benchmark Results — ${teamName}`,
+		'─'.repeat(40),
+		`Scroll depth:         ${result.viewport.scrollDepth.toFixed(1)} screens`,
+		`Viewport density:     ${avg} events/screen (avg)`,
+		`Render completeness:  ${rendered} / ${totalEvents} events (${pct}%)`,
+		`Whitespace ratio:     ${result.viewport.whitespaceRatio.toFixed(2)}`,
+	];
+
+	if (savedTo) {
+		lines.push('');
+		lines.push(`Saved to: ${savedTo}`);
+	}
+
+	return lines.join('\n');
+}
+
+/**
+ * Format a comparison between current and baseline benchmark results.
+ */
+export function formatComparisonOutput(
+	result: BenchmarkResult,
+	comparisons: BenchmarkComparison[],
+): string {
+	const teamName = result.scorecard.session.team;
+	const lines = [
+		`Benchmark Results — ${teamName}`,
+		'─'.repeat(40),
+	];
+
+	for (const c of comparisons) {
+		const sign = c.delta >= 0 ? '+' : '';
+		const icon = c.regressed ? '\u2717' : '\u2713';
+		const label = c.regressed ? ' \u2190 REGRESSION' : '';
+
+		if (c.metric === 'Scroll depth') {
+			lines.push(`${icon} Scroll depth:         ${c.baseline.toFixed(1)} \u2192 ${c.current.toFixed(1)} screens (${sign}${c.deltaPercent}%)${label}`);
+		} else if (c.metric === 'Viewport density') {
+			lines.push(`${icon} Viewport density:     ${Math.round(c.baseline)} \u2192 ${Math.round(c.current)} events/screen (${sign}${c.deltaPercent}%)${label}`);
+		} else if (c.metric === 'Render completeness') {
+			const deltaAbs = c.current - c.baseline;
+			const absSuffix = deltaAbs !== 0 ? ` (${deltaAbs > 0 ? '+' : ''}${deltaAbs} events)` : '';
+			lines.push(`${icon} Render completeness:  ${Math.round(c.baseline)} \u2192 ${Math.round(c.current)}${absSuffix}${label}`);
+		} else if (c.metric === 'Whitespace ratio') {
+			lines.push(`${icon} Whitespace ratio:     ${c.baseline.toFixed(2)} \u2192 ${c.current.toFixed(2)} (${sign}${c.deltaPercent}%)${label}`);
+		}
+	}
+
+	const improved = comparisons.filter(c => c.improved).length;
+	const regressed = comparisons.filter(c => c.regressed).length;
+	lines.push('');
+	lines.push(`Overall: ${improved} improved, ${regressed} regressed`);
+
+	return lines.join('\n');
+}
+
+/**
+ * Run the full Playwright benchmark against a capture bundle.
+ * Requires Playwright to be installed — gracefully errors if not.
+ */
+export async function runBenchmark(options: BenchmarkOptions): Promise<BenchmarkResult> {
+	const { bundlePath, port = 47900 + Math.floor(Math.random() * 100) } = options;
+
+	// Compute scorecard from the capture bundle
+	const session = parseCapture(bundlePath);
+	const scorecard = computeScorecard(session);
+
+	// Load replay source for the server
+	const journalPath = path.join(bundlePath, 'journal.jsonl');
+	if (!fs.existsSync(journalPath)) {
+		throw new Error(`Capture bundle missing journal.jsonl: ${bundlePath}`);
+	}
+	const replay = loadReplaySource(bundlePath);
+
+	// Start replay server — use scorecard team name since capture manifests
+	// use 'team' field while replay manifests use 'teamName'
+	const server = new TeamChatServer({
+		port,
+		teamName: scorecard.session.team,
+		mode: 'replay',
+		replay,
+	});
+	server.start();
+	const actualPort = server.getPort();
+
+	let browser: any;
+	let page: any;
+
+	try {
+		// Dynamic import — Playwright is optional
+		let chromium: any;
+		try {
+			const pw = await import('playwright');
+			chromium = pw.chromium;
+		} catch {
+			throw new Error(
+				'Playwright not installed. Install with: bun add -d playwright && npx playwright install chromium'
+			);
+		}
+
+		browser = await chromium.launch({ headless: true });
+		page = await browser.newPage();
+		await page.setViewportSize({ width: 1280, height: 720 });
+
+		// Navigate with ?seek=end to render all events immediately.
+		// The useReplayController hook reads this param on mount and seeks
+		// the replay cursor to the final position, rendering the full session.
+		await page.goto(`http://localhost:${actualPort}/?seek=end`, { waitUntil: 'networkidle' });
+
+		// Wait for React to process the seek and render events
+		await page.waitForTimeout(2000);
+
+		// Verify events rendered; if not, fall back to clicking the timeline scrubber
+		const renderedCount = await page.evaluate(() => {
+			return document.querySelectorAll('.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-thread-block').length;
+		});
+
+		if (renderedCount === 0) {
+			// Fallback: drag the replay scrubber to the end
+			const scrubber = await page.$('.tc-replay-scrubber');
+			if (scrubber) {
+				const box = await scrubber.boundingBox();
+				if (box) {
+					// Click near the right end of the scrubber to seek to 100%
+					await page.mouse.click(box.x + box.width * 0.98, box.y + box.height / 2);
+					await page.waitForTimeout(2000);
+				}
+			}
+		}
+
+		// Measure viewport metrics
+		const viewport = await measureViewport(page, scorecard);
+
+		const result: BenchmarkResult = {
+			scorecard,
+			viewport,
+			generatedAt: new Date().toISOString(),
+		};
+
+		// Save baseline if requested
+		if (options.saveBaseline) {
+			const baselineOutputPath = path.join(bundlePath, 'benchmark.json');
+			fs.writeFileSync(baselineOutputPath, JSON.stringify(result, null, '\t'));
+		}
+
+		return result;
+	} finally {
+		if (page) await page.close().catch(() => {});
+		if (browser) await browser.close().catch(() => {});
+		server.stop();
+	}
+}
+
+/**
+ * Measure viewport metrics using Playwright page evaluation.
+ */
+async function measureViewport(page: any, scorecard: Scorecard): Promise<ViewportMetrics> {
+	// Count visible event elements (precompute bounds to avoid O(screens * elements))
+	const eventsPerScreen = await page.evaluate(() => {
+		const selectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block';
+		const allElements = document.querySelectorAll(selectors);
+		const viewportHeight = window.innerHeight;
+
+		if (allElements.length === 0) {
+			return [0];
+		}
+
+		// Precompute absolute bounds once
+		const scrollY = window.scrollY;
+		const bounds = Array.from(allElements).map(el => {
+			const rect = el.getBoundingClientRect();
+			return { top: rect.top + scrollY, bottom: rect.bottom + scrollY };
+		});
+
+		// Count elements per screen using cached bounds
+		const scrollHeight = document.documentElement.scrollHeight;
+		const screenCount = Math.max(1, Math.ceil(scrollHeight / viewportHeight));
+		const screens: number[] = [];
+
+		for (let i = 0; i < screenCount; i++) {
+			const screenTop = i * viewportHeight;
+			const screenBottom = screenTop + viewportHeight;
+			let count = 0;
+
+			for (const b of bounds) {
+				if (b.bottom > screenTop && b.top < screenBottom) {
+					count++;
+				}
+			}
+			screens.push(count);
+		}
+
+		return screens;
+	});
+
+	// Scroll depth
+	const scrollDepth = await page.evaluate(() => {
+		return document.documentElement.scrollHeight / window.innerHeight;
+	});
+
+	// Render completeness — count rendered event elements vs scorecard total
+	const renderedEventCount = await page.evaluate(() => {
+		const selectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block';
+		return document.querySelectorAll(selectors).length;
+	});
+	const totalEvents = scorecard.metrics.teamchatEvents;
+	const renderCompleteness = totalEvents > 0 ? renderedEventCount / totalEvents : 1;
+
+	// Whitespace ratio — screenshot pixel analysis
+	const whitespaceRatio = await measureWhitespace(page);
+
+	return {
+		eventsPerScreen: eventsPerScreen as number[],
+		scrollDepth: scrollDepth as number,
+		renderCompleteness: Math.min(renderCompleteness, 1),
+		whitespaceRatio,
+	};
+}
+
+/**
+ * Estimate whitespace ratio by sampling a grid of viewport points.
+ * Uses document.elementFromPoint to avoid double-counting overlapping elements.
+ */
+async function measureWhitespace(page: any): Promise<number> {
+	try {
+		const ratio = await page.evaluate(() => {
+			const width = window.innerWidth;
+			const height = window.innerHeight;
+			const contentSelectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block, .tc-header, .tc-roster-list, .tc-replay-controls, .tc-replay-timeline';
+
+			// Sample a 40x40 grid of points to approximate coverage
+			const gridSize = 40;
+			let coveredSamples = 0;
+			const totalSamples = gridSize * gridSize;
+
+			for (let i = 0; i < gridSize; i++) {
+				const y = (i + 0.5) * (height / gridSize);
+				for (let j = 0; j < gridSize; j++) {
+					const x = (j + 0.5) * (width / gridSize);
+					const el = document.elementFromPoint(x, y);
+					if (!el) continue;
+
+					// Walk up the DOM to check if this point is within a content element
+					let node: Element | null = el as Element;
+					while (node) {
+						if (node instanceof Element && node.matches(contentSelectors)) {
+							coveredSamples++;
+							break;
+						}
+						node = node.parentElement;
+					}
+				}
+			}
+
+			const coveredRatio = totalSamples > 0 ? (coveredSamples / totalSamples) : 0;
+			return Math.max(0, Math.min(1, 1 - coveredRatio));
+		});
+
+		return ratio as number;
+	} catch {
+		// If measurement fails, return a neutral estimate
+		return 0.5;
+	}
+}
