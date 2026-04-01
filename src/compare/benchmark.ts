@@ -156,7 +156,7 @@ export function formatComparisonOutput(
  * Requires Playwright to be installed — gracefully errors if not.
  */
 export async function runBenchmark(options: BenchmarkOptions): Promise<BenchmarkResult> {
-	const { bundlePath, port = 0 } = options;
+	const { bundlePath, port = 47900 + Math.floor(Math.random() * 100) } = options;
 
 	// Compute scorecard from the capture bundle
 	const session = parseCapture(bundlePath);
@@ -169,10 +169,11 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
 	}
 	const replay = loadReplaySource(bundlePath);
 
-	// Start replay server
+	// Start replay server — use scorecard team name since capture manifests
+	// use 'team' field while replay manifests use 'teamName'
 	const server = new TeamChatServer({
 		port: port || 0,
-		teamName: replay.bundle.manifest.teamName,
+		teamName: scorecard.session.team,
 		mode: 'replay',
 		replay,
 	});
@@ -198,16 +199,31 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
 		page = await browser.newPage();
 		await page.setViewportSize({ width: 1280, height: 720 });
 
-		// Navigate and wait for the page to load
-		await page.goto(`http://localhost:${actualPort}`, { waitUntil: 'networkidle' });
+		// Navigate with ?seek=end to render all events immediately.
+		// The useReplayController hook reads this param on mount and seeks
+		// the replay cursor to the final position, rendering the full session.
+		await page.goto(`http://localhost:${actualPort}/?seek=end`, { waitUntil: 'networkidle' });
 
-		// Wait for main content to render
-		await page.waitForSelector('.chat-feed, .message-row, .system-event', { timeout: 10000 }).catch(() => {
-			// If no chat elements appear, the page may have a different structure — continue anyway
+		// Wait for React to process the seek and render events
+		await page.waitForTimeout(2000);
+
+		// Verify events rendered; if not, fall back to clicking the timeline scrubber
+		const renderedCount = await page.evaluate(() => {
+			return document.querySelectorAll('.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-thread-block').length;
 		});
 
-		// Small delay for React rendering to settle
-		await page.waitForTimeout(1000);
+		if (renderedCount === 0) {
+			// Fallback: drag the replay scrubber to the end
+			const scrubber = await page.$('.tc-replay-scrubber');
+			if (scrubber) {
+				const box = await scrubber.boundingBox();
+				if (box) {
+					// Click near the right end of the scrubber to seek to 100%
+					await page.mouse.click(box.x + box.width * 0.98, box.y + box.height / 2);
+					await page.waitForTimeout(2000);
+				}
+			}
+		}
 
 		// Measure viewport metrics
 		const viewport = await measureViewport(page, scorecard);
@@ -238,7 +254,7 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
 async function measureViewport(page: any, scorecard: Scorecard): Promise<ViewportMetrics> {
 	// Count visible event elements
 	const eventsPerScreen = await page.evaluate(() => {
-		const selectors = '.message-row, .system-event, .task-card, .reaction';
+		const selectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block';
 		const allElements = document.querySelectorAll(selectors);
 		const viewportHeight = window.innerHeight;
 		const screens: number[] = [];
@@ -278,7 +294,7 @@ async function measureViewport(page: any, scorecard: Scorecard): Promise<Viewpor
 
 	// Render completeness — count rendered event elements vs scorecard total
 	const renderedEventCount = await page.evaluate(() => {
-		const selectors = '.message-row, .system-event, .task-card, .reaction, .thread-marker, .presence-change, .task-update';
+		const selectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block';
 		return document.querySelectorAll(selectors).length;
 	});
 	const totalEvents = scorecard.metrics.teamchatEvents;
@@ -328,7 +344,7 @@ async function measureWhitespace(page: any): Promise<number> {
 			// We can't directly capture the rendered page in canvas from JS alone
 			// without html2canvas. Instead, we estimate by checking how much of the
 			// viewport area is covered by content elements.
-			const contentSelectors = '.message-row, .system-event, .task-card, .reaction, .thread-marker, .sidebar, .header, .presence-roster, .chat-input, .replay-controls, .timeline';
+			const contentSelectors = '.tc-message-stack, .tc-system-row, .tc-system-inline, .tc-task-card, .tc-reaction-pill, .tc-thread-block, .tc-header, .tc-roster-list, .tc-replay-controls, .tc-replay-timeline';
 			const contentElements = document.querySelectorAll(contentSelectors);
 			let coveredArea = 0;
 			const totalArea = width * height;

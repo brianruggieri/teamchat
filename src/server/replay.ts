@@ -59,6 +59,7 @@ function loadReplayDirectory(rootDir: string): LoadedReplaySource {
 	const eventsPath = resolveFirstExistingPath([
 		path.join(rootDir, 'events.jsonl'),
 		path.join(rootDir, 'session.jsonl'),
+		path.join(rootDir, 'journal.jsonl'),
 	]);
 	if (!eventsPath) {
 		throw new Error(`Replay bundle missing events.jsonl or session.jsonl: ${rootDir}`);

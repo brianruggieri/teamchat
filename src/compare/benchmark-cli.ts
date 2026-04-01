@@ -16,7 +16,7 @@ export async function runBenchmarkCommand(args: string[]): Promise<void> {
 	let bundlePath: string | null = null;
 	let baselinePath: string | undefined;
 	let saveBaseline = false;
-	let port = 0;
+	let port: number | undefined;
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i]!;
@@ -86,7 +86,7 @@ export async function runBenchmarkCommand(args: string[]): Promise<void> {
 	const result = await runBenchmark({
 		bundlePath: resolvedBundle,
 		saveBaseline,
-		port,
+		...(port !== undefined && { port }),
 	});
 
 	// Output results
