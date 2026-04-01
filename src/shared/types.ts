@@ -51,7 +51,9 @@ export type ChatEvent =
 	| ReactionEvent
 	| ThreadMarker
 	| PresenceChange
-	| TaskUpdate;
+	| TaskUpdate
+	| AgentHeartbeat
+	| LeadThought;
 
 export interface ContentMessage {
 	type: 'message';
@@ -133,6 +135,24 @@ export interface TaskUpdate {
 	id: string;
 	task: TaskInfo;
 	timestamp: string;
+}
+
+export interface AgentHeartbeat {
+	type: 'heartbeat';
+	id: string;
+	agentName: string;
+	agentColor: string;
+	activities: string; // compacted summary, e.g. "writing file.tsx, editing route.ts"
+	opCount: number;
+	timestamp: string;
+}
+
+export interface LeadThought {
+	type: 'thought';
+	id: string;
+	text: string;
+	timestamp: string;
+	deduplicated: boolean; // true if >40% overlap with following text was suppressed
 }
 
 // === Beat Detection (conversational structure) ===

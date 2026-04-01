@@ -63,6 +63,8 @@ export function buildMessageLaneItems(events: ChatEvent[], sessionStartOverride?
 			|| event.type === 'task-update'
 			|| event.type === 'reaction'
 			|| event.type === 'thread-marker'
+			|| event.type === 'heartbeat'
+			|| event.type === 'thought'
 		) {
 			continue;
 		}
