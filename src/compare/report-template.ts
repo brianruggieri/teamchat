@@ -189,18 +189,34 @@ function renderGapBreakdown(scorecard: Scorecard, session: ParsedSession): strin
 	const { metrics } = scorecard;
 	const events = session.teamchat.events;
 
-	// Count by category
-	const messageCt = events.filter(e => e.type === 'message').length;
-	const systemCt = events.filter(e => e.type === 'system').length;
-	const taskCt = events.filter(e => e.type === 'task-update').length;
-	const reactionCt = events.filter(e => e.type === 'reaction').length;
-	const presenceCt = events.filter(e => e.type === 'presence').length;
-	const threadCt = events.filter(e => e.type === 'thread-marker').length;
-	const totalEvents = events.length || 1;
+	// Count by category (single pass)
+	let messageCt = 0;
+	let systemCt = 0;
+	let taskCt = 0;
+	let reactionCt = 0;
+	let presenceCt = 0;
+	let threadCt = 0;
 
-	// Hidden layer: DMs + broadcasts
-	const dmCount = session.protocol.messages.filter(m => m.isDM).length;
-	const broadcastCount = session.protocol.messages.filter(m => m.isBroadcast).length;
+	for (const e of events) {
+		switch (e.type) {
+			case 'message': messageCt++; break;
+			case 'system': systemCt++; break;
+			case 'task-update': taskCt++; break;
+			case 'reaction': reactionCt++; break;
+			case 'presence': presenceCt++; break;
+			case 'thread-marker': threadCt++; break;
+		}
+	}
+
+	const totalEvents = events.length;
+
+	// Hidden layer: DMs + broadcasts (single pass)
+	let dmCount = 0;
+	let broadcastCount = 0;
+	for (const m of session.protocol.messages) {
+		if (m.isDM) dmCount++;
+		if (m.isBroadcast) broadcastCount++;
+	}
 	const hiddenTotal = dmCount + broadcastCount;
 
 	// Bar max reference = teamchat event count (the fullest bar)
@@ -222,8 +238,17 @@ function renderGapBreakdown(scorecard: Scorecard, session: ParsedSession): strin
 
 	function renderStackedBar(segs: typeof segments, total: number, width: number): string {
 		if (total === 0) return '<div class="gap-bar-empty"></div>';
-		return segs.map(s => {
-			const pct = Math.max(0.5, (s.count / total) * width);
+		const nonZero = segs.filter(s => s.count > 0);
+		if (nonZero.length === 0) return '<div class="gap-bar-empty"></div>';
+
+		// Compute proportional widths with minimum visibility, then normalize
+		const minPct = 0.5;
+		const adjusted = nonZero.map(s => Math.max(minPct, (s.count / total) * width));
+		const sumAdj = adjusted.reduce((a, v) => a + v, 0);
+		const scale = sumAdj > 0 ? width / sumAdj : 1;
+
+		return nonZero.map((s, i) => {
+			const pct = adjusted[i] * scale;
 			return `<div class="gap-seg" style="width:${pct}%;background:${s.color}" title="${s.label}: ${s.count}"></div>`;
 		}).join('');
 	}
@@ -283,25 +308,33 @@ interface TimelineBucket {
 function buildTimeline(session: ParsedSession): TimelineBucket[] {
 	const BUCKET_MS = 10000; // 10-second windows
 
-	// Collect all timestamps to determine range
-	const allTimestamps: number[] = [];
+	// Determine timestamp range incrementally (avoids stack overflow on large arrays)
+	let minTs = Infinity;
+	let maxTs = -Infinity;
+
 	for (const e of session.terminal.merged) {
 		const t = new Date(e.timestamp).getTime();
-		if (!isNaN(t)) allTimestamps.push(t);
+		if (!isNaN(t)) {
+			if (t < minTs) minTs = t;
+			if (t > maxTs) maxTs = t;
+		}
 	}
 	for (const m of session.protocol.messages) {
 		const t = new Date(m.timestamp).getTime();
-		if (!isNaN(t)) allTimestamps.push(t);
+		if (!isNaN(t)) {
+			if (t < minTs) minTs = t;
+			if (t > maxTs) maxTs = t;
+		}
 	}
 	for (const e of session.teamchat.events) {
 		const t = new Date(e.timestamp).getTime();
-		if (!isNaN(t)) allTimestamps.push(t);
+		if (!isNaN(t)) {
+			if (t < minTs) minTs = t;
+			if (t > maxTs) maxTs = t;
+		}
 	}
 
-	if (allTimestamps.length === 0) return [];
-
-	const minTs = Math.min(...allTimestamps);
-	const maxTs = Math.max(...allTimestamps);
+	if (!isFinite(minTs) || !isFinite(maxTs)) return [];
 
 	// Build buckets
 	const bucketMap = new Map<number, TimelineBucket>();
@@ -426,7 +459,7 @@ function renderTimeline(session: ParsedSession): string {
 			</table>
 			${remainingBuckets.length > 0 ? `
 			<div class="timeline-show-all" id="timeline-show-all">
-				<button onclick="document.getElementById('timeline-overflow').style.display='contents';document.getElementById('timeline-show-all').style.display='none';">
+				<button onclick="document.getElementById('timeline-overflow').style.display='table-row-group';document.getElementById('timeline-show-all').style.display='none';">
 					Show all ${buckets.length} time windows (${remainingBuckets.length} more)
 				</button>
 			</div>` : ''}
