@@ -15,6 +15,8 @@ import { SetupCard } from './SetupCard.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { SessionSummaryCard } from './SessionSummaryCard.jsx';
+import { HeartbeatRow } from './HeartbeatRow.jsx';
+import { ThoughtBubble } from './ThoughtBubble.jsx';
 import { buildMessageLaneItems, type MessageLaneItem } from './messageGrouping.js';
 
 interface MessageListProps {
@@ -147,6 +149,24 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 										key={laneItem.event.id}
 										event={laneItem.event}
 										inline
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'heartbeat') {
+								return (
+									<HeartbeatRow
+										key={laneItem.event.id}
+										event={laneItem.event}
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'thought') {
+								return (
+									<ThoughtBubble
+										key={laneItem.event.id}
+										event={laneItem.event}
 									/>
 								);
 							}

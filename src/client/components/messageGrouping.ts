@@ -2,6 +2,8 @@ import type {
 	ChatEvent,
 	ContentMessage,
 	SystemEvent,
+	AgentHeartbeat,
+	LeadThought,
 } from '../types.js';
 
 export interface MessageStackItem {
@@ -38,13 +40,25 @@ export interface SetupCardItem {
 	events: SystemEvent[];
 }
 
+export interface HeartbeatItem {
+	kind: 'heartbeat';
+	event: AgentHeartbeat;
+}
+
+export interface ThoughtItem {
+	kind: 'thought';
+	event: LeadThought;
+}
+
 export type MessageLaneItem =
 	| MessageStackItem
 	| PlanCardItem
 	| PermissionCardItem
 	| SystemRowItem
 	| SystemGroupItem
-	| SetupCardItem;
+	| SetupCardItem
+	| HeartbeatItem
+	| ThoughtItem;
 
 export function buildMessageLaneItems(events: ChatEvent[], sessionStartOverride?: number): MessageLaneItem[] {
 	const items: MessageLaneItem[] = [];
@@ -63,9 +77,20 @@ export function buildMessageLaneItems(events: ChatEvent[], sessionStartOverride?
 			|| event.type === 'task-update'
 			|| event.type === 'reaction'
 			|| event.type === 'thread-marker'
-			|| event.type === 'heartbeat'
-			|| event.type === 'thought'
 		) {
+			continue;
+		}
+
+		if (event.type === 'heartbeat') {
+			items.push({ kind: 'heartbeat', event: event as AgentHeartbeat });
+			continue;
+		}
+
+		if (event.type === 'thought') {
+			const thought = event as LeadThought;
+			if (!thought.deduplicated) {
+				items.push({ kind: 'thought', event: thought });
+			}
 			continue;
 		}
 
