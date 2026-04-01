@@ -27,9 +27,19 @@ export function parseInboxes(inboxDir: string): ProtocolTimeline {
 		}
 	}
 
-	// Detect broadcasts: same content hash + from within 1s across 2+ recipients
+	// Filter out protocol control messages from broadcast detection —
+	// shutdown_request and idle_notification are individual coordination events, not broadcasts
+	const contentMessages = allEntries.filter(entry => {
+		try {
+			const parsed = JSON.parse(entry.text);
+			if (parsed.type === 'shutdown_request' || parsed.type === 'idle_notification') return false;
+		} catch {}
+		return true;
+	});
+
+	// Detect broadcasts: same content hash + from within 60s across 2+ recipients
 	const byHash = new Map<string, InboxEntry[]>();
-	for (const entry of allEntries) {
+	for (const entry of contentMessages) {
 		const key = `${contentHash(entry.text)}:${entry.from}`;
 		const group = byHash.get(key) ?? [];
 		group.push(entry);
@@ -43,7 +53,7 @@ export function parseInboxes(inboxDir: string): ProtocolTimeline {
 		if (recipients.size < 2) continue;
 		const timestamps = group.map(e => new Date(e.timestamp).getTime());
 		const span = Math.max(...timestamps) - Math.min(...timestamps);
-		if (span <= 1000) {
+		if (span <= 60000) {
 			broadcastHashes.add(key);
 		}
 	}
