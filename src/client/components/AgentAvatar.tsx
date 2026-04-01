@@ -2,6 +2,45 @@ import { useAvatarMark } from './AvatarMarkContext.js';
 import { renderAvatarMark } from '../avatar-marks.js';
 import { getAgentColor } from '../types.js';
 
+export const ROLE_ABBREVIATIONS: Record<string, string> = {
+	'db': 'db',
+	'ui': 'ui',
+	'fe': 'fe',
+	'frontend': 'fe',
+	'backend': 'be',
+	'sv': 'sv',
+	'server': 'sv',
+	'ch': 'ch',
+	'chat': 'ch',
+	'msg': 'msg',
+	'message': 'msg',
+	'auth': 'auth',
+	'perm': 'perm',
+	'permission': 'perm',
+	'rt': 'rt',
+	'route': 'rt',
+	'file': 'file',
+	'vc': 'vc',
+	'voice': 'vc',
+	'srch': 'srch',
+	'search': 'srch',
+	'ntf': 'ntf',
+	'notification': 'ntf',
+	'qa': 'qa',
+	'test': 'tst',
+	'privacy': 'prv',
+	'gateway': 'gw',
+	'api': 'api',
+	'lead': 'ld',
+};
+
+export function getAvatarAbbreviation(name: string): string {
+	const firstSegment = name.split('-')[0]?.toLowerCase() ?? '';
+	const abbrev = ROLE_ABBREVIATIONS[firstSegment];
+	if (abbrev) return abbrev;
+	return name.slice(0, 2).toLowerCase();
+}
+
 interface AgentAvatarProps {
 	name: string;
 	color: string;
@@ -31,7 +70,7 @@ export function AgentAvatar({
 				/>
 			) : (
 				<div className={`tc-avatar-core ${getAgentColor(color).dot}`}>
-					{name.charAt(0).toUpperCase()}
+					{getAvatarAbbreviation(name)}
 				</div>
 			)}
 			{isLead && (

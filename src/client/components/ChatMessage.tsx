@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ContentMessage, Reaction } from '../types.js';
-import { getAgentColor } from '../types.js';
+import { getAgentColor, AGENT_COLOR_VALUES } from '../types.js';
 import { ReactionRow } from './ReactionRow.jsx';
 import { useRelativeTime } from '../hooks/useRelativeTime.js';
 
@@ -10,7 +10,17 @@ interface ChatMessageProps {
 	stackPosition?: 'single' | 'first' | 'middle' | 'last';
 }
 
-const TRUNCATE_LENGTH = 200;
+const TRUNCATE_LENGTH = 400;
+
+function getAgentTintColor(colorName: string): string {
+	const colors = AGENT_COLOR_VALUES[colorName];
+	if (!colors) return 'transparent';
+	const hex = colors.fill;
+	const r = parseInt(hex.slice(1, 3), 16);
+	const g = parseInt(hex.slice(3, 5), 16);
+	const b = parseInt(hex.slice(5, 7), 16);
+	return `rgba(${r}, ${g}, ${b}, 0.07)`;
+}
 
 export function ChatMessage({
 	message,
@@ -20,6 +30,7 @@ export function ChatMessage({
 	const [expanded, setExpanded] = useState(false);
 	const { nowMs, formatRelativeTime, formatAbsoluteTime, formatISOTooltip } = useRelativeTime();
 	const agentColor = getAgentColor(message.fromColor);
+	const bubbleTint = message.isLead ? undefined : { backgroundColor: getAgentTintColor(message.fromColor) };
 	const isLong = message.text.length > TRUNCATE_LENGTH;
 	const displayText = isLong && !expanded
 		? message.summary ?? `${message.text.slice(0, TRUNCATE_LENGTH)}...`
@@ -39,6 +50,7 @@ export function ChatMessage({
 				className={`tc-chat-bubble ${message.isLead ? 'is-lead' : 'is-peer'} ${
 					stackPosition !== 'single' ? `is-${stackPosition}` : 'is-single'
 				} ${message.isLead ? '' : `border-l-2 ${agentColor.border}`}`}
+				style={bubbleTint}
 			>
 				<MessageContent text={displayText} />
 				{isLong && (
