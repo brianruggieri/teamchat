@@ -107,8 +107,7 @@ export function applyChatEventInPlace(state: ChatState, event: ChatEvent): void 
 				existing.messageCount++;
 				existing.lastMessageTimestamp = msg.timestamp;
 				if (existing.status === 'new') existing.status = 'active';
-				// Re-surface thread when 3+ messages and there are intervening
-				// non-DM events between the first and latest DM for this pair
+				// Re-surface thread when there are 3 or more messages in this DM
 				if (existing.messageCount >= 3) {
 					state.resurfacedThreadKeys.add(key);
 				}

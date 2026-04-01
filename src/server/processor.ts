@@ -227,8 +227,13 @@ export class EventProcessor {
 						this.makeReaction(hb.id, '⚠️', hb.agentName, hb.agentColor, now, `edit conflict on ${fileName}`),
 					);
 				}
-				// Update the map for this file
+				// Update the map for this file and evict stale entries (>60s)
 				this.recentFileEdits.set(fileName, { agentName: hb.agentName, timestamp: now });
+				for (const [key, entry] of this.recentFileEdits) {
+					if (key !== fileName && !isWithinWindow(entry.timestamp, now, 60_000)) {
+						this.recentFileEdits.delete(key);
+					}
+				}
 			}
 
 			// Pattern 5 🔍 Research phase: agent's first heartbeat with only reads/searches, no writes

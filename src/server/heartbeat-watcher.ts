@@ -119,7 +119,7 @@ export class HeartbeatWatcher {
 		}, this.pollIntervalMs);
 	}
 
-	/** Read new lines from a file since the last tracked position. */
+	/** Read new complete lines from a file since the last tracked position. */
 	private tailFile(filePath: string): void {
 		try {
 			if (!fs.existsSync(filePath)) return;
@@ -129,15 +129,28 @@ export class HeartbeatWatcher {
 
 			if (currentSize <= lastPos) return;
 
+			// Cap read size to avoid large allocations on first scan
+			const MAX_CHUNK_SIZE = 1024 * 1024; // 1MB
+			const readEnd = Math.min(lastPos + MAX_CHUNK_SIZE, currentSize);
+
 			const fd = fs.openSync(filePath, 'r');
 			try {
-				const buf = Buffer.alloc(currentSize - lastPos);
+				const buf = Buffer.alloc(readEnd - lastPos);
 				fs.readSync(fd, buf, 0, buf.length, lastPos);
-				this.filePositions.set(filePath, currentSize);
+
+				const chunk = buf.toString('utf-8');
+
+				// Only advance to the last newline to avoid losing partial lines
+				const lastNewline = chunk.lastIndexOf('\n');
+				if (lastNewline === -1) {
+					// No complete line yet — don't advance position
+					return;
+				}
+				this.filePositions.set(filePath, lastPos + Buffer.byteLength(chunk.slice(0, lastNewline + 1), 'utf-8'));
 
 				const agentName = this.extractAgentName(filePath);
-				const chunk = buf.toString('utf-8');
-				const lines = chunk.split('\n');
+				const completeChunk = chunk.slice(0, lastNewline + 1);
+				const lines = completeChunk.split('\n');
 
 				for (const line of lines) {
 					const trimmed = line.trim();

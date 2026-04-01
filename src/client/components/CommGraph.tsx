@@ -96,9 +96,6 @@ export function CommGraph({ members, threadStatuses, onFilterThread, activeFilte
 		[members, threadStatuses],
 	);
 
-	// Graceful degrade: hide if fewer than 2 threads
-	if (threads.length < 2) return null;
-
 	const nodeMap = useMemo(() => {
 		const map = new Map<string, GraphNode>();
 		for (const node of nodes) {
@@ -217,6 +214,10 @@ export function CommGraph({ members, threadStatuses, onFilterThread, activeFilte
 		},
 		[edges, nodeMap, activeFilter, onFilterThread],
 	);
+
+	// Graceful degrade: hide if fewer than 2 threads
+	// (placed after all hooks to satisfy Rules of Hooks)
+	if (threads.length < 2) return null;
 
 	return (
 		<section className="tc-sidecard tc-rail-section">

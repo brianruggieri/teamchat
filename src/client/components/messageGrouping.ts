@@ -215,6 +215,8 @@ export function buildMessageLaneItems(events: ChatEvent[], sessionStartOverride?
  * Returns { item, nextIndex } where nextIndex is past the last consumed event.
  */
 const CASCADE_LOOKAHEAD = 10;
+/** Hard cap on how far ahead (in total events) cascade detection scans. */
+const CASCADE_MAX_DISTANCE = 30;
 
 function tryBuildCascade(
 	events: ChatEvent[],
@@ -225,9 +227,11 @@ function tryBuildCascade(
 	const claims: SystemEvent[] = [];
 	const consumedIndices = new Set<number>();
 
+	const maxIndex = Math.min(events.length, startIndex + 1 + CASCADE_MAX_DISTANCE);
+
 	// Scan ahead for task-unblocked events
 	let lookahead = 0;
-	for (let j = startIndex + 1; j < events.length && lookahead < CASCADE_LOOKAHEAD; j++) {
+	for (let j = startIndex + 1; j < maxIndex && lookahead < CASCADE_LOOKAHEAD; j++) {
 		const next = events[j]!;
 		// Skip non-system events and filtered types in lookahead count
 		if (
@@ -253,7 +257,7 @@ function tryBuildCascade(
 
 	// Scan a second pass for task-claimed events for those task IDs
 	// (they may appear interleaved or after the unblocked events)
-	for (let j = startIndex + 1; j < events.length; j++) {
+	for (let j = startIndex + 1; j < maxIndex; j++) {
 		const next = events[j]!;
 		if (
 			next.type === 'presence'
