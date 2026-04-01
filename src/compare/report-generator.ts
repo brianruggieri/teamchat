@@ -99,5 +99,5 @@ export function parseCapture(bundlePath: string): ParsedSession {
 export function generateReport(bundlePath: string): string {
 	const session = parseCapture(bundlePath);
 	const scorecard = computeScorecard(session);
-	return renderReport(scorecard);
+	return renderReport(scorecard, session);
 }

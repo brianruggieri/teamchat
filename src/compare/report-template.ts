@@ -1,4 +1,5 @@
-import type { Scorecard, KeyMoment } from './types.js';
+import type { Scorecard, KeyMoment, ParsedSession, TerminalEntry, ProtocolMessage } from './types.js';
+import type { ChatEvent } from '../shared/types.js';
 
 function escapeHtml(text: string): string {
 	return text
@@ -16,11 +17,151 @@ function formatDuration(ms: number): string {
 	return `${h}h ${m}m`;
 }
 
-function renderMomentCard(moment: KeyMoment, index: number): string {
+function formatTime(timestamp: string): string {
+	try {
+		const d = new Date(timestamp);
+		if (isNaN(d.getTime())) return timestamp.slice(0, 8);
+		return d.toTimeString().slice(0, 8);
+	} catch {
+		return timestamp.slice(0, 8);
+	}
+}
+
+function truncate(text: string, max: number): string {
+	const clean = text.replace(/\n/g, ' ').trim();
+	if (clean.length <= max) return clean;
+	return clean.slice(0, max) + '...';
+}
+
+// --- Data extraction helpers ---
+
+function getTerminalEntriesAround(entries: TerminalEntry[], timestamp: string, windowMs: number = 30000): TerminalEntry[] {
+	const ts = new Date(timestamp).getTime();
+	if (isNaN(ts)) return [];
+	return entries.filter(e => {
+		const t = new Date(e.timestamp).getTime();
+		return !isNaN(t) && Math.abs(t - ts) <= windowMs;
+	});
+}
+
+function getProtocolMessagesAround(messages: ProtocolMessage[], timestamp: string, windowMs: number = 30000): ProtocolMessage[] {
+	const ts = new Date(timestamp).getTime();
+	if (isNaN(ts)) return [];
+	return messages.filter(m => {
+		const t = new Date(m.timestamp).getTime();
+		return !isNaN(t) && Math.abs(t - ts) <= windowMs;
+	});
+}
+
+function getEventsAround(events: ChatEvent[], timestamp: string, windowMs: number = 30000): ChatEvent[] {
+	const ts = new Date(timestamp).getTime();
+	if (isNaN(ts)) return [];
+	return events.filter(e => {
+		const t = new Date(e.timestamp).getTime();
+		return !isNaN(t) && Math.abs(t - ts) <= windowMs;
+	});
+}
+
+function renderTerminalLines(entries: TerminalEntry[], maxLines: number = 5): string {
+	if (entries.length === 0) return '<span class="empty-indicator">No terminal output in this window.</span>';
+	const lines = entries.slice(0, maxLines).map(e => {
+		const time = formatTime(e.timestamp);
+		const agent = escapeHtml(e.agent);
+		const typeTag = e.type === 'tool-call' ? `<span class="term-tool">[${escapeHtml(e.toolName ?? 'tool')}]</span> ` : '';
+		const content = escapeHtml(truncate(e.content, 120));
+		return `<span class="term-time">[${time}]</span> <span class="term-agent">${agent}:</span> ${typeTag}${content}`;
+	}).join('\n');
+	const suffix = entries.length > maxLines ? `\n<span class="term-more">... ${entries.length - maxLines} more lines</span>` : '';
+	return lines + suffix;
+}
+
+function renderTeamchatEvents(events: ChatEvent[], maxEvents: number = 5): string {
+	if (events.length === 0) return '<span class="empty-indicator">No teamchat events in this window.</span>';
+	const items = events.slice(0, maxEvents).map(e => {
+		switch (e.type) {
+			case 'message': {
+				const dmBadge = e.isDM ? '<span class="tc-badge dm">DM</span> ' : '';
+				const bcBadge = e.isBroadcast ? '<span class="tc-badge broadcast">Broadcast</span> ' : '';
+				const from = escapeHtml(e.from);
+				const text = escapeHtml(truncate(e.text, 100));
+				const targets = e.isDM && e.dmParticipants ? ` <span class="tc-participants">${escapeHtml(e.dmParticipants.join(', '))}</span>` : '';
+				return `<div class="tc-event">${dmBadge}${bcBadge}<strong>${from}</strong>${targets}: ${text}</div>`;
+			}
+			case 'system': {
+				const badge = `<span class="tc-badge system">${escapeHtml(e.subtype)}</span>`;
+				return `<div class="tc-event">${badge} ${escapeHtml(truncate(e.text, 100))}</div>`;
+			}
+			case 'reaction': {
+				return `<div class="tc-event"><span class="tc-badge reaction">${escapeHtml(e.emoji)}</span> ${escapeHtml(e.fromAgent)} reacted</div>`;
+			}
+			case 'thread-marker': {
+				const label = e.subtype === 'thread-start' ? 'Thread started' : 'Thread ended';
+				return `<div class="tc-event"><span class="tc-badge thread">${label}</span> ${escapeHtml(e.participants.join(', '))}</div>`;
+			}
+			case 'presence': {
+				return `<div class="tc-event"><span class="tc-badge presence">${escapeHtml(e.status)}</span> ${escapeHtml(e.agentName)}</div>`;
+			}
+			case 'task-update': {
+				return `<div class="tc-event"><span class="tc-badge task">${escapeHtml(e.task.status)}</span> ${escapeHtml(truncate(e.task.subject, 80))}</div>`;
+			}
+			default:
+				return '';
+		}
+	}).join('\n');
+	const suffix = events.length > maxEvents ? `\n<div class="tc-more">${events.length - maxEvents} more events</div>` : '';
+	return items + suffix;
+}
+
+// --- Moment card with real data ---
+
+function renderMomentCard(moment: KeyMoment, index: number, session: ParsedSession | null): string {
 	const typeLabel = {
 		dm: 'DM Thread', cascade: 'Task Cascade', broadcast: 'Broadcast',
 		idle: 'Idle Gap', bottleneck: 'Bottleneck', coordination: 'Coordination',
 	}[moment.type];
+
+	let terminalContent: string;
+	let teamchatContent: string;
+
+	if (session) {
+		// Real data from the session
+		const terminalEntries = getTerminalEntriesAround(session.terminal.merged, moment.timestamp);
+		const leadEntries = getTerminalEntriesAround(session.terminal.lead, moment.timestamp);
+		const teamchatEvents = getEventsAround(session.teamchat.events, moment.timestamp);
+		const protocolMsgs = getProtocolMessagesAround(session.protocol.messages, moment.timestamp);
+
+		// Terminal pane: for DMs, show what the lead terminal showed (which is NOT the DM)
+		if (moment.type === 'dm') {
+			if (leadEntries.length > 0) {
+				terminalContent = `<div class="pane-note">Lead terminal around this time:</div>\n${renderTerminalLines(leadEntries, 5)}`;
+			} else if (terminalEntries.length > 0) {
+				terminalContent = `<div class="pane-note">Nearby agent terminal output:</div>\n${renderTerminalLines(terminalEntries, 5)}`;
+			} else {
+				terminalContent = '<span class="empty-indicator">No terminal output — DMs are invisible to all terminals.</span>';
+			}
+		} else if (moment.type === 'broadcast') {
+			// For broadcasts, show the repetitive protocol messages
+			const broadcastMsgs = protocolMsgs.filter(m => m.isBroadcast);
+			if (broadcastMsgs.length > 0) {
+				const lines = broadcastMsgs.slice(0, 5).map(m => {
+					return `<span class="term-time">[${formatTime(m.timestamp)}]</span> <span class="term-agent">${escapeHtml(m.from)}</span> -> <span class="term-agent">${escapeHtml(m.to)}</span>: ${escapeHtml(truncate(m.content, 80))}`;
+				}).join('\n');
+				const suffix = broadcastMsgs.length > 5 ? `\n<span class="term-more">... ${broadcastMsgs.length - 5} more identical sends</span>` : '';
+				terminalContent = lines + suffix;
+			} else {
+				terminalContent = renderTerminalLines(terminalEntries, 5);
+			}
+		} else {
+			terminalContent = renderTerminalLines(terminalEntries, 5);
+		}
+
+		// Teamchat pane: real events
+		teamchatContent = renderTeamchatEvents(teamchatEvents, 5);
+	} else {
+		// Fallback to summary strings
+		terminalContent = escapeHtml(moment.terminalSummary);
+		teamchatContent = escapeHtml(moment.teamchatSummary);
+	}
 
 	return `
 	<div class="moment-card">
@@ -31,27 +172,285 @@ function renderMomentCard(moment: KeyMoment, index: number): string {
 		<div class="moment-split">
 			<div class="moment-pane">
 				<div class="pane-label">What the terminal showed</div>
-				<div class="terminal-mock">${escapeHtml(moment.terminalSummary)}</div>
+				<div class="terminal-mock">${terminalContent}</div>
 			</div>
 			<div class="moment-pane">
 				<div class="pane-label">What teamchat showed</div>
-				<div class="teamchat-mock">${escapeHtml(moment.teamchatSummary)}</div>
+				<div class="teamchat-mock">${teamchatContent}</div>
 			</div>
 		</div>
 		<div class="moment-annotation">${escapeHtml(moment.description)}</div>
 	</div>`;
 }
 
-export function renderReport(scorecard: Scorecard): string {
-	const { session, metrics, keyMoments } = scorecard;
-	const momentCards = keyMoments.map((m, i) => renderMomentCard(m, i)).join('\n');
+// --- Section 2: "The Gap" Visual Breakdown ---
+
+function renderGapBreakdown(scorecard: Scorecard, session: ParsedSession): string {
+	const { metrics } = scorecard;
+	const events = session.teamchat.events;
+
+	// Count by category
+	const messageCt = events.filter(e => e.type === 'message').length;
+	const systemCt = events.filter(e => e.type === 'system').length;
+	const taskCt = events.filter(e => e.type === 'task-update').length;
+	const reactionCt = events.filter(e => e.type === 'reaction').length;
+	const presenceCt = events.filter(e => e.type === 'presence').length;
+	const threadCt = events.filter(e => e.type === 'thread-marker').length;
+	const totalEvents = events.length || 1;
+
+	// Hidden layer: DMs + broadcasts
+	const dmCount = session.protocol.messages.filter(m => m.isDM).length;
+	const broadcastCount = session.protocol.messages.filter(m => m.isBroadcast).length;
+	const hiddenTotal = dmCount + broadcastCount;
+
+	// Bar max reference = teamchat event count (the fullest bar)
+	const maxRef = Math.max(metrics.terminalLinesLead, metrics.terminalLinesAll, hiddenTotal, totalEvents, 1);
+
+	function barWidth(count: number): number {
+		return Math.max(2, Math.round((count / maxRef) * 100));
+	}
+
+	// Stacked bar segments for teamchat
+	const segments = [
+		{ label: 'Messages', count: messageCt, color: 'var(--accent-blue)' },
+		{ label: 'System', count: systemCt, color: 'var(--text-dim)' },
+		{ label: 'Tasks', count: taskCt, color: 'var(--accent-green)' },
+		{ label: 'Reactions', count: reactionCt, color: 'var(--accent-amber)' },
+		{ label: 'Presence', count: presenceCt, color: 'rgba(92, 96, 120, 0.5)' },
+		{ label: 'Threads', count: threadCt, color: 'var(--accent-indigo)' },
+	];
+
+	function renderStackedBar(segs: typeof segments, total: number, width: number): string {
+		if (total === 0) return '<div class="gap-bar-empty"></div>';
+		return segs.map(s => {
+			const pct = Math.max(0.5, (s.count / total) * width);
+			return `<div class="gap-seg" style="width:${pct}%;background:${s.color}" title="${s.label}: ${s.count}"></div>`;
+		}).join('');
+	}
+
+	const legendHtml = segments.filter(s => s.count > 0).map(s =>
+		`<span class="gap-legend-item"><span class="gap-legend-dot" style="background:${s.color}"></span>${s.label} (${s.count})</span>`
+	).join('');
+
+	return `
+<section>
+<div class="container">
+	<div class="section-header"><h2>The Gap</h2><p>How much each layer captures — the wider the bar, the more you see.</p></div>
+	<div class="gap-chart">
+		<div class="gap-row">
+			<div class="gap-label">YOUR TERMINAL</div>
+			<div class="gap-bar-track">
+				<div class="gap-bar-fill terminal-bar" style="width:${barWidth(metrics.terminalLinesLead)}%"></div>
+			</div>
+			<div class="gap-count">${metrics.terminalLinesLead} lines</div>
+		</div>
+		<div class="gap-row">
+			<div class="gap-label">ALL ${scorecard.session.agents} TERMINALS</div>
+			<div class="gap-bar-track">
+				<div class="gap-bar-fill all-terminals-bar" style="width:${barWidth(metrics.terminalLinesAll)}%"></div>
+			</div>
+			<div class="gap-count">${metrics.terminalLinesAll} lines</div>
+		</div>
+		<div class="gap-row">
+			<div class="gap-label">HIDDEN LAYER</div>
+			<div class="gap-bar-track">
+				<div class="gap-bar-fill hidden-bar" style="width:${barWidth(hiddenTotal)}%"></div>
+			</div>
+			<div class="gap-count">${dmCount} DMs + ${broadcastCount} broadcasts</div>
+		</div>
+		<div class="gap-row">
+			<div class="gap-label">TEAMCHAT VIEW</div>
+			<div class="gap-bar-track" style="position:relative;display:flex">
+				${renderStackedBar(segments, totalEvents, barWidth(totalEvents))}
+			</div>
+			<div class="gap-count">${totalEvents} events</div>
+		</div>
+	</div>
+	<div class="gap-legend">${legendHtml}</div>
+</div>
+</section>`;
+}
+
+// --- Section 5: Full Synchronized Timeline ---
+
+interface TimelineBucket {
+	time: string; // HH:MM:SS
+	terminal: string[];
+	hidden: string[];
+	teamchat: string[];
+}
+
+function buildTimeline(session: ParsedSession): TimelineBucket[] {
+	const BUCKET_MS = 10000; // 10-second windows
+
+	// Collect all timestamps to determine range
+	const allTimestamps: number[] = [];
+	for (const e of session.terminal.merged) {
+		const t = new Date(e.timestamp).getTime();
+		if (!isNaN(t)) allTimestamps.push(t);
+	}
+	for (const m of session.protocol.messages) {
+		const t = new Date(m.timestamp).getTime();
+		if (!isNaN(t)) allTimestamps.push(t);
+	}
+	for (const e of session.teamchat.events) {
+		const t = new Date(e.timestamp).getTime();
+		if (!isNaN(t)) allTimestamps.push(t);
+	}
+
+	if (allTimestamps.length === 0) return [];
+
+	const minTs = Math.min(...allTimestamps);
+	const maxTs = Math.max(...allTimestamps);
+
+	// Build buckets
+	const bucketMap = new Map<number, TimelineBucket>();
+
+	function getBucket(ts: number): TimelineBucket {
+		const key = Math.floor((ts - minTs) / BUCKET_MS);
+		let bucket = bucketMap.get(key);
+		if (!bucket) {
+			const d = new Date(minTs + key * BUCKET_MS);
+			bucket = { time: d.toTimeString().slice(0, 8), terminal: [], hidden: [], teamchat: [] };
+			bucketMap.set(key, bucket);
+		}
+		return bucket;
+	}
+
+	// Terminal entries
+	for (const e of session.terminal.merged) {
+		const t = new Date(e.timestamp).getTime();
+		if (isNaN(t)) continue;
+		const bucket = getBucket(t);
+		const toolTag = e.type === 'tool-call' ? `[${e.toolName ?? 'tool'}] ` : '';
+		bucket.terminal.push(`${escapeHtml(e.agent)}: ${toolTag}${escapeHtml(truncate(e.content, 80))}`);
+	}
+
+	// Hidden layer (protocol messages)
+	for (const m of session.protocol.messages) {
+		const t = new Date(m.timestamp).getTime();
+		if (isNaN(t)) continue;
+		const bucket = getBucket(t);
+		const label = m.isDM ? `${escapeHtml(m.from)} -> ${escapeHtml(m.to)}` : `${escapeHtml(m.from)} -> all`;
+		bucket.hidden.push(`${label}: ${escapeHtml(truncate(m.content, 80))}`);
+	}
+
+	// Teamchat events
+	for (const e of session.teamchat.events) {
+		const t = new Date(e.timestamp).getTime();
+		if (isNaN(t)) continue;
+		const bucket = getBucket(t);
+		switch (e.type) {
+			case 'message': {
+				const prefix = e.isDM ? '[DM] ' : e.isBroadcast ? '[BC] ' : '';
+				bucket.teamchat.push(`${prefix}${escapeHtml(e.from)}: ${escapeHtml(truncate(e.text, 80))}`);
+				break;
+			}
+			case 'system':
+				bucket.teamchat.push(`<span class="tl-badge ${escapeHtml(e.subtype)}">${escapeHtml(e.subtype)}</span> ${escapeHtml(truncate(e.text, 80))}`);
+				break;
+			case 'reaction':
+				bucket.teamchat.push(`${escapeHtml(e.emoji)} ${escapeHtml(e.fromAgent)} reacted`);
+				break;
+			case 'thread-marker':
+				bucket.teamchat.push(`<span class="tl-badge thread">${e.subtype === 'thread-start' ? 'Thread start' : 'Thread end'}</span> ${escapeHtml(e.participants.join(', '))}`);
+				break;
+			case 'presence':
+				bucket.teamchat.push(`<span class="tl-badge presence">${escapeHtml(e.status)}</span> ${escapeHtml(e.agentName)}`);
+				break;
+			case 'task-update':
+				bucket.teamchat.push(`<span class="tl-badge task">${escapeHtml(e.task.status)}</span> ${escapeHtml(truncate(e.task.subject, 60))}`);
+				break;
+		}
+	}
+
+	// Sort buckets by key and return
+	const sorted = [...bucketMap.entries()].sort((a, b) => a[0] - b[0]);
+	return sorted.map(([, b]) => b);
+}
+
+function renderTimeline(session: ParsedSession): string {
+	const buckets = buildTimeline(session);
+	if (buckets.length === 0) return '';
+
+	const totalEntries = buckets.reduce((sum, b) => sum + b.terminal.length + b.hidden.length + b.teamchat.length, 0);
+	const INITIAL_MAX = 200;
+	const showAll = buckets.length <= INITIAL_MAX;
+
+	function renderBucketRows(bucketsToRender: TimelineBucket[]): string {
+		return bucketsToRender.map(b => {
+			const terminalCell = b.terminal.length > 0
+				? b.terminal.slice(0, 3).join('<br>') + (b.terminal.length > 3 ? `<br><span class="tl-more">+${b.terminal.length - 3} more</span>` : '')
+				: '<span class="tl-empty"></span>';
+			const hiddenCell = b.hidden.length > 0
+				? b.hidden.slice(0, 3).join('<br>') + (b.hidden.length > 3 ? `<br><span class="tl-more">+${b.hidden.length - 3} more</span>` : '')
+				: '<span class="tl-empty"></span>';
+			const teamchatCell = b.teamchat.length > 0
+				? b.teamchat.slice(0, 3).join('<br>') + (b.teamchat.length > 3 ? `<br><span class="tl-more">+${b.teamchat.length - 3} more</span>` : '')
+				: '<span class="tl-empty"></span>';
+
+			return `<tr>
+				<td class="tl-time">${b.time}</td>
+				<td class="tl-terminal">${terminalCell}</td>
+				<td class="tl-hidden">${hiddenCell}</td>
+				<td class="tl-teamchat">${teamchatCell}</td>
+			</tr>`;
+		}).join('\n');
+	}
+
+	const initialBuckets = showAll ? buckets : buckets.slice(0, INITIAL_MAX);
+	const remainingBuckets = showAll ? [] : buckets.slice(INITIAL_MAX);
+
+	return `
+<section>
+<div class="container">
+	<div class="section-header"><h2>Full Synchronized Timeline</h2><p>Every entry from all three data sources, aligned by time.</p></div>
+	<details class="timeline-collapse">
+		<summary class="timeline-toggle">Show full timeline (${totalEntries} entries across ${buckets.length} time windows)</summary>
+		<div class="timeline-wrapper">
+			<table class="timeline-table">
+				<thead>
+					<tr>
+						<th class="tl-th-time">Time</th>
+						<th class="tl-th-terminal">Terminal</th>
+						<th class="tl-th-hidden">Hidden Layer</th>
+						<th class="tl-th-teamchat">teamchat</th>
+					</tr>
+				</thead>
+				<tbody id="timeline-body">
+					${renderBucketRows(initialBuckets)}
+				</tbody>
+				${remainingBuckets.length > 0 ? `<tbody id="timeline-overflow" style="display:none">
+					${renderBucketRows(remainingBuckets)}
+				</tbody>` : ''}
+			</table>
+			${remainingBuckets.length > 0 ? `
+			<div class="timeline-show-all" id="timeline-show-all">
+				<button onclick="document.getElementById('timeline-overflow').style.display='contents';document.getElementById('timeline-show-all').style.display='none';">
+					Show all ${buckets.length} time windows (${remainingBuckets.length} more)
+				</button>
+			</div>` : ''}
+		</div>
+	</details>
+</div>
+</section>`;
+}
+
+// --- Main render ---
+
+export function renderReport(scorecard: Scorecard, session?: ParsedSession): string {
+	const { session: sess, metrics, keyMoments } = scorecard;
+	const momentCards = keyMoments.map((m, i) => renderMomentCard(m, i, session ?? null)).join('\n');
+
+	const gapSection = session ? renderGapBreakdown(scorecard, session) : '';
+	const timelineSection = session ? renderTimeline(session) : '';
 
 	return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>teamchat Session Report — ${escapeHtml(session.team)}</title>
+<title>teamchat Session Report — ${escapeHtml(sess.team)}</title>
 <style>
 :root{--bg:#0f1117;--bg-card:#161922;--bg-elevated:#1c1f2e;--bg-terminal:#0a0c10;--border:#2a2d3a;--text:#e2e4ea;--text-muted:#8b8fa3;--text-dim:#5c6078;--accent-blue:#5b8def;--accent-green:#4ade80;--accent-amber:#f59e0b;--accent-red:#ef4444;--accent-purple:#a78bfa;--accent-indigo:#6366f1}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -93,6 +492,80 @@ section{padding:64px 0;border-bottom:1px solid var(--border)}
 .terminal-mock{background:var(--bg-terminal);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-family:'SF Mono',monospace;font-size:.75rem;line-height:1.7;color:var(--text-dim);white-space:pre-wrap}
 .teamchat-mock{background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:.8rem;line-height:1.5}
 .moment-annotation{padding:14px 24px;border-top:1px solid var(--border);font-size:.85rem;color:var(--text-muted);background:rgba(91,141,239,.04)}
+
+/* Terminal line styling */
+.term-time{color:var(--text-dim)}
+.term-agent{color:var(--accent-blue)}
+.term-tool{color:var(--accent-amber);font-size:.7rem}
+.term-more{color:var(--text-dim);font-style:italic;font-size:.7rem}
+.empty-indicator{color:var(--text-dim);font-style:italic}
+.pane-note{color:var(--text-dim);font-size:.7rem;font-style:italic;margin-bottom:8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+
+/* Teamchat event styling in moment cards */
+.tc-event{margin-bottom:8px;line-height:1.4}
+.tc-event:last-child{margin-bottom:0}
+.tc-badge{display:inline-block;font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;padding:1px 6px;border-radius:4px;font-weight:600;margin-right:4px;vertical-align:middle}
+.tc-badge.dm{background:rgba(99,102,241,.2);color:var(--accent-indigo)}
+.tc-badge.broadcast{background:rgba(245,158,11,.2);color:var(--accent-amber)}
+.tc-badge.system{background:rgba(139,143,163,.15);color:var(--text-muted)}
+.tc-badge.reaction{background:rgba(245,158,11,.15);color:var(--accent-amber)}
+.tc-badge.thread{background:rgba(99,102,241,.15);color:var(--accent-indigo)}
+.tc-badge.presence{background:rgba(92,96,120,.15);color:var(--text-dim)}
+.tc-badge.task{background:rgba(74,222,128,.15);color:var(--accent-green)}
+.tc-participants{color:var(--text-dim);font-size:.78rem}
+.tc-more{color:var(--text-dim);font-size:.75rem;font-style:italic;margin-top:4px}
+
+/* Gap breakdown section */
+.gap-chart{display:flex;flex-direction:column;gap:16px;margin-bottom:24px}
+.gap-row{display:grid;grid-template-columns:160px 1fr 140px;align-items:center;gap:16px}
+.gap-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);font-weight:600;text-align:right}
+.gap-bar-track{height:32px;background:var(--bg-elevated);border-radius:6px;overflow:hidden;display:flex;position:relative}
+.gap-bar-fill{height:100%;border-radius:6px;transition:width .3s ease}
+.terminal-bar{background:var(--text-dim)}
+.all-terminals-bar{background:var(--text-muted)}
+.hidden-bar{background:var(--accent-amber)}
+.gap-seg{height:100%;min-width:2px}
+.gap-seg:first-child{border-radius:6px 0 0 6px}
+.gap-seg:last-child{border-radius:0 6px 6px 0}
+.gap-bar-empty{height:100%;width:100%}
+.gap-count{font-size:.82rem;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.gap-legend{display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;justify-content:center}
+.gap-legend-item{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;color:var(--text-dim)}
+.gap-legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block}
+
+/* Timeline section */
+.timeline-collapse{margin-top:8px}
+.timeline-toggle{cursor:pointer;padding:16px 24px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;font-size:.9rem;color:var(--text-muted);list-style:none;user-select:none;transition:background .15s}
+.timeline-toggle:hover{background:var(--bg-elevated)}
+.timeline-toggle::-webkit-details-marker{display:none}
+.timeline-toggle::before{content:'+ ';color:var(--accent-blue);font-weight:700}
+details[open] .timeline-toggle::before{content:'- '}
+.timeline-wrapper{margin-top:16px;overflow-x:auto}
+.timeline-table{width:100%;border-collapse:collapse;font-size:.78rem;table-layout:fixed}
+.timeline-table th{text-align:left;padding:10px 12px;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);font-weight:600;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--bg)}
+.tl-th-time{width:80px}
+.tl-th-terminal,.tl-th-hidden,.tl-th-teamchat{width:calc((100% - 80px) / 3)}
+.timeline-table td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;word-break:break-word}
+.tl-time{font-family:'SF Mono',monospace;color:var(--text-dim);font-size:.72rem;white-space:nowrap}
+.tl-terminal{font-family:'SF Mono',monospace;color:var(--text-dim);font-size:.72rem}
+.tl-hidden{color:var(--accent-amber);font-size:.75rem}
+.tl-teamchat{font-size:.75rem}
+.tl-empty{display:block;height:4px}
+.tl-more{color:var(--text-dim);font-style:italic;font-size:.68rem}
+.tl-badge{display:inline-block;font-size:.6rem;text-transform:uppercase;letter-spacing:.04em;padding:1px 5px;border-radius:3px;font-weight:600;margin-right:3px}
+.tl-badge.member-joined,.tl-badge.team-created{background:rgba(74,222,128,.15);color:var(--accent-green)}
+.tl-badge.task-created,.tl-badge.task-claimed,.tl-badge.task-completed,.tl-badge.task-unblocked,.tl-badge.all-tasks-completed,.tl-badge.task-assigned{background:rgba(74,222,128,.12);color:var(--accent-green)}
+.tl-badge.task-failed,.tl-badge.bottleneck{background:rgba(239,68,68,.12);color:var(--accent-red)}
+.tl-badge.idle-surfaced{background:rgba(167,139,250,.12);color:var(--accent-purple)}
+.tl-badge.member-left,.tl-badge.shutdown-requested,.tl-badge.shutdown-approved,.tl-badge.shutdown-rejected,.tl-badge.team-deleted{background:rgba(139,143,163,.12);color:var(--text-muted)}
+.tl-badge.nudge{background:rgba(245,158,11,.12);color:var(--accent-amber)}
+.tl-badge.thread{background:rgba(99,102,241,.12);color:var(--accent-indigo)}
+.tl-badge.presence{background:rgba(92,96,120,.12);color:var(--text-dim)}
+.tl-badge.task{background:rgba(74,222,128,.12);color:var(--accent-green)}
+.timeline-show-all{text-align:center;padding:16px}
+.timeline-show-all button{background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px 24px;color:var(--text-muted);font-size:.85rem;cursor:pointer;transition:background .15s}
+.timeline-show-all button:hover{background:var(--bg-card)}
+
 .noise-comparison{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:start;margin-bottom:32px}
 .noise-box{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .noise-label{padding:12px 16px;border-bottom:1px solid var(--border);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--text-dim);font-weight:600}
@@ -112,19 +585,21 @@ section{padding:64px 0;border-bottom:1px solid var(--border)}
 <div class="container">
 <div class="hero-badge"><span class="dot"></span> Session Report</div>
 <h1>Your terminal showed you <span>${metrics.terminalLinesLead} lines</span>.<br>${metrics.teamchatEvents} events actually happened.</h1>
-<p class="subtitle">A comparison of what Claude Code's CLI showed versus what teamchat captured during a ${session.agents}-agent team session.</p>
+<p class="subtitle">A comparison of what Claude Code's CLI showed versus what teamchat captured during a ${sess.agents}-agent team session.</p>
 <div class="stat-cards">
 <div class="stat-card terminal"><div class="label">Your Terminal</div><div class="number">${metrics.terminalLinesLead}</div><div class="desc">Lines of output in the lead agent's terminal.</div></div>
 <div class="stat-card hidden"><div class="label">Hidden Layer</div><div class="number">${metrics.hiddenMessages}</div><div class="desc">Inter-agent messages no terminal showed.</div></div>
 <div class="stat-card teamchat"><div class="label">teamchat View</div><div class="number">${metrics.teamchatEvents}</div><div class="desc">Total events rendered with derived intelligence.</div></div>
 </div>
 <div class="hero-meta">
-<span>${formatDuration(session.durationMs)}</span>
-<span>${session.agents} agents</span>
-<span>${session.tasks} tasks</span>
+<span>${formatDuration(sess.durationMs)}</span>
+<span>${sess.agents} agents</span>
+<span>${sess.tasks} tasks</span>
 </div>
 </div>
 </section>
+
+${gapSection}
 
 <section>
 <div class="container">
@@ -141,9 +616,11 @@ ${momentCards}
 <div class="noise-arrow">&#8594;</div>
 <div class="noise-box"><div class="noise-label">teamchat renders</div><div class="noise-content"><div class="suppressed"><span class="dot"></span> ${metrics.idleEventsShown} idle indicator${metrics.idleEventsShown !== 1 ? 's' : ''} <span style="color:var(--text-dim);font-size:.75rem">(${metrics.idlePingsRaw} pings suppressed)</span></div></div></div>
 </div>
-${metrics.broadcastsRaw > 0 ? '<div class="noise-comparison"><div class="noise-box"><div class="noise-label">Broadcast in raw inboxes</div><div class="noise-content" style="font-family:monospace;font-size:.72rem;color:#3a3d4a;line-height:1.8">' + metrics.broadcastsRaw + ' identical inbox writes across ' + session.agents + ' agents</div></div><div class="noise-arrow">&#8594;</div><div class="noise-box"><div class="noise-label">teamchat renders</div><div class="noise-content"><div class="suppressed"><span class="dot" style="background:var(--accent-blue)"></span> ' + metrics.broadcastsShown + ' broadcast card' + (metrics.broadcastsShown !== 1 ? 's' : '') + ' <span style="color:var(--text-dim);font-size:.75rem">(' + metrics.broadcastDedup + ':1 dedup ratio)</span></div></div></div></div>' : ''}
+${metrics.broadcastsRaw > 0 ? '<div class="noise-comparison"><div class="noise-box"><div class="noise-label">Broadcast in raw inboxes</div><div class="noise-content" style="font-family:monospace;font-size:.72rem;color:#3a3d4a;line-height:1.8">' + metrics.broadcastsRaw + ' identical inbox writes across ' + sess.agents + ' agents</div></div><div class="noise-arrow">&#8594;</div><div class="noise-box"><div class="noise-label">teamchat renders</div><div class="noise-content"><div class="suppressed"><span class="dot" style="background:var(--accent-blue)"></span> ' + metrics.broadcastsShown + ' broadcast card' + (metrics.broadcastsShown !== 1 ? 's' : '') + ' <span style="color:var(--text-dim);font-size:.75rem">(' + metrics.broadcastDedup + ':1 dedup ratio)</span></div></div></div></div>' : ''}
 </div>
 </section>
+
+${timelineSection}
 
 <section class="footer">
 <div class="container">
