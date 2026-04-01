@@ -152,6 +152,20 @@ export class EventProcessor {
 	private recentNudges: Map<string, { eventId: string; timestamp: string }> = new Map(); // agent name → nudge info
 	private recentBroadcasts: { eventId: string; timestamp: string; from: string }[] = [];
 
+	// Inferred reaction state (Decision 4)
+	/** Pattern 1 👀 — DMs awaiting recipient action. key = recipient agent name */
+	private recentDMsAwaitingAck: Map<string, { messageId: string; timestamp: string }> = new Map();
+	/** Pattern 2 ⚡ — recently completed tasks, key = task ID */
+	private recentCompletedTasks: Map<string, { eventId: string; timestamp: string }> = new Map();
+	/** Pattern 3 ⚠️ — file edits per file path, key = file name */
+	private recentFileEdits: Map<string, { agentName: string; timestamp: string }> = new Map();
+	/** Patterns 5+6 — whether an agent has ever written/edited */
+	private agentHasWritten: Set<string> = new Set();
+	/** Pattern 5 🔍 — whether we already emitted the research-phase reaction for this agent */
+	private agentResearchEmitted: Set<string> = new Set();
+	/** Pattern 6 📝 — whether we already emitted the build-phase reaction for this agent */
+	private agentBuildPhaseEmitted: Set<string> = new Set();
+
 	// Dedup tracking (Rules 6, 9)
 	/** Rule 6: track recently emitted broadcast text+timestamp to suppress matching DMs. */
 	private recentBroadcastKeys: { text: string; timestamp: string }[] = [];
@@ -190,6 +204,56 @@ export class EventProcessor {
 				);
 				break;
 		}
+	}
+
+	/** Inject an externally-created event (e.g., heartbeat) into the event stream. */
+	injectEvent(event: ChatEvent): void {
+		const extraReactions: ChatEvent[] = [];
+
+		if (event.type === 'heartbeat') {
+			const hb = event as import('../shared/types.js').AgentHeartbeat;
+			const activities = hb.activities.toLowerCase();
+			const hasWrite = /\b(writing|editing)\b/.test(activities);
+			const hasRead = /\b(reading|searching)\b/.test(activities);
+
+			// Pattern 3 ⚠️ Edit conflict: two different agents edit/write the same file within 60s
+			const fileMatches = activities.matchAll(/(?:writing|editing)\s+([\w.\-/]+)/g);
+			for (const match of fileMatches) {
+				const fileName = match[1]!;
+				const prev = this.recentFileEdits.get(fileName);
+				const now = hb.timestamp;
+				if (prev && prev.agentName !== hb.agentName && isWithinWindow(prev.timestamp, now, 60_000)) {
+					extraReactions.push(
+						this.makeReaction(hb.id, '⚠️', hb.agentName, hb.agentColor, now, `edit conflict on ${fileName}`),
+					);
+				}
+				// Update the map for this file
+				this.recentFileEdits.set(fileName, { agentName: hb.agentName, timestamp: now });
+			}
+
+			// Pattern 5 🔍 Research phase: agent's first heartbeat with only reads/searches, no writes
+			if (hasRead && !hasWrite && !this.agentHasWritten.has(hb.agentName) && !this.agentResearchEmitted.has(hb.agentName)) {
+				this.agentResearchEmitted.add(hb.agentName);
+				extraReactions.push(
+					this.makeReaction(hb.id, '🔍', hb.agentName, hb.agentColor, hb.timestamp, 'research phase'),
+				);
+			}
+
+			// Pattern 6 📝 Build phase: agent switches from read-only to write/edit
+			if (hasWrite && this.agentResearchEmitted.has(hb.agentName) && !this.agentHasWritten.has(hb.agentName) && !this.agentBuildPhaseEmitted.has(hb.agentName)) {
+				this.agentBuildPhaseEmitted.add(hb.agentName);
+				extraReactions.push(
+					this.makeReaction(hb.id, '📝', hb.agentName, hb.agentColor, hb.timestamp, 'build phase'),
+				);
+			}
+
+			// Track write state (must happen after Pattern 6 check)
+			if (hasWrite) {
+				this.agentHasWritten.add(hb.agentName);
+			}
+		}
+
+		this.emit([event, ...extraReactions]);
 	}
 
 	/** Get all events emitted so far. */
@@ -564,6 +628,19 @@ export class EventProcessor {
 		const contentMsg = this.buildContentMessage(msg, false, true, participants);
 		events.push(contentMsg);
 
+		// Pattern 1 👀 Seen & acting: record this DM so we can detect when the recipient acts.
+		// Only track teammate-to-teammate DMs (lead→teammate nudges are handled separately).
+		if (!isLeadAgent(msg.from) && !isLeadAgent(inboxOwner)) {
+			this.recentDMsAwaitingAck.set(inboxOwner, { messageId: contentMsg.id, timestamp: msg.timestamp });
+		}
+
+		// Pattern 1 👀: if this agent was the *recipient* of a recent DM and is now sending,
+		// emit 👀 on the original DM to signal "seen & acting".
+		const dmAck = this.checkDMSeenReaction(msg.from, msg.timestamp);
+		if (dmAck) {
+			events.push(dmAck);
+		}
+
 		// Nudge detection: lead → single idle agent (non-assignment DM)
 		if (isLeadAgent(msg.from)) {
 			const isIdle = this.presence.get(inboxOwner) === 'idle';
@@ -756,6 +833,13 @@ export class EventProcessor {
 			}
 		}
 
+		// Pattern 4 📢 Completion broadcast: any agent sends a broadcast containing completion keywords
+		if (isBroadcast && this.isCompletionText(pending.text)) {
+			events.push(
+				this.makeReaction(msg.id, '📢', pending.from, pending.fromColor, pending.timestamp, 'completion broadcast'),
+			);
+		}
+
 		this.emit(events);
 	}
 
@@ -799,36 +883,58 @@ export class EventProcessor {
 
 			// Owner change (task claimed)
 			if (prev.owner !== curr.owner && curr.owner !== null) {
-				events.push(
-					this.makeSystemEvent(
-						'task-claimed',
-						`${curr.owner} claimed #${curr.id}: ${curr.subject}`,
-						curr.owner,
-						this.getAgentColor(curr.owner),
-						curr.id,
-						curr.subject,
-					),
+				const claimEvent = this.makeSystemEvent(
+					'task-claimed',
+					`${curr.owner} claimed #${curr.id}: ${curr.subject}`,
+					curr.owner,
+					this.getAgentColor(curr.owner),
+					curr.id,
+					curr.subject,
 				);
+				events.push(claimEvent);
 				// Rule 3: suppress task-update(in_progress) when task-claimed was emitted.
 				taskIdsWithSystemEvent.add(id);
 
 				// Rule 8: suppress ✋ reaction on lead message — task-claimed system event
 				// already conveys the same information.
+
+				// Pattern 2 ⚡ Chain reaction: if any blocker of this task completed recently, emit ⚡
+				if (curr.blockedBy && curr.blockedBy.length > 0) {
+					const now = curr.updated || new Date().toISOString();
+					for (const blockerId of curr.blockedBy) {
+						const completed = this.recentCompletedTasks.get(blockerId);
+						if (completed && isWithinWindow(completed.timestamp, now, 30_000)) {
+							events.push(
+								this.makeReaction(completed.eventId, '⚡', curr.owner, this.getAgentColor(curr.owner), now, 'chain reaction'),
+							);
+							break; // emit once per claim
+						}
+					}
+				}
 			}
 
 			// Status change
 			if (prev.status !== curr.status) {
 				if (curr.status === 'completed') {
-					events.push(
-						this.makeSystemEvent(
-							'task-completed',
-							`${curr.owner ?? curr.subject ?? 'Someone'} completed #${curr.id}${curr.owner ? `: ${curr.subject}` : ''}`,
-							curr.owner ?? curr.subject,
-							curr.owner ? this.getAgentColor(curr.owner) : null,
-							curr.id,
-							curr.subject,
-						),
+					const completedEvent = this.makeSystemEvent(
+						'task-completed',
+						`${curr.owner ?? curr.subject ?? 'Someone'} completed #${curr.id}${curr.owner ? `: ${curr.subject}` : ''}`,
+						curr.owner ?? curr.subject,
+						curr.owner ? this.getAgentColor(curr.owner) : null,
+						curr.id,
+						curr.subject,
 					);
+					events.push(completedEvent);
+					// Record for Pattern 2 ⚡ chain reaction tracking
+					this.recentCompletedTasks.set(curr.id, {
+						eventId: completedEvent.id,
+						timestamp: curr.updated || new Date().toISOString(),
+					});
+					// Prune old entries (keep last 50)
+					if (this.recentCompletedTasks.size > 50) {
+						const firstKey = this.recentCompletedTasks.keys().next().value;
+						if (firstKey !== undefined) this.recentCompletedTasks.delete(firstKey);
+					}
 					// Rule 4: suppress task-update(completed) when task-completed was emitted.
 					taskIdsWithSystemEvent.add(id);
 				} else if (curr.status === 'failed') {
@@ -1172,6 +1278,27 @@ export class EventProcessor {
 
 	// === Reaction inference helpers ===
 
+	/**
+	 * Pattern 1 👀 Seen & acting: if the given sender was recently the *recipient* of a DM
+	 * and is now sending a message within 15s, emit 👀 on the original DM.
+	 */
+	private checkDMSeenReaction(senderName: string, timestamp: string): ReactionEvent | null {
+		const pending = this.recentDMsAwaitingAck.get(senderName);
+		if (!pending) return null;
+		if (!isWithinWindow(pending.timestamp, timestamp, 15_000)) {
+			this.recentDMsAwaitingAck.delete(senderName);
+			return null;
+		}
+		this.recentDMsAwaitingAck.delete(senderName);
+		const agentColor = this.getAgentColor(senderName);
+		return this.makeReaction(pending.messageId, '👀', senderName, agentColor, timestamp, 'seen & acting');
+	}
+
+	/** Returns true if the text contains completion keywords — used for Pattern 4 📢. */
+	private isCompletionText(text: string): boolean {
+		return /\b(done|complete|completed|finished|ready|implemented|all passing|passing)\b/i.test(text);
+	}
+
 	/** Check if an agent message should trigger a nudge ack reaction (👍 on the nudge event). */
 	private checkNudgeAck(agentName: string, timestamp: string): ReactionEvent | null {
 		const nudge = this.recentNudges.get(agentName);
@@ -1202,7 +1329,7 @@ export class EventProcessor {
 	}
 
 	/** Get agent color from cache, recent events, or default to 'blue'. */
-	private getAgentColor(agentName: string): string {
+	getAgentColor(agentName: string): string {
 		// Fast path: O(1) cache lookup
 		const cached = this.agentColorCache.get(agentName);
 		if (cached !== undefined) {
