@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useChatReducer } from './hooks/useChatReducer.js';
 import { useWebSocket } from './hooks/useWebSocket.js';
@@ -7,6 +7,7 @@ import { TimeProvider } from './hooks/useRelativeTime.js';
 import { useReplayController } from './hooks/useReplayController.js';
 import { Header } from './components/Header.jsx';
 import { MessageList } from './components/MessageList.jsx';
+import { TypingIndicator } from './components/TypingIndicator.jsx';
 import { TaskSidebar } from './components/TaskSidebar.jsx';
 import { PresenceRoster } from './components/PresenceRoster.jsx';
 import { SessionStats } from './components/SessionStats.jsx';
@@ -20,6 +21,7 @@ import { AgentProfile } from './components/AgentProfile.jsx';
 import { AvatarMarkProvider } from './components/AvatarMarkContext.js';
 import { ThreadSummary } from './components/ThreadSummary.jsx';
 import { CommGraph } from './components/CommGraph.jsx';
+import { ConfettiOverlay } from './components/ConfettiOverlay.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap, ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -558,9 +560,22 @@ function TeamChatScaffold({
 	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null } | { type: 'SET_THREAD_FILTER'; threadKey: string | null }) => void;
 }) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
+	const [confettiTriggered, setConfettiTriggered] = useState(false);
+	const prevAllCompletedRef = useRef(false);
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
 		state.events.length,
 	]);
+
+	const allTasksCompleted = state.events.some(
+		(e) => e.type === 'system' && (e as { subtype?: string }).subtype === 'all-tasks-completed',
+	);
+
+	useEffect(() => {
+		if (allTasksCompleted && !prevAllCompletedRef.current) {
+			setConfettiTriggered(true);
+		}
+		prevAllCompletedRef.current = allTasksCompleted;
+	}, [allTasksCompleted]);
 
 	const scrollToThread = useCallback((threadKey: string) => {
 		const el = document.querySelector(`[data-thread-key="${threadKey}"]`);
@@ -699,6 +714,9 @@ function TeamChatScaffold({
 								resurfacedThreadKeys={state.resurfacedThreadKeys}
 								threadFilter={state.threadFilter}
 							/>
+							{state.typing && (
+								<TypingIndicator typing={state.typing} />
+							)}
 						</div>
 					</div>
 
@@ -725,11 +743,19 @@ function TeamChatScaffold({
 								/>
 							</div>
 						) : (
-							desktopPanels.map((panel, index) => (
-								<div key={index} className="tc-rail-section">
-									{panel}
-								</div>
-							))
+							desktopPanels.map((panel, index) => {
+								const panelKey = React.isValidElement(panel) ? (panel.key ?? '') : '';
+								const isGrowable = panelKey === 'tasks';
+								const isPinnedBottom = panelKey === 'stats';
+								return (
+									<div
+										key={index}
+										className={`tc-rail-section${isGrowable ? ' is-growable' : ''}${isPinnedBottom ? ' is-pinned-bottom' : ''}`}
+									>
+										{panel}
+									</div>
+								);
+							})
 						)}
 					</div>
 				</aside>
@@ -792,6 +818,7 @@ function TeamChatScaffold({
 					</div>
 				</div>
 			)}
+			<ConfettiOverlay active={confettiTriggered} />
 		</div>
 	);
 }

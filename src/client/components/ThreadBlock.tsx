@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { ChatEvent, ContentMessage } from '../../shared/types.js';
+import type { ChatEvent, ContentMessage, AgentInfo } from '../../shared/types.js';
 import type { Reaction } from '../types.js';
 import { AgentAvatar } from './AgentAvatar.jsx';
 import { MessageStack } from './MessageStack.jsx';
@@ -19,6 +19,7 @@ interface ThreadBlockProps {
 	events: ChatEvent[];
 	reactions: Record<string, Reaction[]>;
 	topic: string;
+	team?: AgentInfo[];
 }
 
 /** Maps agent color names to CSS border/tint values for inline styles. */
@@ -67,7 +68,7 @@ function DmBubblePip({ name, color }: { name: string; color: string }) {
 	return <span className="tc-dm-bubble-dot" style={{ backgroundColor: 'var(--text-muted)' }} />;
 }
 
-export function ThreadBlock({ threadKey, participants, events, reactions, topic }: ThreadBlockProps) {
+export function ThreadBlock({ threadKey, participants, events, reactions, topic, team }: ThreadBlockProps) {
 	const messages = useMemo(
 		() => events.filter((e) => e.type === 'message') as ContentMessage[],
 		[events],
@@ -98,6 +99,7 @@ export function ThreadBlock({ threadKey, participants, events, reactions, topic 
 		reactions={reactions}
 		topic={topic}
 		messageCount={messageCount}
+		team={team}
 	/>;
 }
 
@@ -109,20 +111,26 @@ interface ThreadLaneProps {
 	reactions: Record<string, Reaction[]>;
 	topic: string;
 	messageCount: number;
+	team?: AgentInfo[];
 }
 
-function ThreadLane({ threadKey, participants, events, messages, reactions, topic, messageCount }: ThreadLaneProps) {
+function ThreadLane({ threadKey, participants, events, messages, reactions, topic, messageCount, team }: ThreadLaneProps) {
 	const [expanded, setExpanded] = useState(false);
 	const [showAll, setShowAll] = useState(false);
 
 	// Extract initiator and responder info
 	const initiator = messages[0]?.from ?? participants[0] ?? '';
-	const initiatorColor = messages[0]?.fromColor ?? '';
+	const initiatorColor = useMemo(() => {
+		const fromTeam = team?.find(m => m.name === initiator)?.color;
+		return fromTeam ?? messages[0]?.fromColor ?? '';
+	}, [team, initiator, messages]);
 	const responder = participants.find(p => p !== initiator) ?? participants[1] ?? '';
 	const responderColor = useMemo(() => {
+		const fromTeam = team?.find(m => m.name === responder)?.color;
+		if (fromTeam) return fromTeam;
 		const responderMsg = messages.find(m => m.from !== initiator);
 		return responderMsg?.fromColor ?? '';
-	}, [messages, initiator]);
+	}, [team, messages, initiator, responder]);
 
 	const isResolved = useMemo(() => isThreadResolved(messages), [messages]);
 

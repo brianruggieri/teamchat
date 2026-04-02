@@ -44,6 +44,12 @@ export interface Reaction {
 	tooltip: string | null;
 }
 
+export interface TypingState {
+	agentName: string;
+	agentColor: string;
+	isLead: boolean;
+}
+
 export interface ChatState {
 	events: ChatEvent[];
 	tasks: TaskInfo[];
@@ -58,6 +64,7 @@ export interface ChatState {
 	activeAgentKey: string | null; // agent name for sidebar drill-in
 	resurfacedThreadKeys: Set<string>; // threads that should re-surface at latest position
 	threadFilter: string | null; // threadKey to filter feed to, null = show all
+	typing: TypingState | null; // currently "typing" agent for stagger animation
 }
 
 export type ChatAction =
@@ -65,7 +72,9 @@ export type ChatAction =
 	| { type: 'EVENT'; event: ChatEvent }
 	| { type: 'CONNECTION_CHANGE'; connected: boolean }
 	| { type: 'SELECT_AGENT'; agentName: string | null }
-	| { type: 'SET_THREAD_FILTER'; threadKey: string | null };
+	| { type: 'SET_THREAD_FILTER'; threadKey: string | null }
+	| { type: 'TYPING_START'; event: ChatEvent }
+	| { type: 'TYPING_STOP' };
 
 export const INITIAL_STATE: ChatState = {
 	events: [],
@@ -81,6 +90,7 @@ export const INITIAL_STATE: ChatState = {
 	activeAgentKey: null,
 	resurfacedThreadKeys: new Set(),
 	threadFilter: null,
+	typing: null,
 };
 
 export interface AgentColor {

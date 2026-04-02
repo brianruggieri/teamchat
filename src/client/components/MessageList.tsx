@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import type {
 	ChatEvent,
 	ContentMessage,
@@ -79,19 +79,34 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 		});
 	}, [items, threadFilter]);
 
+	// Track the previous visible item count to stagger-animate only new items.
+	// Items beyond prevCount are "new" and get increasing animation-delay.
+	const prevCountRef = useRef(0);
+	const prevCount = prevCountRef.current;
+	prevCountRef.current = visibleItems.length;
+
 	return (
 		<div className="tc-message-list">
 			{visibleItems.map((item, index) => {
+				// Wrap newly added items with a stagger delay
+				const isNew = index >= prevCount;
+				const staggerMs = isNew ? (index - prevCount) * 80 : 0;
+				const staggerStyle = isNew
+					? { animationDelay: `${staggerMs}ms` } as React.CSSProperties
+					: undefined;
+
 				if (item.kind === 'accumulated-thread') {
 					return (
-						<ThreadBlock
-							key={item.threadKey}
-							threadKey={item.threadKey}
-							participants={item.participants}
-							events={item.events}
-							reactions={reactions}
-							topic={item.topic}
-						/>
+						<div key={item.threadKey} className={isNew ? 'tc-stagger-in' : ''} style={staggerStyle}>
+							<ThreadBlock
+								threadKey={item.threadKey}
+								participants={item.participants}
+								events={item.events}
+								reactions={reactions}
+								topic={item.topic}
+								team={team?.members ?? []}
+							/>
+						</div>
 					);
 				}
 
@@ -107,7 +122,7 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 
 				const laneItems = item.laneItems;
 				return (
-					<React.Fragment key={`lane-${index}`}>
+					<div key={`lane-${index}`} className={isNew ? 'tc-stagger-in' : ''} style={staggerStyle}>
 						{laneItems.map((laneItem) => {
 							if (laneItem.kind === 'message-stack') {
 								const key = laneItem.messages[0]?.id ?? `stack-${index}`;
@@ -227,7 +242,7 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 
 							return null;
 						})}
-					</React.Fragment>
+					</div>
 				);
 			})}
 		</div>

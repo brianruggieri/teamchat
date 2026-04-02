@@ -153,6 +153,7 @@ function freshState(overrides: Partial<ChatState> = {}): ChatState {
 		activeAgentKey: null,
 		resurfacedThreadKeys: new Set(),
 		threadFilter: null,
+		typing: null,
 		...overrides,
 	};
 }

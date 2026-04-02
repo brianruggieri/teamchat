@@ -152,6 +152,13 @@
 	transition: color 0.15s;
 }
 
+/* Avatar pair layout in thread header */
+.tc-thread-avatars {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
 /* Single DM badge (1-message, no lane) */
 .tc-dm-badge {
 	display: inline-flex;

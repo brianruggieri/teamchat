@@ -6,6 +6,7 @@ interface TaskCardProps {
 	task: TaskInfo;
 	onTaskClick: (taskId: string) => void;
 	isPulsing?: boolean;
+	isCelebrating?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -19,6 +20,7 @@ export function TaskCard({
 	task,
 	onTaskClick,
 	isPulsing = false,
+	isCelebrating = false,
 }: TaskCardProps) {
 	const { formatDuration } = useRelativeTime();
 	const isBlocked = task.status === 'pending'
@@ -28,7 +30,7 @@ export function TaskCard({
 	return (
 		<button
 			type="button"
-			className={`tc-task-card ${isPulsing ? 'pulse' : ''}`}
+			className={`tc-task-card ${isPulsing ? 'pulse' : ''} ${isCelebrating ? 'celebrate' : ''}`}
 			onClick={() => onTaskClick(task.id)}
 			title={task.description ?? task.subject}
 		>
