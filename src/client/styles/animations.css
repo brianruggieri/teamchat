@@ -3,3 +3,152 @@
 		transform: rotate(360deg);
 	}
 }
+
+/* === Message entrance animation === */
+@keyframes fadeSlideIn {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.tc-message-stack,
+.tc-dm-lane,
+.tc-system-inline,
+.tc-system-group,
+.tc-cascade-card,
+.tc-heartbeat-row,
+.tc-thought-bubble,
+.tc-setup-card {
+	animation: fadeSlideIn 220ms ease-out both;
+}
+
+/* === Typing indicator === */
+.tc-typing-indicator {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 8px 14px;
+	border-radius: 18px;
+	background: rgba(17, 28, 41, 0.95);
+	border: 1px solid var(--border-strong);
+	animation: fadeSlideIn 150ms ease-out both;
+}
+
+@keyframes typingBounce {
+	0%, 60%, 100% {
+		transform: translateY(0);
+		opacity: 0.4;
+	}
+	30% {
+		transform: translateY(-4px);
+		opacity: 1;
+	}
+}
+
+.tc-typing-dot {
+	display: block;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--text-muted);
+	animation: typingBounce 1.2s ease-in-out infinite;
+}
+
+.tc-typing-dot:nth-child(2) {
+	animation-delay: 0.15s;
+}
+
+.tc-typing-dot:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+/* === Stagger wrapper for batched new items (replay + live) === */
+.tc-stagger-in {
+	animation: fadeSlideIn 250ms ease-out both;
+}
+
+/* === Thread re-surface animation === */
+.tc-dm-lane {
+	animation: fadeSlideIn 280ms ease-out both;
+}
+
+/* === Continued-below placeholder entrance === */
+.tc-continued-below {
+	animation: fadeSlideIn 200ms ease-out both;
+}
+
+/* === Celebration Animations === */
+
+@keyframes confettiFall {
+	0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+	100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes celebrationGlow {
+	0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+	50% { box-shadow: 0 0 16px 4px rgba(34, 197, 94, 0.2); }
+	100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+@keyframes resolutionPulse {
+	0% { box-shadow: 0 0 0 0 rgba(91, 109, 247, 0.4); }
+	50% { box-shadow: 0 0 12px 3px rgba(91, 109, 247, 0.2); }
+	100% { box-shadow: 0 0 0 0 rgba(91, 109, 247, 0); }
+}
+
+@keyframes taskCompleteFade {
+	0% { background-color: rgba(34, 197, 94, 0.15); }
+	100% { background-color: transparent; }
+}
+
+@keyframes pulseUnblock {
+	0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.4); }
+	50% { box-shadow: 0 0 8px 2px rgba(96, 165, 250, 0.2); }
+	100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+}
+
+.tc-task-card.celebrate {
+	animation: celebrationGlow 2s ease-in-out;
+}
+
+.tc-task-card.celebrate .tc-status-pill.is-completed {
+	animation: taskCompleteFade 2s ease-in-out;
+}
+
+.tc-dm-lane.is-resolved {
+	animation: resolutionPulse 2s ease-in-out;
+}
+
+.tc-system-card.is-celebration {
+	border-color: rgba(34, 197, 94, 0.3);
+	background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(91, 109, 247, 0.08));
+}
+
+.tc-system-card.is-celebration .tc-system-icon {
+	font-size: 1.4rem;
+}
+
+.tc-system-card.is-celebration .tc-system-text {
+	font-size: 0.88rem;
+	font-weight: 600;
+}
+
+.tc-confetti-overlay {
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 9999;
+	overflow: hidden;
+}
+
+.tc-confetti-particle {
+	position: absolute;
+	top: -10px;
+	animation: confettiFall linear forwards;
+	will-change: transform;
+}

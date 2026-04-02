@@ -151,6 +151,9 @@ function freshState(overrides: Partial<ChatState> = {}): ChatState {
 		permissionCards: {},
 		threadStatuses: {},
 		activeAgentKey: null,
+		resurfacedThreadKeys: new Set(),
+		threadFilter: null,
+		typing: null,
 		...overrides,
 	};
 }

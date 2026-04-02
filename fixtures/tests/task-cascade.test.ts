@@ -100,33 +100,62 @@ describe("Task Cascade", () => {
 		expect(celebrationReaction).toBeDefined();
 	});
 
-	test("task-update events include full task state", () => {
+	test("task-update NOT emitted for status transitions covered by system events (Rules 2-4)", () => {
+		// Rules 2-4: task-update is suppressed when a matching system event exists.
+		// - task-claimed covers pending→in_progress transitions
+		// - task-completed covers *→completed transitions
+		// - task-created covers new pending tasks
 		feedSnapshotsUpTo(processor, 1);
 
 		const taskUpdates = collector.events.filter(
 			(e) => e.type === "task-update",
 		) as TaskUpdateEvent[];
 
-		expect(taskUpdates.length).toBeGreaterThanOrEqual(1);
-		const task1Update = taskUpdates.find((u) => u.task.id === "1");
-		expect(task1Update).toBeDefined();
-		expect(task1Update!.task.status).toBe("in_progress");
-		expect(task1Update!.task.owner).toBe("backend");
+		// No task-update for the in_progress transition (task-claimed system event covers it)
+		const inProgressUpdate = taskUpdates.find(
+			(u) => u.task.id === "1" && u.task.status === "in_progress",
+		);
+		expect(inProgressUpdate).toBeUndefined();
+
+		// But the task-claimed system event IS emitted
+		const taskClaimed = collector.events.filter(
+			(e) => e.type === "system" && (e as SystemEvent).subtype === "task-claimed",
+		);
+		expect(taskClaimed).toHaveLength(1);
+
+		// getTasks() still returns correct current state (via processor state tracking)
+		const tasks = processor.getTasks();
+		const task1 = tasks.find((t) => t.id === "1");
+		expect(task1!.status).toBe("in_progress");
+		expect(task1!.owner).toBe("backend");
 	});
 
-	test("task-update emitted for each changed task", () => {
-		// Snapshot 3: #1 completes AND #3 claimed — two changes
+	test("task-update suppressed for claimed/completed tasks (Rules 3-4)", () => {
+		// Snapshot 3: #1 completes AND #3/#4 claimed — system events cover these transitions
 		feedSnapshotsUpTo(processor, 3);
 
 		const taskUpdates = collector.events.filter(
 			(e) => e.type === "task-update",
 		) as TaskUpdateEvent[];
 
-		// Should have updates for all tasks that changed across snapshots 1-3
-		const updatedIds = new Set(taskUpdates.map((u) => u.task.id));
-		expect(updatedIds.has("1")).toBe(true); // claimed then completed
-		expect(updatedIds.has("3")).toBe(true); // claimed
-		expect(updatedIds.has("4")).toBe(true); // claimed by privacy
+		// No in_progress task-updates (all have task-claimed system events)
+		const inProgressUpdates = taskUpdates.filter((u) => u.task.status === "in_progress");
+		expect(inProgressUpdates).toHaveLength(0);
+
+		// No completed task-updates for #1 (task-completed system event covers it)
+		const completedUpdate = taskUpdates.find(
+			(u) => u.task.id === "1" && u.task.status === "completed",
+		);
+		expect(completedUpdate).toBeUndefined();
+
+		// System events ARE emitted
+		const sysEvents = collector.events.filter((e) => e.type === "system") as SystemEvent[];
+		const claimedIds = sysEvents
+			.filter((e) => e.subtype === "task-claimed")
+			.map((e) => e.taskId);
+		expect(claimedIds).toContain("1");
+		expect(claimedIds).toContain("3");
+		expect(claimedIds).toContain("4");
 	});
 
 	test("getTasks returns current state after processing", () => {

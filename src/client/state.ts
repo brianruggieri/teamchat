@@ -35,6 +35,8 @@ export function cloneChatState(state: ChatState): ChatState {
 			Object.entries(state.threadStatuses).map(([k, v]) => [k, { ...v, beats: [...v.beats], participants: [...v.participants] }]),
 		),
 		activeAgentKey: state.activeAgentKey,
+		resurfacedThreadKeys: new Set(state.resurfacedThreadKeys),
+		threadFilter: state.threadFilter,
 	};
 }
 
@@ -48,6 +50,8 @@ export function createBaseChatState(overrides: Partial<ChatState> = {}): ChatSta
 		planCards: {},
 		permissionCards: {},
 		threadStatuses: {},
+		resurfacedThreadKeys: new Set(),
+		threadFilter: null,
 		...overrides,
 	};
 }
@@ -103,6 +107,10 @@ export function applyChatEventInPlace(state: ChatState, event: ChatEvent): void 
 				existing.messageCount++;
 				existing.lastMessageTimestamp = msg.timestamp;
 				if (existing.status === 'new') existing.status = 'active';
+				// Re-surface thread when there are 3 or more messages in this DM
+				if (existing.messageCount >= 3) {
+					state.resurfacedThreadKeys.add(key);
+				}
 			} else {
 				state.threadStatuses[key] = {
 					threadKey: key,

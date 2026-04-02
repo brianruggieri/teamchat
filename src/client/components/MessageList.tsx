@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import type {
 	ChatEvent,
 	ContentMessage,
@@ -8,13 +8,17 @@ import type {
 	ThreadStatus,
 } from '../types.js';
 import { ThreadBlock } from './ThreadBlock.jsx';
+import { ContinuedBelow } from './ContinuedBelow.jsx';
 import { MessageStack } from './MessageStack.jsx';
 import { SystemEventComponent } from './SystemEvent.jsx';
 import { SystemEventGroup } from './SystemEventGroup.jsx';
 import { SetupCard } from './SetupCard.jsx';
+import { CascadeCard } from './CascadeCard.jsx';
 import { PlanApprovalCard } from './PlanApprovalCard.jsx';
 import { PermissionRequestCard } from './PermissionRequestCard.jsx';
 import { SessionSummaryCard } from './SessionSummaryCard.jsx';
+import { HeartbeatRow } from './HeartbeatRow.jsx';
+import { ThoughtBubble } from './ThoughtBubble.jsx';
 import { buildMessageLaneItems, type MessageLaneItem } from './messageGrouping.js';
 
 interface MessageListProps {
@@ -24,6 +28,8 @@ interface MessageListProps {
 	team: TeamState | null;
 	threadStatuses: Record<string, ThreadStatus>;
 	sessionStart: string | null;
+	resurfacedThreadKeys?: Set<string>;
+	threadFilter?: string | null;
 }
 
 interface AccumulatedThread {
@@ -34,36 +40,89 @@ interface AccumulatedThread {
 	topic: string;
 }
 
+interface ContinuedBelowItem {
+	kind: 'continued-below';
+	threadKey: string;
+	participants: string[];
+}
+
 interface FlatEventsGroup {
 	kind: 'flat-events';
 	events: ChatEvent[];
 	laneItems: MessageLaneItem[];
 }
 
-type RenderItem = AccumulatedThread | FlatEventsGroup;
+type RenderItem = AccumulatedThread | ContinuedBelowItem | FlatEventsGroup;
 
-export function MessageList({ events, reactions, tasks, team, threadStatuses, sessionStart }: MessageListProps) {
-	const items = useMemo(() => groupEvents(events), [events]);
+export function MessageList({ events, reactions, tasks, team, threadStatuses, sessionStart, resurfacedThreadKeys, threadFilter }: MessageListProps) {
+	const items = useMemo(
+		() => groupEvents(events, resurfacedThreadKeys),
+		[events, resurfacedThreadKeys],
+	);
+
+	// Apply thread filter: when active, only show items related to that thread
+	const visibleItems = useMemo(() => {
+		if (!threadFilter) return items;
+		return items.filter((item) => {
+			if (item.kind === 'accumulated-thread') return item.threadKey === threadFilter;
+			if (item.kind === 'continued-below') return item.threadKey === threadFilter;
+			// Show flat events from agents involved in the filtered thread
+			if (item.kind === 'flat-events') {
+				const threadParts = threadFilter.split(':');
+				return item.events.some((e) => {
+					if (e.type === 'message') return threadParts.includes((e as ContentMessage).from);
+					if (e.type === 'system') return threadParts.includes(e.agentName ?? '');
+					return false;
+				});
+			}
+			return true;
+		});
+	}, [items, threadFilter]);
+
+	// Track the previous visible item count to stagger-animate only new items.
+	// Items beyond prevCount are "new" and get increasing animation-delay.
+	const prevCountRef = useRef(0);
+	const prevCount = prevCountRef.current;
+	prevCountRef.current = visibleItems.length;
 
 	return (
 		<div className="tc-message-list">
-			{items.map((item, index) => {
+			{visibleItems.map((item, index) => {
+				// Wrap newly added items with a stagger delay
+				const isNew = index >= prevCount;
+				const staggerMs = isNew ? (index - prevCount) * 80 : 0;
+				const staggerStyle = isNew
+					? { animationDelay: `${staggerMs}ms` } as React.CSSProperties
+					: undefined;
+
 				if (item.kind === 'accumulated-thread') {
 					return (
-						<ThreadBlock
-							key={item.threadKey}
+						<div key={item.threadKey} className={isNew ? 'tc-stagger-in' : ''} style={staggerStyle}>
+							<ThreadBlock
+								threadKey={item.threadKey}
+								participants={item.participants}
+								events={item.events}
+								reactions={reactions}
+								topic={item.topic}
+								team={team?.members ?? []}
+							/>
+						</div>
+					);
+				}
+
+				if (item.kind === 'continued-below') {
+					return (
+						<ContinuedBelow
+							key={`continued-${item.threadKey}`}
 							threadKey={item.threadKey}
 							participants={item.participants}
-							events={item.events}
-							reactions={reactions}
-							topic={item.topic}
 						/>
 					);
 				}
 
 				const laneItems = item.laneItems;
 				return (
-					<React.Fragment key={`lane-${index}`}>
+					<div key={`lane-${index}`} className={isNew ? 'tc-stagger-in' : ''} style={staggerStyle}>
 						{laneItems.map((laneItem) => {
 							if (laneItem.kind === 'message-stack') {
 								const key = laneItem.messages[0]?.id ?? `stack-${index}`;
@@ -105,6 +164,7 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 										<SystemEventComponent
 											key={laneItem.events[0].id}
 											event={laneItem.events[0]}
+											inline
 										/>
 									);
 								}
@@ -123,6 +183,17 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 									<SetupCard
 										key={`setup-${laneItem.events[0]?.id ?? 'card'}`}
 										events={laneItem.events}
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'cascade') {
+								return (
+									<CascadeCard
+										key={`cascade-${laneItem.completion.id}`}
+										completion={laneItem.completion}
+										unblocks={laneItem.unblocks}
+										claims={laneItem.claims}
 									/>
 								);
 							}
@@ -151,9 +222,27 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
 								);
 							}
 
+							if (laneItem.kind === 'heartbeat') {
+								return (
+									<HeartbeatRow
+										key={laneItem.event.id}
+										event={laneItem.event}
+									/>
+								);
+							}
+
+							if (laneItem.kind === 'thought') {
+								return (
+									<ThoughtBubble
+										key={laneItem.event.id}
+										event={laneItem.event}
+									/>
+								);
+							}
+
 							return null;
 						})}
-					</React.Fragment>
+					</div>
 				);
 			})}
 		</div>
@@ -164,13 +253,18 @@ export function MessageList({ events, reactions, tasks, team, threadStatuses, se
  * Group events into accumulated thread blocks and flat event groups.
  *
  * All DMs for each participant pair are accumulated into a single
- * thread block, placed at the position of the first DM for that pair.
- * Thread markers are ignored entirely (legacy compat).
+ * thread block. For re-surfaced threads (3+ messages), the block is
+ * placed at the LAST DM position (WhatsApp-style) and a "continued
+ * below" placeholder marks the original position.
+ *
+ * Non-resurfaced threads are placed at the first DM position (original
+ * behavior). Thread markers are ignored entirely (legacy compat).
  */
-function groupEvents(events: ChatEvent[]): RenderItem[] {
+function groupEvents(events: ChatEvent[], resurfacedThreadKeys?: Set<string>): RenderItem[] {
 	const items: RenderItem[] = [];
 	const dmsByPair = new Map<string, ChatEvent[]>();
-	const dmPairInserted = new Set<string>();
+	const dmPairFirstSeen = new Set<string>();
+	const dmPairLastSeen = new Set<string>();
 	let flatBuffer: ChatEvent[] = [];
 
 	const sessionStartMs = events.length > 0 ? new Date(events[0]!.timestamp).getTime() : undefined;
@@ -199,29 +293,77 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 		}
 	}
 
+	// Determine which pairs are re-surfaced
+	const resurfaced = resurfacedThreadKeys ?? new Set<string>();
+
+	// Find the index of the last DM for each resurfaced pair
+	const lastDmIndex = new Map<string, number>();
+	for (let i = events.length - 1; i >= 0; i--) {
+		const event = events[i]!;
+		if (event.type === 'message' && (event as ContentMessage).isDM) {
+			const msg = event as ContentMessage;
+			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			if (resurfaced.has(key) && !lastDmIndex.has(key)) {
+				lastDmIndex.set(key, i);
+			}
+		}
+	}
+
 	// Build timeline with accumulated thread blocks
-	for (const event of events) {
+	for (let i = 0; i < events.length; i++) {
+		const event = events[i]!;
+
 		// Skip thread markers entirely
 		if (event.type === 'thread-marker') continue;
 
 		if (event.type === 'message' && (event as ContentMessage).isDM) {
 			const msg = event as ContentMessage;
 			const key = [...(msg.dmParticipants ?? [])].sort().join(':');
+			const isResurfaced = resurfaced.has(key);
 
-			if (!dmPairInserted.has(key)) {
-				// First DM for this pair — insert the accumulated block here
-				pushFlat();
-				dmPairInserted.add(key);
-				const allDMs = dmsByPair.get(key) ?? [];
-				items.push({
-					kind: 'accumulated-thread',
-					threadKey: key,
-					participants: [...(msg.dmParticipants ?? [])].sort(),
-					events: allDMs,
-					topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
-				});
+			if (isResurfaced) {
+				// Re-surfaced thread: place "continued below" at first DM,
+				// place accumulated block at last DM
+				if (!dmPairFirstSeen.has(key)) {
+					dmPairFirstSeen.add(key);
+					pushFlat();
+					items.push({
+						kind: 'continued-below',
+						threadKey: key,
+						participants: [...(msg.dmParticipants ?? [])].sort(),
+					});
+				}
+
+				if (!dmPairLastSeen.has(key) && i === lastDmIndex.get(key)) {
+					dmPairLastSeen.add(key);
+					pushFlat();
+					const allDMs = dmsByPair.get(key) ?? [];
+					items.push({
+						kind: 'accumulated-thread',
+						threadKey: key,
+						participants: [...(msg.dmParticipants ?? [])].sort(),
+						events: allDMs,
+						topic: allDMs.length > 0
+							? (allDMs[0] as ContentMessage).text.slice(0, 60).replace(/\n/g, ' ')
+							: '',
+					});
+				}
+			} else {
+				// Non-resurfaced: place block at first DM (original behavior)
+				if (!dmPairFirstSeen.has(key)) {
+					pushFlat();
+					dmPairFirstSeen.add(key);
+					const allDMs = dmsByPair.get(key) ?? [];
+					items.push({
+						kind: 'accumulated-thread',
+						threadKey: key,
+						participants: [...(msg.dmParticipants ?? [])].sort(),
+						events: allDMs,
+						topic: msg.text.slice(0, 60).replace(/\n/g, ' '),
+					});
+				}
 			}
-			// Subsequent DMs for this pair are already in the accumulated block — skip
+			// All DM events are in the accumulated block — skip individual rendering
 			continue;
 		}
 
@@ -232,3 +374,5 @@ function groupEvents(events: ChatEvent[]): RenderItem[] {
 	pushFlat();
 	return items;
 }
+
+export { type RenderItem, type ContinuedBelowItem, type AccumulatedThread };

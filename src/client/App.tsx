@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useChatReducer } from './hooks/useChatReducer.js';
 import { useWebSocket } from './hooks/useWebSocket.js';
@@ -7,6 +7,7 @@ import { TimeProvider } from './hooks/useRelativeTime.js';
 import { useReplayController } from './hooks/useReplayController.js';
 import { Header } from './components/Header.jsx';
 import { MessageList } from './components/MessageList.jsx';
+import { TypingIndicator } from './components/TypingIndicator.jsx';
 import { TaskSidebar } from './components/TaskSidebar.jsx';
 import { PresenceRoster } from './components/PresenceRoster.jsx';
 import { SessionStats } from './components/SessionStats.jsx';
@@ -19,6 +20,8 @@ import { ModeBanner } from './components/ModeBanner.jsx';
 import { AgentProfile } from './components/AgentProfile.jsx';
 import { AvatarMarkProvider } from './components/AvatarMarkContext.js';
 import { ThreadSummary } from './components/ThreadSummary.jsx';
+import { CommGraph } from './components/CommGraph.jsx';
+import { ConfettiOverlay } from './components/ConfettiOverlay.jsx';
 import type { AppBootstrap, ReplayAppBootstrap, ReplayBundle, AutoAppBootstrap, ReplayArtifact } from '../shared/replay.js';
 import type { ChatState } from './types.js';
 import { resolveSelectedArtifactId } from './artifacts.js';
@@ -214,6 +217,13 @@ function LiveWorkspace({ bootstrap }: { bootstrap: Extract<AppBootstrap, { mode:
 							tasks={state.tasks}
 							onAgentClick={onAgentClick}
 						/>,
+						<CommGraph
+							key="comm-graph"
+							members={state.team?.members ?? []}
+							threadStatuses={state.threadStatuses}
+							activeFilter={state.threadFilter}
+							onFilterThread={(threadKey) => dispatch({ type: 'SET_THREAD_FILTER', threadKey })}
+						/>,
 						<ThreadSummary
 							key="threads"
 							threadStatuses={state.threadStatuses}
@@ -314,9 +324,14 @@ function ReplayWorkspaceLoaded({
 	const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 	const [artifactViewerOpen, setArtifactViewerOpen] = useState(false);
 	const [activeAgentKey, setActiveAgentKey] = useState<string | null>(null);
+	const [replayThreadFilter, setReplayThreadFilter] = useState<string | null>(null);
 
-	const handleSelectAgent = useCallback((action: { type: 'SELECT_AGENT'; agentName: string | null }) => {
-		setActiveAgentKey(action.agentName);
+	const handleDispatch = useCallback((action: { type: 'SELECT_AGENT'; agentName: string | null } | { type: 'SET_THREAD_FILTER'; threadKey: string | null }) => {
+		if (action.type === 'SELECT_AGENT') {
+			setActiveAgentKey(action.agentName);
+		} else if (action.type === 'SET_THREAD_FILTER') {
+			setReplayThreadFilter(action.threadKey);
+		}
 	}, []);
 
 	useEffect(() => {
@@ -460,13 +475,13 @@ function ReplayWorkspaceLoaded({
 			<TimeProvider nowMs={controller.state.virtualNowMs}>
 				<>
 					<TeamChatScaffold
-						state={{ ...controller.derivedState.chatState, activeAgentKey }}
+						state={{ ...controller.derivedState.chatState, activeAgentKey, threadFilter: replayThreadFilter }}
 						mode="replay"
 						headerStatusText={replayStatusText}
 						topContent={replayTopContent}
 						emptyTitle="Replay ready"
 						emptyDescription="Press play, step through the session, or scrub the timeline."
-						dispatch={handleSelectAgent}
+						dispatch={handleDispatch}
 						renderPanels={(onTaskClick, onAgentClick) => [
 							<ReplayArtifactPanel
 								key="artifacts"
@@ -484,6 +499,13 @@ function ReplayWorkspaceLoaded({
 								threadStatuses={controller.derivedState.chatState.threadStatuses}
 								tasks={controller.derivedState.chatState.tasks}
 								onAgentClick={onAgentClick}
+							/>,
+							<CommGraph
+								key="comm-graph"
+								members={controller.derivedState.chatState.team?.members ?? []}
+								threadStatuses={controller.derivedState.chatState.threadStatuses}
+								activeFilter={replayThreadFilter}
+								onFilterThread={(threadKey) => setReplayThreadFilter(threadKey)}
 							/>,
 							<ThreadSummary
 								key="threads"
@@ -535,12 +557,25 @@ function TeamChatScaffold({
 	emptyTitle: string;
 	emptyDescription: string;
 	renderPanels: (onTaskClick: (taskId: string) => void, onAgentClick?: (name: string) => void) => React.ReactNode[];
-	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null }) => void;
+	dispatch?: (action: { type: 'SELECT_AGENT'; agentName: string | null } | { type: 'SET_THREAD_FILTER'; threadKey: string | null }) => void;
 }) {
 	const [workbenchOpen, setWorkbenchOpen] = useState(false);
+	const [confettiTriggered, setConfettiTriggered] = useState(false);
+	const prevAllCompletedRef = useRef(false);
 	const { containerRef, showIndicator, scrollToBottom } = useAutoScroll([
 		state.events.length,
 	]);
+
+	const allTasksCompleted = state.events.some(
+		(e) => e.type === 'system' && (e as { subtype?: string }).subtype === 'all-tasks-completed',
+	);
+
+	useEffect(() => {
+		if (allTasksCompleted && !prevAllCompletedRef.current) {
+			setConfettiTriggered(true);
+		}
+		prevAllCompletedRef.current = allTasksCompleted;
+	}, [allTasksCompleted]);
 
 	const scrollToThread = useCallback((threadKey: string) => {
 		const el = document.querySelector(`[data-thread-key="${threadKey}"]`);
@@ -676,7 +711,12 @@ function TeamChatScaffold({
 								team={state.team}
 								threadStatuses={state.threadStatuses}
 								sessionStart={state.sessionStart}
+								resurfacedThreadKeys={state.resurfacedThreadKeys}
+								threadFilter={state.threadFilter}
 							/>
+							{state.typing && (
+								<TypingIndicator typing={state.typing} />
+							)}
 						</div>
 					</div>
 
@@ -703,11 +743,19 @@ function TeamChatScaffold({
 								/>
 							</div>
 						) : (
-							desktopPanels.map((panel, index) => (
-								<div key={index} className="tc-rail-section">
-									{panel}
-								</div>
-							))
+							desktopPanels.map((panel, index) => {
+								const panelKey = React.isValidElement(panel) ? (panel.key ?? '') : '';
+								const isGrowable = panelKey === 'tasks';
+								const isPinnedBottom = panelKey === 'stats';
+								return (
+									<div
+										key={index}
+										className={`tc-rail-section${isGrowable ? ' is-growable' : ''}${isPinnedBottom ? ' is-pinned-bottom' : ''}`}
+									>
+										{panel}
+									</div>
+								);
+							})
 						)}
 					</div>
 				</aside>
@@ -770,6 +818,7 @@ function TeamChatScaffold({
 					</div>
 				</div>
 			)}
+			<ConfettiOverlay active={confettiTriggered} />
 		</div>
 	);
 }

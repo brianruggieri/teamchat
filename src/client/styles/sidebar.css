@@ -335,6 +335,28 @@
 	color: var(--text-secondary);
 }
 
+.tc-rail-section.is-growable {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 2px;
+}
+
+.tc-rail-section.is-pinned-bottom {
+	flex-shrink: 0;
+	margin-top: auto;
+}
+
+.tc-roster-badge {
+	font-size: 0.62rem;
+}
+
+.tc-roster-state {
+	font-size: 0.62rem;
+	min-width: 52px;
+	text-align: right;
+}
+
 .tc-stats-strip {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));

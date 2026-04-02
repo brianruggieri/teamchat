@@ -10,7 +10,6 @@ import type {
 	TaskInfo,
 	TaskUpdate,
 	TeamConfig,
-	ThreadMarker,
 	ThreadStatus,
 } from '../shared/types.js';
 import {
@@ -142,7 +141,6 @@ export class EventProcessor {
 	private emittedTaskIds: Set<string> = new Set();
 	private idlePingCount = 0;
 	private idleSurfacedCount = 0;
-	private recentLeadMessages: { id: string; text: string; timestamp: string }[] = [];
 	private threadStatuses: Map<string, ThreadStatus> = new Map();
 	private allEvents: ChatEvent[] = [];
 	private broadcastHoldMs = 500;
@@ -153,6 +151,26 @@ export class EventProcessor {
 	private recentShutdownRequests: Map<string, string> = new Map(); // agent name → event ID
 	private recentNudges: Map<string, { eventId: string; timestamp: string }> = new Map(); // agent name → nudge info
 	private recentBroadcasts: { eventId: string; timestamp: string; from: string }[] = [];
+
+	// Inferred reaction state (Decision 4)
+	/** Pattern 1 👀 — DMs awaiting recipient action. key = recipient agent name */
+	private recentDMsAwaitingAck: Map<string, { messageId: string; timestamp: string }> = new Map();
+	/** Pattern 2 ⚡ — recently completed tasks, key = task ID */
+	private recentCompletedTasks: Map<string, { eventId: string; timestamp: string }> = new Map();
+	/** Pattern 3 ⚠️ — file edits per file path, key = file name */
+	private recentFileEdits: Map<string, { agentName: string; timestamp: string }> = new Map();
+	/** Patterns 5+6 — whether an agent has ever written/edited */
+	private agentHasWritten: Set<string> = new Set();
+	/** Pattern 5 🔍 — whether we already emitted the research-phase reaction for this agent */
+	private agentResearchEmitted: Set<string> = new Set();
+	/** Pattern 6 📝 — whether we already emitted the build-phase reaction for this agent */
+	private agentBuildPhaseEmitted: Set<string> = new Set();
+
+	// Dedup tracking (Rules 6, 9)
+	/** Rule 6: track recently emitted broadcast text+timestamp to suppress matching DMs. */
+	private recentBroadcastKeys: { text: string; timestamp: string }[] = [];
+	/** Rule 9: last pending task-update fingerprint per task ID — suppress consecutive pending updates. */
+	private lastPendingTaskUpdateKey: Map<string, string> = new Map();
 
 	// Color lookup cache — populated on first observation of each agent's color
 	private agentColorCache: Map<string, string> = new Map();
@@ -186,6 +204,61 @@ export class EventProcessor {
 				);
 				break;
 		}
+	}
+
+	/** Inject an externally-created event (e.g., heartbeat) into the event stream. */
+	injectEvent(event: ChatEvent): void {
+		const extraReactions: ChatEvent[] = [];
+
+		if (event.type === 'heartbeat') {
+			const hb = event as import('../shared/types.js').AgentHeartbeat;
+			const activities = hb.activities.toLowerCase();
+			const hasWrite = /\b(writing|editing)\b/.test(activities);
+			const hasRead = /\b(reading|searching)\b/.test(activities);
+
+			// Pattern 3 ⚠️ Edit conflict: two different agents edit/write the same file within 60s
+			const fileMatches = activities.matchAll(/(?:writing|editing)\s+([\w.\-/]+)/g);
+			for (const match of fileMatches) {
+				const fileName = match[1]!;
+				const prev = this.recentFileEdits.get(fileName);
+				const now = hb.timestamp;
+				if (prev && prev.agentName !== hb.agentName && isWithinWindow(prev.timestamp, now, 60_000)) {
+					extraReactions.push(
+						this.makeReaction(hb.id, '⚠️', hb.agentName, hb.agentColor, now, `edit conflict on ${fileName}`),
+					);
+				}
+				// Update the map for this file and evict stale entries (>60s)
+				this.recentFileEdits.set(fileName, { agentName: hb.agentName, timestamp: now });
+				for (const [key, entry] of this.recentFileEdits) {
+					if (key !== fileName && !isWithinWindow(entry.timestamp, now, 60_000)) {
+						this.recentFileEdits.delete(key);
+					}
+				}
+			}
+
+			// Pattern 5 🔍 Research phase: agent's first heartbeat with only reads/searches, no writes
+			if (hasRead && !hasWrite && !this.agentHasWritten.has(hb.agentName) && !this.agentResearchEmitted.has(hb.agentName)) {
+				this.agentResearchEmitted.add(hb.agentName);
+				extraReactions.push(
+					this.makeReaction(hb.id, '🔍', hb.agentName, hb.agentColor, hb.timestamp, 'research phase'),
+				);
+			}
+
+			// Pattern 6 📝 Build phase: agent switches from read-only to write/edit
+			if (hasWrite && this.agentResearchEmitted.has(hb.agentName) && !this.agentHasWritten.has(hb.agentName) && !this.agentBuildPhaseEmitted.has(hb.agentName)) {
+				this.agentBuildPhaseEmitted.add(hb.agentName);
+				extraReactions.push(
+					this.makeReaction(hb.id, '📝', hb.agentName, hb.agentColor, hb.timestamp, 'build phase'),
+				);
+			}
+
+			// Track write state (must happen after Pattern 6 check)
+			if (hasWrite) {
+				this.agentHasWritten.add(hb.agentName);
+			}
+		}
+
+		this.emit([event, ...extraReactions]);
 	}
 
 	/** Get all events emitted so far. */
@@ -367,14 +440,9 @@ export class EventProcessor {
 					),
 					this.makePresenceChange(msg.from, 'offline', msg.timestamp),
 				];
-				// Emit 👋 reaction on the original shutdown-requested event
-				const requestEventId = this.recentShutdownRequests.get(msg.from);
-				if (requestEventId) {
-					approvalEvents.push(
-						this.makeReaction(requestEventId, '👋', msg.from, msg.color, msg.timestamp, 'shutdown compliance'),
-					);
-					this.recentShutdownRequests.delete(msg.from);
-				}
+				// Rule 8: 👋 reaction on shutdown-requested is suppressed —
+				// shutdown-approved system event already conveys the same info.
+				this.recentShutdownRequests.delete(msg.from);
 				this.emit(approvalEvents);
 				break;
 			}
@@ -547,23 +615,36 @@ export class EventProcessor {
 	}
 
 	private emitDM(inboxOwner: string, msg: RawInboxMessage): void {
+		// Rule 6: suppress DM if a broadcast with matching text+timestamp was already emitted
+		// within a 1s window.
+		for (const bk of this.recentBroadcastKeys) {
+			if (bk.text === msg.text.slice(0, 100) && isWithinWindow(bk.timestamp, msg.timestamp, 1000)) {
+				return;
+			}
+		}
+
 		const events: ChatEvent[] = [];
 		const participants = [msg.from, inboxOwner].sort();
 		const threadKey = participants.join(':');
 
-		// Check if we need a thread-start marker
-		if (!this.isInActiveThread(participants)) {
-			events.push({
-				type: 'thread-marker',
-				id: generateEventId(),
-				subtype: 'thread-start',
-				participants,
-				timestamp: msg.timestamp,
-			});
-		}
+		// Rule 7: thread-start markers are suppressed — the DM message itself signals
+		// the thread start, and ThreadBlock groups DMs by participants.
 
 		const contentMsg = this.buildContentMessage(msg, false, true, participants);
 		events.push(contentMsg);
+
+		// Pattern 1 👀 Seen & acting: record this DM so we can detect when the recipient acts.
+		// Only track teammate-to-teammate DMs (lead→teammate nudges are handled separately).
+		if (!isLeadAgent(msg.from) && !isLeadAgent(inboxOwner)) {
+			this.recentDMsAwaitingAck.set(inboxOwner, { messageId: contentMsg.id, timestamp: msg.timestamp });
+		}
+
+		// Pattern 1 👀: if this agent was the *recipient* of a recent DM and is now sending,
+		// emit 👀 on the original DM to signal "seen & acting".
+		const dmAck = this.checkDMSeenReaction(msg.from, msg.timestamp);
+		if (dmAck) {
+			events.push(dmAck);
+		}
 
 		// Nudge detection: lead → single idle agent (non-assignment DM)
 		if (isLeadAgent(msg.from)) {
@@ -621,12 +702,8 @@ export class EventProcessor {
 			if (ackEmoji) {
 				const recentMsg = this.findRecentMessageFrom(inboxOwner, msg.timestamp, 30_000);
 				if (recentMsg) {
-					// Replace the content message with a reaction, but preserve
-					// thread-start markers that were pushed earlier in this call.
-					const preserved = events.filter((e) => e.type === 'thread-marker');
 					events.length = 0;
 					events.push(
-						...preserved,
 						this.makeReaction(recentMsg, ackEmoji, msg.from, msg.color, msg.timestamp, msg.text),
 					);
 				}
@@ -690,19 +767,8 @@ export class EventProcessor {
 
 		const events: ChatEvent[] = [msg];
 
-		// Track lead messages for task claim correlation
+		// Nudge detection: lead → single idle agent (non-assignment message)
 		if (isLeadAgent(pending.from)) {
-			this.recentLeadMessages.push({
-				id: msg.id,
-				text: msg.text,
-				timestamp: msg.timestamp,
-			});
-			// Keep only last 50 lead messages
-			if (this.recentLeadMessages.length > 50) {
-				this.recentLeadMessages.shift();
-			}
-
-			// Nudge detection: lead → single idle agent (non-assignment message)
 			if (!isBroadcast && pending.inboxes.size === 1) {
 				const target = [...pending.inboxes][0]!;
 				const isIdle = this.presence.get(target) === 'idle';
@@ -726,6 +792,15 @@ export class EventProcessor {
 				if (this.recentBroadcasts.length > 20) {
 					this.recentBroadcasts.shift();
 				}
+			}
+		}
+
+		// Rule 6: record this broadcast/non-DM message so matching DMs can be suppressed.
+		if (isBroadcast) {
+			this.recentBroadcastKeys.push({ text: msg.text.slice(0, 100), timestamp: msg.timestamp });
+			// Keep only last 100 entries to prevent unbounded growth
+			if (this.recentBroadcastKeys.length > 100) {
+				this.recentBroadcastKeys.shift();
 			}
 		}
 
@@ -763,6 +838,13 @@ export class EventProcessor {
 			}
 		}
 
+		// Pattern 4 📢 Completion broadcast: any agent sends a broadcast containing completion keywords
+		if (isBroadcast && this.isCompletionText(pending.text)) {
+			events.push(
+				this.makeReaction(msg.id, '📢', pending.from, pending.fromColor, pending.timestamp, 'completion broadcast'),
+			);
+		}
+
 		this.emit(events);
 	}
 
@@ -775,6 +857,10 @@ export class EventProcessor {
 		const prevMap = new Map(previous.map((t) => [t.id, t]));
 		const currMap = new Map(current.map((t) => [t.id, t]));
 		const events: ChatEvent[] = [];
+
+		// Rules 2-4: track which task IDs had a system event emitted in this batch.
+		// TaskUpdates for those IDs with matching status transitions are suppressed.
+		const taskIdsWithSystemEvent = new Set<string>();
 
 		// Detect new tasks (deduplicate — replay can re-fire)
 		for (const [id, task] of currMap) {
@@ -791,50 +877,71 @@ export class EventProcessor {
 						task.created || undefined,
 					),
 				);
-				events.push(this.makeTaskUpdate(task));
 			}
 		}
 
 		// Detect changes in existing tasks
+		// Rule 2: new tasks (no prev) are skipped structurally by the `if (!prev) continue` guard below.
 		for (const [id, curr] of currMap) {
 			const prev = prevMap.get(id);
 			if (!prev) continue;
 
 			// Owner change (task claimed)
 			if (prev.owner !== curr.owner && curr.owner !== null) {
-				events.push(
-					this.makeSystemEvent(
-						'task-claimed',
-						`${curr.owner} claimed #${curr.id}: ${curr.subject}`,
-						curr.owner,
-						this.getAgentColor(curr.owner),
-						curr.id,
-						curr.subject,
-					),
+				const claimEvent = this.makeSystemEvent(
+					'task-claimed',
+					`${curr.owner} claimed #${curr.id}: ${curr.subject}`,
+					curr.owner,
+					this.getAgentColor(curr.owner),
+					curr.id,
+					curr.subject,
 				);
+				events.push(claimEvent);
+				// Rule 3: suppress task-update(in_progress) when task-claimed was emitted.
+				taskIdsWithSystemEvent.add(id);
 
-				// Correlate with lead assignment message for ✋ reaction
-				const leadMsg = this.findLeadMessageAboutTask(curr.id, curr.subject, curr.updated);
-				if (leadMsg) {
-					events.push(
-						this.makeReaction(leadMsg, '✋', curr.owner, '', curr.updated),
-					);
+				// Rule 8: suppress ✋ reaction on lead message — task-claimed system event
+				// already conveys the same information.
+
+				// Pattern 2 ⚡ Chain reaction: if any blocker of this task completed recently, emit ⚡
+				if (curr.blockedBy && curr.blockedBy.length > 0) {
+					const now = curr.updated || new Date().toISOString();
+					for (const blockerId of curr.blockedBy) {
+						const completed = this.recentCompletedTasks.get(blockerId);
+						if (completed && isWithinWindow(completed.timestamp, now, 30_000)) {
+							events.push(
+								this.makeReaction(completed.eventId, '⚡', curr.owner, this.getAgentColor(curr.owner), now, 'chain reaction'),
+							);
+							break; // emit once per claim
+						}
+					}
 				}
 			}
 
 			// Status change
 			if (prev.status !== curr.status) {
 				if (curr.status === 'completed') {
-					events.push(
-						this.makeSystemEvent(
-							'task-completed',
-							`${curr.owner ?? curr.subject ?? 'Someone'} completed #${curr.id}${curr.owner ? `: ${curr.subject}` : ''}`,
-							curr.owner ?? curr.subject,
-							curr.owner ? this.getAgentColor(curr.owner) : null,
-							curr.id,
-							curr.subject,
-						),
+					const completedEvent = this.makeSystemEvent(
+						'task-completed',
+						`${curr.owner ?? curr.subject ?? 'Someone'} completed #${curr.id}${curr.owner ? `: ${curr.subject}` : ''}`,
+						curr.owner ?? curr.subject,
+						curr.owner ? this.getAgentColor(curr.owner) : null,
+						curr.id,
+						curr.subject,
 					);
+					events.push(completedEvent);
+					// Record for Pattern 2 ⚡ chain reaction tracking
+					this.recentCompletedTasks.set(curr.id, {
+						eventId: completedEvent.id,
+						timestamp: curr.updated || new Date().toISOString(),
+					});
+					// Prune old entries (keep last 50)
+					if (this.recentCompletedTasks.size > 50) {
+						const firstKey = this.recentCompletedTasks.keys().next().value;
+						if (firstKey !== undefined) this.recentCompletedTasks.delete(firstKey);
+					}
+					// Rule 4: suppress task-update(completed) when task-completed was emitted.
+					taskIdsWithSystemEvent.add(id);
 				} else if (curr.status === 'failed') {
 					events.push(
 						this.makeSystemEvent(
@@ -849,8 +956,32 @@ export class EventProcessor {
 				}
 			}
 
-			// Emit task update for any change
+			// Emit task update for any change — subject to dedup rules
 			if (taskChanged(prev, curr)) {
+				const hasSystemEvent = taskIdsWithSystemEvent.has(id);
+				const statusTransition =
+					(curr.status === 'in_progress' && prev.status === 'pending') ||
+					(curr.status === 'completed' && prev.status !== 'completed');
+
+				if (hasSystemEvent && statusTransition) {
+					// Rules 2-4: suppress the TaskUpdate — system event already conveys status change.
+					continue;
+				}
+
+				// Rule 9: collapse consecutive pending task-updates for the same task.
+				if (curr.status === 'pending') {
+					const pendingKey = JSON.stringify({ id: curr.id, status: curr.status, owner: curr.owner, blockedBy: curr.blockedBy });
+					const lastKey = this.lastPendingTaskUpdateKey.get(curr.id);
+					if (lastKey === pendingKey) {
+						// Identical pending state — suppress duplicate.
+						continue;
+					}
+					this.lastPendingTaskUpdateKey.set(curr.id, pendingKey);
+				} else {
+					// Clear pending tracking when task leaves pending status
+					this.lastPendingTaskUpdateKey.delete(curr.id);
+				}
+
 				events.push(this.makeTaskUpdate(curr));
 			}
 		}
@@ -1076,35 +1207,7 @@ export class EventProcessor {
 			replyToId: null,
 		};
 
-		// Track lead messages for task claim correlation
-		if (isLeadAgent(msg.from)) {
-			this.recentLeadMessages.push({
-				id: contentMsg.id,
-				text: contentMsg.text,
-				timestamp: contentMsg.timestamp,
-			});
-			if (this.recentLeadMessages.length > 50) {
-				this.recentLeadMessages.shift();
-			}
-		}
-
 		return contentMsg;
-	}
-
-	private isInActiveThread(participants: string[]): boolean {
-		const key = [...participants].sort().join(':');
-		// Check recent events for an active thread with these participants
-		for (let i = this.allEvents.length - 1; i >= 0; i--) {
-			const ev = this.allEvents[i]!;
-			if (ev.type === 'thread-marker') {
-				const marker = ev as ThreadMarker;
-				const markerKey = [...marker.participants].sort().join(':');
-				if (markerKey === key) {
-					return marker.subtype === 'thread-start';
-				}
-			}
-		}
-		return false;
 	}
 
 	private findRecentMessageFrom(
@@ -1157,25 +1260,6 @@ export class EventProcessor {
 		return null;
 	}
 
-	private findLeadMessageAboutTask(
-		taskId: string,
-		taskSubject: string,
-		claimTimestamp: string,
-	): string | null {
-		// Look for a lead message within the claim window that references this task
-		for (let i = this.recentLeadMessages.length - 1; i >= 0; i--) {
-			const leadMsg = this.recentLeadMessages[i]!;
-			if (!isWithinWindow(leadMsg.timestamp, claimTimestamp, this.taskClaimWindowMs)) {
-				continue;
-			}
-			const text = leadMsg.text.toLowerCase();
-			if (text.includes(`#${taskId}`) || text.includes(taskSubject.toLowerCase())) {
-				return leadMsg.id;
-			}
-		}
-		return null;
-	}
-
 	private detectAcknowledgment(text: string): string | null {
 		const normalized = text.trim().toLowerCase().replace(/[.!?]+$/, '');
 		return ACK_PHRASES[normalized] ?? null;
@@ -1198,6 +1282,27 @@ export class EventProcessor {
 	}
 
 	// === Reaction inference helpers ===
+
+	/**
+	 * Pattern 1 👀 Seen & acting: if the given sender was recently the *recipient* of a DM
+	 * and is now sending a message within 15s, emit 👀 on the original DM.
+	 */
+	private checkDMSeenReaction(senderName: string, timestamp: string): ReactionEvent | null {
+		const pending = this.recentDMsAwaitingAck.get(senderName);
+		if (!pending) return null;
+		if (!isWithinWindow(pending.timestamp, timestamp, 15_000)) {
+			this.recentDMsAwaitingAck.delete(senderName);
+			return null;
+		}
+		this.recentDMsAwaitingAck.delete(senderName);
+		const agentColor = this.getAgentColor(senderName);
+		return this.makeReaction(pending.messageId, '👀', senderName, agentColor, timestamp, 'seen & acting');
+	}
+
+	/** Returns true if the text contains completion keywords — used for Pattern 4 📢. */
+	private isCompletionText(text: string): boolean {
+		return /\b(done|complete|completed|finished|ready|implemented|all passing|passing)\b/i.test(text);
+	}
 
 	/** Check if an agent message should trigger a nudge ack reaction (👍 on the nudge event). */
 	private checkNudgeAck(agentName: string, timestamp: string): ReactionEvent | null {
@@ -1229,7 +1334,7 @@ export class EventProcessor {
 	}
 
 	/** Get agent color from cache, recent events, or default to 'blue'. */
-	private getAgentColor(agentName: string): string {
+	getAgentColor(agentName: string): string {
 		// Fast path: O(1) cache lookup
 		const cached = this.agentColorCache.get(agentName);
 		if (cached !== undefined) {

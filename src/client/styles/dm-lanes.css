@@ -124,6 +124,41 @@
 	border-color: var(--border-strong);
 	color: var(--text-secondary);
 }
+/* "Continued below" placeholder for re-surfaced threads */
+.tc-continued-below {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 4px 28px;
+	cursor: pointer;
+	background: none;
+	border: none;
+	color: inherit;
+	font: inherit;
+}
+.tc-continued-below:hover .tc-continued-below-label {
+	color: var(--text-secondary);
+}
+.tc-continued-below-line {
+	flex: 1;
+	height: 0;
+	border-top: 1px dashed rgba(126, 146, 170, 0.2);
+}
+.tc-continued-below-label {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+	transition: color 0.15s;
+}
+
+/* Avatar pair layout in thread header */
+.tc-thread-avatars {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
 /* Single DM badge (1-message, no lane) */
 .tc-dm-badge {
 	display: inline-flex;

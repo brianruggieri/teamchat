@@ -62,7 +62,9 @@ describe("DM Thread Detection", () => {
 		);
 	});
 
-	test("creates thread-start marker for first DM in a pair", () => {
+	test("no thread-start marker emitted for DMs (Rule 7: markers suppressed)", () => {
+		// Rule 7: thread-start markers are suppressed — the DM message itself signals
+		// the thread start. ThreadBlock groups DMs by participants.
 		const dmEvent = fixtureEvents.find(
 			(e) => e.label === "Frontend DMs privacy about masking",
 		)!;
@@ -77,24 +79,23 @@ describe("DM Thread Detection", () => {
 		const threadMarkers = collector.events.filter(
 			(e) => e.type === "thread-marker",
 		) as ThreadMarker[];
-		expect(threadMarkers.length).toBeGreaterThanOrEqual(1);
-		expect(threadMarkers[0]!.subtype).toBe("thread-start");
-		expect(threadMarkers[0]!.participants).toEqual(
-			expect.arrayContaining(["frontend", "privacy"]),
-		);
+		// No thread-start markers emitted — DM message serves as the thread signal
+		expect(threadMarkers).toHaveLength(0);
+
+		// But the DM message IS emitted
+		const messages = collector.events.filter((e) => e.type === "message");
+		expect(messages).toHaveLength(1);
 	});
 
-	test("does not create duplicate thread-start for consecutive DMs in same thread", () => {
-		// First DM in the frontend↔privacy thread
+	test("consecutive DMs in same thread have no thread-start markers (Rule 7)", () => {
+		// Rule 7: thread-start markers are never emitted, even for new threads.
 		const dm1 = fixtureEvents.find(
 			(e) => e.label === "Frontend DMs privacy about masking",
 		)!;
-		// Second DM (privacy responds)
 		const dm2 = fixtureEvents.find(
 			(e) => e.label === "Privacy explains masking to frontend",
 		)!;
 
-		// Feed first DM
 		processor.processDelta({
 			type: "inbox",
 			agentName: "privacy",
@@ -102,7 +103,6 @@ describe("DM Thread Detection", () => {
 			current: [dm1.message],
 		});
 
-		// Feed second DM (response goes to frontend's inbox)
 		processor.processDelta({
 			type: "inbox",
 			agentName: "frontend",
@@ -110,15 +110,14 @@ describe("DM Thread Detection", () => {
 			current: [dm2.message],
 		});
 
-		const threadStarts = collector.events.filter(
-			(e) => e.type === "thread-marker" && (e as ThreadMarker).subtype === "thread-start",
+		const threadMarkers = collector.events.filter(
+			(e) => e.type === "thread-marker",
 		) as ThreadMarker[];
+		expect(threadMarkers).toHaveLength(0);
 
-		// Should only have 1 thread-start for this pair
-		const frontendPrivacyStarts = threadStarts.filter((t) =>
-			t.participants.includes("frontend") && t.participants.includes("privacy"),
-		);
-		expect(frontendPrivacyStarts).toHaveLength(1);
+		// Both DM messages should be emitted
+		const messages = collector.events.filter((e) => e.type === "message");
+		expect(messages).toHaveLength(2);
 	});
 
 	test("classifies qa→backend RBAC bug DM correctly", () => {

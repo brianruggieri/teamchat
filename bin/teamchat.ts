@@ -8,6 +8,7 @@ import { Journal } from '../src/server/journal.js';
 import { TeamChatServer } from '../src/server/server.js';
 import { loadReplaySource } from '../src/server/replay.js';
 import { runExport, runScan, type ExportArgs } from '../src/export/cli.js';
+import { HeartbeatWatcher } from '../src/server/heartbeat-watcher.js';
 
 // === Argument parsing ===
 
@@ -24,6 +25,7 @@ interface CliArgs {
 	version: boolean;
 	demo: boolean;
 	auto: boolean;
+	subagentDir: string | null;
 	// Export subcommand
 	subcommand: 'export' | 'scan' | 'capture' | 'report' | 'benchmark' | null;
 	subcommandArg: string | null;
@@ -47,6 +49,7 @@ function parseArgs(argv: string[]): CliArgs {
 		version: false,
 		demo: false,
 		auto: false,
+		subagentDir: null,
 		subcommand: null,
 		subcommandArg: null,
 		latest: false,
@@ -104,6 +107,9 @@ function parseArgs(argv: string[]): CliArgs {
 				break;
 			case '--auto':
 				args.auto = true;
+				break;
+			case '--subagent-dir':
+				args.subagentDir = argv[++i] ?? null;
 				break;
 			case '--latest':
 				args.latest = true;
@@ -178,6 +184,7 @@ OPTIONS:
   --port, -p <port>       Server port (default: 3456)
   --compact               Enable compact mode (compress short acks to reactions)
   --no-journal            Disable JSONL journaling
+  --subagent-dir <path>   Watch subagent JSONL files for heartbeat events
   --share                 Expose server on all interfaces (for sharing)
   --version, -v           Print version and exit
   --help, -h              Show this help message
@@ -506,6 +513,7 @@ function startTeamSession(
 	port: number,
 	compact: boolean,
 	noJournal: boolean,
+	subagentDir?: string | null,
 ): void {
 	const journal = new Journal(teamName, !noJournal);
 	const sessionStartedAt = Date.now();
@@ -576,6 +584,18 @@ function startTeamSession(
 	// Start watching for changes
 	watcher.start();
 
+	// Start heartbeat watcher if subagent directory is provided
+	let heartbeatWatcher: HeartbeatWatcher | null = null;
+	if (subagentDir) {
+		heartbeatWatcher = new HeartbeatWatcher(
+			subagentDir,
+			(heartbeat) => processor.injectEvent(heartbeat),
+			(name) => processor.getAgentColor(name),
+		);
+		heartbeatWatcher.start();
+		console.log(`Heartbeat watcher: ${subagentDir}`);
+	}
+
 	if (!noJournal) {
 		console.log(`Journal: ${journal.getFilePath()}`);
 	}
@@ -598,6 +618,7 @@ function startTeamSession(
 			presence: processor.getPresence(),
 		});
 
+		if (heartbeatWatcher) heartbeatWatcher.stop();
 		watcher.stop();
 		server.stop();
 		process.exit(0);
@@ -701,7 +722,7 @@ if (args.subcommand === 'export') {
 		console.error('  3. Or try: teamchat --replay --demo  (to see a demo session)');
 		process.exit(2);
 	}
-	startTeamSession(args.team, args.port, args.compact, args.noJournal);
+	startTeamSession(args.team, args.port, args.compact, args.noJournal, args.subagentDir);
 } else if (args.auto) {
 	const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? '~';
 	const teamsDir = path.join(homeDir, '.claude', 'teams');
